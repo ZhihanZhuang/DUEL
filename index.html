@@ -503,13 +503,14 @@ class Minion extends Entity {
         let enemy = game.getEnemyOf(this.owner);
         if (enemy && !enemy.dead) {
             this.shootTimer += dt;
-            if (this.shootTimer >= 3000) {
+            if (this.shootTimer >= 1500) { // 射速加快，从 3000ms 改为 1500ms
                 this.shootTimer = 0;
                 let cx = this.x + this.w/2; let cy = this.y + 25;
                 let ex = enemy.x + enemy.w/2; let ey = enemy.y + enemy.h/2;
                 let angle = Math.atan2(ey - cy, ex - cx);
                 let speed = 12;
-                game.projectiles.push(new Projectile(cx, cy, 6, 6, Math.cos(angle)*speed, Math.sin(angle)*speed, 10, this.owner, "#222")); // 1 WRD
+                // 子弹颜色从 "#222" 改为 "#FFFF00" (黄色)
+                game.projectiles.push(new Projectile(cx, cy, 6, 6, Math.cos(angle)*speed, Math.sin(angle)*speed, 10, this.owner, "#FFFF00")); // 1 WRD
                 game.particles.push(new Particle(cx + Math.cos(angle)*15, cy + Math.sin(angle)*15, "#FFA500", 0, 0, 100));
             }
         }
