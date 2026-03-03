@@ -416,7 +416,7 @@ class Minion extends Entity {
         this.hp = owner.maxHp * 0.1;
         this.maxHp = this.hp;
         this.shootTimer = Math.random() * 1000; // staggered shooting
-        this.color = "#777";
+        this.color = "#f4f4f4"; // White peasant robe
     }
     takeDamage(amt, attacker) {
         this.hp -= amt;
@@ -455,7 +455,7 @@ class Minion extends Entity {
             if (this.shootTimer >= 3000) {
                 this.shootTimer = 0;
                 // Calculate trajectory
-                let cx = this.x + this.w/2; let cy = this.y + 10;
+                let cx = this.x + this.w/2; let cy = this.y + 25; // Adjusted to new musket height
                 let ex = enemy.x + enemy.w/2; let ey = enemy.y + enemy.h/2;
                 let angle = Math.atan2(ey - cy, ex - cx);
                 let speed = 12;
@@ -466,17 +466,46 @@ class Minion extends Entity {
         }
     }
     draw(ctx) {
+        // Base Body (White peasant clothes)
         ctx.fillStyle = this.color;
         ctx.fillRect(this.x, this.y, this.w, this.h);
-        // Musket stick
+
+        // Obi (Belt)
+        ctx.fillStyle = "#333";
+        ctx.fillRect(this.x, this.y + 35, this.w, 6);
+
         let enemy = game.getEnemyOf(this.owner);
         let dir = (enemy && enemy.x < this.x) ? -1 : 1;
-        ctx.fillStyle = "#333";
-        ctx.fillRect(this.x + (dir>0?15:-25), this.y + 20, 45, 6);
+
+        // Face/Eye slit (under the hat)
+        ctx.fillStyle = "#111";
+        ctx.fillRect(this.x + (dir > 0 ? 22 : 8), this.y + 15, 5, 4);
+
+        // Japanese Peasant Hat (Kasa)
+        ctx.fillStyle = "#dcb274"; // Straw/bamboo color
+        ctx.beginPath();
+        ctx.moveTo(this.x + this.w / 2, this.y - 12); // Tip of hat
+        ctx.lineTo(this.x - 12, this.y + 8);          // Left brim
+        ctx.lineTo(this.x + this.w + 12, this.y + 8); // Right brim
+        ctx.fill();
         
-        // HP bar
-        ctx.fillStyle = "red"; ctx.fillRect(this.x, this.y - 8, this.w, 4);
-        ctx.fillStyle = "green"; ctx.fillRect(this.x, this.y - 8, this.w * (this.hp/this.maxHp), 4);
+        // Hat rim shadow for depth
+        ctx.strokeStyle = "#b58b4c";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(this.x - 12, this.y + 8);
+        ctx.lineTo(this.x + this.w + 12, this.y + 8);
+        ctx.stroke();
+
+        // Musket details
+        ctx.fillStyle = "#4a2e15"; // Wood stock
+        ctx.fillRect(this.x + (dir>0?10:-20), this.y + 25, 45, 5);
+        ctx.fillStyle = "#222"; // Metal barrel
+        ctx.fillRect(this.x + (dir>0?25:-20), this.y + 23, 30, 3);
+        
+        // HP bar (Moved higher to clear the new hat)
+        ctx.fillStyle = "red"; ctx.fillRect(this.x, this.y - 20, this.w, 4);
+        ctx.fillStyle = "green"; ctx.fillRect(this.x, this.y - 20, this.w * (this.hp/this.maxHp), 4);
     }
 }
 
