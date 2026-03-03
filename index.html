@@ -171,6 +171,12 @@
             color: #ffeb3b;
             margin-bottom: 20px;
         }
+        #btn-restart {
+            font-size: 1.2rem;
+            padding: 10px 30px;
+            flex: 0;
+            margin-top: 10px;
+        }
     </style>
 </head>
 <body>
@@ -405,7 +411,7 @@ class Projectile extends Entity {
 
 class Minion extends Entity {
     constructor(owner, x, y) {
-        super(x, y, 20, 40);
+        super(x, y, 35, 65);
         this.owner = owner;
         this.hp = owner.maxHp * 0.1;
         this.maxHp = this.hp;
@@ -466,7 +472,7 @@ class Minion extends Entity {
         let enemy = game.getEnemyOf(this.owner);
         let dir = (enemy && enemy.x < this.x) ? -1 : 1;
         ctx.fillStyle = "#333";
-        ctx.fillRect(this.x + (dir>0?10:-20), this.y + 10, 30, 4);
+        ctx.fillRect(this.x + (dir>0?15:-25), this.y + 20, 45, 6);
         
         // HP bar
         ctx.fillStyle = "red"; ctx.fillRect(this.x, this.y - 8, this.w, 4);
@@ -663,10 +669,7 @@ class Fighter extends Entity {
             // Dynamic Friction (Slippery platform support)
             let friction = 0.25;
             if (this.currentPlatform && this.currentPlatform.type === 'center') {
-                this.takeDamage(10 * (dt/1000), null, true); // Poison: 1 WRD (10 dmg) per second
-                if (Math.random() < 0.2) {
-                    game.particles.push(new Particle(this.x + Math.random()*this.w, this.y + this.h, "#9932CC", 0, -1, 150));
-                }
+                friction = 0.03; // Slippery ice-like friction
             }
             
             // Smooth Friction (Allows Knockback to feel natural)
@@ -688,11 +691,22 @@ class Fighter extends Entity {
                 if (!this.hasHit && this.isMeleeAttack()) {
                     let hitBox = this.getMeleeHitbox();
                     let enemy = game.getEnemyOf(this);
+                    let hitAnything = false;
+                    
                     if (!enemy.dead && checkAABB(hitBox, enemy)) {
                         enemy.takeDamage(this.getMeleeDamage(), this);
                         if (this.heroName === 'Macu' && this.buffs.battleCry > 0) enemy.buffs.poison = 30000;
-                        this.hasHit = true;
+                        hitAnything = true;
                     }
+                    
+                    for (let m of game.minions) {
+                        if (m.owner !== this && !m.dead && checkAABB(hitBox, m)) {
+                            m.takeDamage(this.getMeleeDamage(), this);
+                            hitAnything = true;
+                        }
+                    }
+                    
+                    if (hitAnything) this.hasHit = true;
                 }
                 
                 if (this.stateTimer <= 0) {
@@ -1467,13 +1481,10 @@ class Game {
         // Platforms
         for (let plat of PLATFORMS) {
             if (plat.type === 'center') {
-                this.ctx.fillStyle = "#5D3FD3"; // Poison/Slippery color (purple)
+                this.ctx.fillStyle = "#add8e6"; // Ice color (light blue)
                 this.ctx.fillRect(plat.x, plat.y, plat.w, plat.h);
-                this.ctx.fillStyle = "#301934";
+                this.ctx.fillStyle = "#87cefa";
                 this.ctx.fillRect(plat.x, plat.y + plat.h, plat.w, 10);
-                
-                // Poison mist visual
-                if (Math.random() < 0.1) this.particles.push(new Particle(plat.x + Math.random()*plat.w, plat.y - 5, "#9932CC", 0, -0.5, 300));
             } else {
                 this.ctx.fillStyle = "#5c4033"; // Wood
                 this.ctx.fillRect(plat.x, plat.y, plat.w, plat.h);
