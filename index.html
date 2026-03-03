@@ -273,11 +273,11 @@ let PLATFORMS = [
 const HEROES = {
     Hason: {
         name: "Hason", desc: "Cowboy with Colt Revolver",
-        color: "#8B4513", maxHp: 750, speed: 5, jump: 15, width: 40, height: 70, superCD: 10000
+        color: "#8B4513", maxHp: 750, speed: 5, jump: 15, width: 40, height: 70, superCD: 45000
     },
     Hunter: {
         name: "Hunter", desc: "Pirate with Musket & Great Sword",
-        color: "#008080", maxHp: 750, speed: 4.5, jump: 14, width: 45, height: 70, superCD: 13000
+        color: "#008080", maxHp: 750, speed: 4.5, jump: 14, width: 45, height: 70, superCD: 45000
     },
     Macu: {
         name: "Macu", desc: "Ainu Warrior with Long Spear",
@@ -285,7 +285,7 @@ const HEROES = {
     },
     Willi: {
         name: "Willi", desc: "Ninja with Throwing Knives",
-        color: "#2F4F4F", maxHp: 500, speed: 6.5, jump: 16, width: 35, height: 65, superCD: 12000
+        color: "#2F4F4F", maxHp: 500, speed: 6.5, jump: 16, width: 35, height: 65, superCD: 45000
     },
     Artu: {
         name: "Artu", desc: "Daimyo with Great Armor & Ashigaru",
@@ -789,7 +789,7 @@ class Fighter extends Entity {
 
         if (this.heroName === 'Hason' && this.hasonAmmo < 6) {
             this.hasonRecharge += dt;
-            let rechargeTime = this.hasonAmmo === 0 ? 2000 : 800;
+            let rechargeTime = 1500; // 统一调整为 1.5 秒
             if (this.hasonRecharge >= rechargeTime) {
                 this.hasonAmmo++;
                 this.hasonRecharge = 0;
@@ -1069,7 +1069,7 @@ class Fighter extends Entity {
         }
         else if (this.heroName === 'Hunter' && this.hunterWeapon === 'musket') {
             game.projectiles.push(new Projectile(px, py, 12, 12, this.facing * 25, 0, 17, this, "#222", "homing_bullet")); // 追踪弹+17伤害(1.7 WRD)
-            this.hunterMusketCD = 3000; // 冷却降低至3秒
+            this.hunterMusketCD = 1000; // 冷却降低至1秒
             game.particles.push(new Particle(px, py, "#FFA500", this.facing*5, -2, 150));
         }
     }
@@ -1743,4 +1743,3 @@ window.dispatchEvent(new Event('resize'));
 </script>
 </body>
 </html>
-
