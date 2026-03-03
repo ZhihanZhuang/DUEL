@@ -156,6 +156,7 @@
             border: 1px solid #111;
         }
         .health-bar { height: 100%; background: #4caf50; transition: width 0.1s; }
+        .horse-bar { height: 100%; background: #8B4513; transition: width 0.1s; }
         .super-bar { height: 100%; background: #2196f3; transition: width 0.1s; }
         .super-bar.ready { background: #ffeb3b; animation: pulse 1s infinite alternate; }
         
@@ -189,12 +190,14 @@
         <div id="hud-p1" class="hud-player">
             <div class="hud-name" id="p1-name">P1 Name</div>
             <div class="bar-container"><div id="p1-hp" class="health-bar" style="width: 100%"></div></div>
+            <div class="bar-container hidden" id="p1-horse-container"><div id="p1-horse-hp" class="horse-bar" style="width: 100%"></div></div>
             <div class="bar-container" style="height:10px;"><div id="p1-super" class="super-bar" style="width: 0%"></div></div>
             <div class="status-text" id="p1-status"></div>
         </div>
         <div id="hud-p2" class="hud-player">
             <div class="hud-name" id="p2-name">P2 Name</div>
             <div class="bar-container"><div id="p2-hp" class="health-bar" style="width: 100%; float: right;"></div></div>
+            <div class="bar-container hidden" id="p2-horse-container"><div id="p2-horse-hp" class="horse-bar" style="width: 100%; float: right;"></div></div>
             <div class="bar-container" style="height:10px;"><div id="p2-super" class="super-bar" style="width: 0%; float: right;"></div></div>
             <div class="status-text" id="p2-status"></div>
         </div>
@@ -213,7 +216,7 @@
                 <div class="controls-info">
                     Move: <span>W, A, S, D</span><br>
                     Attack: <span>Space</span><br>
-                    Super Skill (45s): <span>E</span><br>
+                    Super Skill: <span>E</span><br>
                     Switch Weapon: <span>T</span> (Hunter Only)
                 </div>
             </div>
@@ -225,7 +228,7 @@
                 <div class="controls-info">
                     Move: <span>Arrows (↑, ←, ↓, →)</span><br>
                     Attack: <span>Num 9</span><br>
-                    Super Skill (45s): <span>Num Enter</span><br>
+                    Super Skill: <span>Num Enter</span><br>
                     Switch Weapon: <span>P</span> (Hunter Only)
                 </div>
             </div>
@@ -258,7 +261,7 @@ const GRAVITY = 0.6;
 let GROUND_Y = CANVAS_H - 100;
 
 let PLATFORMS = [
-    // Center: Slippery and Poisonous
+    // Center: Slippery Ice
     { x: CANVAS_W / 2 - 200, y: GROUND_Y - 180, w: 400, h: 20, type: 'center' },
     // Left side high
     { x: Math.max(50, CANVAS_W / 4 - 150), y: GROUND_Y - 350, w: 250, h: 20, type: 'side' },
@@ -266,29 +269,31 @@ let PLATFORMS = [
     { x: Math.min(CANVAS_W - 300, CANVAS_W * (3/4) - 100), y: GROUND_Y - 350, w: 250, h: 20, type: 'side' }
 ];
 
-const SUPER_COOLDOWN = 45000; // 45 seconds
-
 // Stats Balanced around WRD (1 WRD = 10 Game Units)
 const HEROES = {
     Hason: {
-        name: "Hason", desc: "Cowboy with Colt Revolver & Dynamite",
-        color: "#8B4513", maxHp: 750, speed: 5, jump: 15, width: 40, height: 70
+        name: "Hason", desc: "Cowboy with Colt Revolver",
+        color: "#8B4513", maxHp: 750, speed: 5, jump: 15, width: 40, height: 70, superCD: 45000
     },
     Hunter: {
         name: "Hunter", desc: "Pirate with Musket & Great Sword",
-        color: "#008080", maxHp: 750, speed: 4.5, jump: 14, width: 45, height: 70
+        color: "#008080", maxHp: 750, speed: 4.5, jump: 14, width: 45, height: 70, superCD: 45000
     },
     Macu: {
-        name: "Macu", desc: "Ainu Warrior with Long Spear & Poison",
-        color: "#2E8B57", maxHp: 900, speed: 4, jump: 16, width: 40, height: 75 // Jump same as Willi
+        name: "Macu", desc: "Ainu Warrior with Long Spear",
+        color: "#2E8B57", maxHp: 900, speed: 4, jump: 16, width: 40, height: 75, superCD: 45000
     },
     Willi: {
-        name: "Willi", desc: "Ninja with Throwing Knives & Invisibility",
-        color: "#2F4F4F", maxHp: 500, speed: 6.5, jump: 16, width: 35, height: 65
+        name: "Willi", desc: "Ninja with Throwing Knives",
+        color: "#2F4F4F", maxHp: 500, speed: 6.5, jump: 16, width: 35, height: 65, superCD: 45000
     },
     Artu: {
-        name: "Artu", desc: "Daimyo with Great Armor & Ashigaru Summons",
-        color: "#8B0000", maxHp: 1000, speed: 3.5, jump: 13, width: 50, height: 75
+        name: "Artu", desc: "Daimyo with Great Armor & Ashigaru",
+        color: "#8B0000", maxHp: 1000, speed: 3.5, jump: 13, width: 50, height: 75, superCD: 65000 // +20s CD
+    },
+    Duke: {
+        name: "Duke", desc: "Cavalry Rider with Lance & Handgun",
+        color: "#4682B4", maxHp: 750, speed: 6.5, jump: 12, width: 45, height: 70, superCD: 20000 // Fast CD
     }
 };
 
@@ -321,8 +326,8 @@ class Entity {
 }
 
 class Particle extends Entity {
-    constructor(x, y, color, vx, vy, life) {
-        super(x, y, 4, 4);
+    constructor(x, y, color, vx, vy, life, size=4) {
+        super(x, y, size, size);
         this.color = color;
         this.vx = vx; this.vy = vy;
         this.life = life; this.maxLife = life;
@@ -346,7 +351,7 @@ class Projectile extends Entity {
         super(x, y, w, h);
         this.vx = vx; this.vy = vy;
         this.damage = damage; this.owner = owner;
-        this.color = color; this.type = type; // normal, dynamite, etc.
+        this.color = color; this.type = type; 
         this.timer = 0;
     }
     update(dt) {
@@ -362,7 +367,7 @@ class Projectile extends Entity {
             this.timer += dt;
             if (this.timer >= 1500) { // Explode
                 this.dead = true;
-                game.createExplosion(this.x + this.w/2, this.y + this.h/2, 120, 80, this.owner);
+                game.createExplosion(this.x + this.w/2, this.y + this.h/2, 120, 150, this.owner);
             }
         } else if (this.type === "knife") {
             this.vy += GRAVITY * 0.1; // slight drop
@@ -373,12 +378,13 @@ class Projectile extends Entity {
             this.dead = true;
         }
 
-        // Collision with enemy player or minions (if normal projectile)
+        // Collision with enemy player or minions
         if (!this.dead && this.type !== "dynamite") {
             let targets = [game.getEnemyOf(this.owner), ...game.minions.filter(m => m.owner !== this.owner)];
             for (let t of targets) {
                 if (!t.dead && checkAABB(this, t)) {
-                    t.takeDamage(this.damage, this.owner);
+                    let noKnockback = (this.type === "bullet"); // Duke's Handgun has no knockback exaggeration
+                    t.takeDamage(this.damage, this.owner, false, noKnockback);
                     this.dead = true;
                     for(let i=0; i<5; i++) game.particles.push(new Particle(this.x, this.y, this.color, (Math.random()-0.5)*5, (Math.random()-0.5)*5, 300));
                     break;
@@ -391,7 +397,6 @@ class Projectile extends Entity {
         if (this.type === "dynamite") {
             ctx.fillStyle = "#ff3333";
             ctx.fillRect(this.x, this.y, this.w, this.h);
-            // fuse
             ctx.fillStyle = "#ffff00";
             ctx.fillRect(this.x + this.w/2, this.y - 5, 2, 5);
         } else if (this.type === "knife") {
@@ -403,6 +408,9 @@ class Projectile extends Entity {
             ctx.moveTo(-10, -2); ctx.lineTo(10, 0); ctx.lineTo(-10, 2); ctx.fill();
             ctx.restore();
             this.timer += 16;
+        } else if (this.type === "bullet") {
+            ctx.fillStyle = "#fff"; // Bright fast bullet
+            ctx.fillRect(this.x, this.y, this.w, this.h);
         } else {
             ctx.fillRect(this.x, this.y, this.w, this.h);
         }
@@ -413,9 +421,9 @@ class Minion extends Entity {
     constructor(owner, x, y) {
         super(x, y, 35, 65);
         this.owner = owner;
-        this.hp = owner.maxHp * 0.1;
+        this.hp = 30; // 3 WRD
         this.maxHp = this.hp;
-        this.shootTimer = Math.random() * 1000; // staggered shooting
+        this.shootTimer = Math.random() * 1000;
         this.color = "#f4f4f4"; // White peasant robe
     }
     takeDamage(amt, attacker) {
@@ -426,17 +434,14 @@ class Minion extends Entity {
         }
     }
     update(dt) {
-        // Gravity
         this.vy += GRAVITY;
         this.y += this.vy;
         
-        // Ground Collision
         if (this.y + this.h >= GROUND_Y) {
             this.y = GROUND_Y - this.h;
             this.vy = 0;
         }
         
-        // Platform Collision
         if (this.vy > 0) {
             for (let plat of PLATFORMS) {
                 if (this.y + this.h - this.vy <= plat.y && this.y + this.h >= plat.y) {
@@ -448,48 +453,39 @@ class Minion extends Entity {
             }
         }
 
-        // Aim and shoot
         let enemy = game.getEnemyOf(this.owner);
         if (enemy && !enemy.dead) {
             this.shootTimer += dt;
             if (this.shootTimer >= 3000) {
                 this.shootTimer = 0;
-                // Calculate trajectory
-                let cx = this.x + this.w/2; let cy = this.y + 25; // Adjusted to new musket height
+                let cx = this.x + this.w/2; let cy = this.y + 25;
                 let ex = enemy.x + enemy.w/2; let ey = enemy.y + enemy.h/2;
                 let angle = Math.atan2(ey - cy, ex - cx);
                 let speed = 12;
                 game.projectiles.push(new Projectile(cx, cy, 6, 6, Math.cos(angle)*speed, Math.sin(angle)*speed, 10, this.owner, "#222")); // 1 WRD
-                // Muzzle flash
                 game.particles.push(new Particle(cx + Math.cos(angle)*15, cy + Math.sin(angle)*15, "#FFA500", 0, 0, 100));
             }
         }
     }
     draw(ctx) {
-        // Base Body (White peasant clothes)
         ctx.fillStyle = this.color;
         ctx.fillRect(this.x, this.y, this.w, this.h);
-
-        // Obi (Belt)
         ctx.fillStyle = "#333";
         ctx.fillRect(this.x, this.y + 35, this.w, 6);
 
         let enemy = game.getEnemyOf(this.owner);
         let dir = (enemy && enemy.x < this.x) ? -1 : 1;
 
-        // Face/Eye slit (under the hat)
         ctx.fillStyle = "#111";
         ctx.fillRect(this.x + (dir > 0 ? 22 : 8), this.y + 15, 5, 4);
 
-        // Japanese Peasant Hat (Kasa)
-        ctx.fillStyle = "#dcb274"; // Straw/bamboo color
+        ctx.fillStyle = "#dcb274";
         ctx.beginPath();
-        ctx.moveTo(this.x + this.w / 2, this.y - 12); // Tip of hat
-        ctx.lineTo(this.x - 12, this.y + 8);          // Left brim
-        ctx.lineTo(this.x + this.w + 12, this.y + 8); // Right brim
+        ctx.moveTo(this.x + this.w / 2, this.y - 12);
+        ctx.lineTo(this.x - 12, this.y + 8);
+        ctx.lineTo(this.x + this.w + 12, this.y + 8);
         ctx.fill();
         
-        // Hat rim shadow for depth
         ctx.strokeStyle = "#b58b4c";
         ctx.lineWidth = 2;
         ctx.beginPath();
@@ -497,13 +493,11 @@ class Minion extends Entity {
         ctx.lineTo(this.x + this.w + 12, this.y + 8);
         ctx.stroke();
 
-        // Musket details
-        ctx.fillStyle = "#4a2e15"; // Wood stock
+        ctx.fillStyle = "#4a2e15";
         ctx.fillRect(this.x + (dir>0?10:-20), this.y + 25, 45, 5);
-        ctx.fillStyle = "#222"; // Metal barrel
+        ctx.fillStyle = "#222";
         ctx.fillRect(this.x + (dir>0?25:-20), this.y + 23, 30, 3);
         
-        // HP bar (Moved higher to clear the new hat)
         ctx.fillStyle = "red"; ctx.fillRect(this.x, this.y - 20, this.w, 4);
         ctx.fillStyle = "green"; ctx.fillRect(this.x, this.y - 20, this.w * (this.hp/this.maxHp), 4);
     }
@@ -513,7 +507,7 @@ class Hurricane extends Entity {
     constructor(owner) {
         super(CANVAS_W/2 - 50, GROUND_Y - 300, 100, 300);
         this.owner = owner;
-        this.timer = 15000; // 15 seconds
+        this.timer = 15000;
         this.tickTimer = 0;
     }
     update(dt) {
@@ -521,16 +515,14 @@ class Hurricane extends Entity {
         if (this.timer <= 0) this.dead = true;
         
         this.tickTimer += dt;
-        if (this.tickTimer >= 200) { // damage every 0.2s
+        if (this.tickTimer >= 200) {
             this.tickTimer = 0;
             let enemy = game.getEnemyOf(this.owner);
             if (checkAABB(this, enemy)) {
-                enemy.takeDamage(0.6, this.owner, true); // 0.6 per tick * 5 ticks = 3 dmg/sec (0.3 WRD/s)
-                // Apply slow is handled in Player update
+                enemy.takeDamage(0.6, this.owner, true);
             }
         }
         
-        // Visual spin
         if(Math.random() < 0.3) {
             game.particles.push(new Particle(this.x + Math.random()*this.w, this.y + Math.random()*this.h, "#aaddff", (Math.random()-0.5)*4, -Math.random()*5, 400));
         }
@@ -538,7 +530,6 @@ class Hurricane extends Entity {
     draw(ctx) {
         ctx.globalAlpha = 0.5;
         ctx.fillStyle = "#88ccff";
-        // Draw tornado shape loosely
         ctx.beginPath();
         ctx.moveTo(this.x, this.y);
         ctx.lineTo(this.x + this.w, this.y);
@@ -568,50 +559,81 @@ class Fighter extends Entity {
         
         this.isGrounded = false;
         
+        this.superCooldownMax = stats.superCD;
         this.superCooldown = 0; 
         this.stunTimer = 0;
         
-        // Advanced Platforming & Combat States
         this.coyoteTime = 0;
         this.jumpBuffer = 0;
-        this.maxJumps = heroName === 'Willi' ? 2 : 1; // Willi gets double jump
+        this.maxJumps = heroName === 'Willi' ? 2 : 1;
         this.jumpsLeft = this.maxJumps;
         this.currentPlatform = null;
         
-        this.aiIntent = { left: false, right: false }; // Used for AI control
+        this.aiIntent = { left: false, right: false };
         
-        this.attackState = 'idle'; // idle, windup, active, recovery
+        this.attackState = 'idle';
         this.stateTimer = 0;
-        this.maxStateTimer = 0; // Used to track progress of current state
+        this.maxStateTimer = 0;
         this.hasHit = false;
         
-        // Character specific states
-        this.buffs = { poison: 0, battleCry: 0, shade: 0, hurricaneSlow: false };
+        // Status Effects & Character Specifics
+        this.buffs = { poison: 0, battleCry: 0, shade: 0, dizzy: 0, hurricaneSlow: false };
         this.hasonAmmo = 6; this.hasonRecharge = 0;
-        this.hunterWeapon = 'musket'; // 'musket' or 'sword'
+        this.hasonSuperCharges = 0;
+        this.hasonSuperWindow = 0;
+        this.hunterWeapon = 'musket';
         this.hunterMusketCD = 0;
+        
+        // Duke Mechanics (Phase 1)
+        if (this.heroName === 'Duke') {
+            this.isMounted = true;
+            this.maxHorseHp = 500; // 50 WRD
+            this.horseHp = 500;
+            this.runTimer = 0; // Tracks consecutive running time
+            // Hitbox adjustment for horse
+            this.w = 70;
+            this.h = 80;
+        }
     }
 
-    takeDamage(amt, attacker, isDoT = false) {
+    takeDamage(amt, attacker, isDoT = false, noKnockback = false) {
         if (this.dead) return;
         
-        // Artu damage reduction
         if (this.heroName === 'Artu') amt *= 0.9;
-        // Macu battlecry buff on attacker
         if (attacker && attacker.buffs && attacker.buffs.battleCry > 0) amt *= 1.5;
 
+        // Duke Multi-layer HP Logic
+        if (this.heroName === 'Duke' && this.isMounted) {
+            this.horseHp -= amt;
+            
+            // Hit Sparks
+            for(let i=0; i<6; i++) {
+                game.particles.push(new Particle(this.x+this.w/2, this.y+this.h/2, "#FFF", (Math.random()-0.5)*12, (Math.random()-0.5)*12, 250));
+            }
+
+            if (this.horseHp <= 0) {
+                this.isMounted = false;
+                this.horseHp = 0;
+                this.buffs.dizzy = 5000; // Duke dizzy for 5s upon dismount
+                this.baseSpeed = 4.5; // Reduced speed off horse
+                this.w = 45; // Shrink hitbox back to normal
+                this.h = 70;
+                // Massive horse death particles
+                for(let i=0; i<30; i++) game.particles.push(new Particle(this.x, this.y+40, "#8B4513", (Math.random()-0.5)*20, -Math.random()*15, 800, 8));
+            }
+            return; // Exit early to prevent Duke's main HP from taking overkill damage
+        }
+
         this.hp -= amt;
-        this.stunTimer = 150; // brief hit stun
+        this.stunTimer = 150;
         
-        // Combat Weight: Knockback & Hitstop (Skip for DoTs like Poison/Hurricane)
-        if (!isDoT) {
+        if (!isDoT && !noKnockback) {
             let direction = attacker ? (this.x + this.w/2 < attacker.x + attacker.w/2 ? -1 : 1) : (this.facing === 1 ? -1 : 1);
-            this.vx = direction * (amt * 0.5); // Dynamic Knockback based on damage
+            this.vx = direction * (amt * 0.5);
             this.vy = -Math.min(amt * 0.3, 10);
-            game.hitstop = 60; // GLOBAL HITSTOP: FREEZE THE GAME BRIEFLY
+            game.hitstop = 60;
         }
         
-        // Hit Sparks
         for(let i=0; i<6; i++) {
             let sparkColors = ["#FFA500", "#FFD700", "#FFFFFF"];
             let sColor = sparkColors[Math.floor(Math.random() * sparkColors.length)];
@@ -628,15 +650,22 @@ class Fighter extends Entity {
     update(dt) {
         if (this.dead) return;
 
-        // Apply Buffs/Debuffs
         let currentSpeed = this.baseSpeed;
         let currentJump = this.baseJump;
         
+        if (this.buffs.dizzy > 0) {
+            this.buffs.dizzy -= dt;
+            // Interrupt active attacks if dizzied
+            if (this.attackState !== 'idle') this.attackState = 'idle';
+        }
+        
         if (this.buffs.poison > 0) {
             this.buffs.poison -= dt;
-            currentSpeed *= 0.6; // slow
+            if (!(this.heroName === 'Duke' && this.isMounted && this.runTimer > 0 && this.runTimer <= 3000)) {
+                currentSpeed *= 0.6;
+            }
             if (Math.floor(this.buffs.poison/1000) !== Math.floor((this.buffs.poison+dt)/1000)) {
-                this.takeDamage(2, null, true); // 2 dmg per sec (DoT)
+                this.takeDamage(2, null, true);
             }
             if(Math.random()<0.1) game.particles.push(new Particle(this.x+this.w/2, this.y, "#00ff00", 0, -2, 300));
         }
@@ -649,24 +678,25 @@ class Fighter extends Entity {
         this.buffs.hurricaneSlow = false;
         if (game.hurricane && !game.hurricane.dead && game.hurricane.owner !== this) {
             if (checkAABB(this, game.hurricane)) {
-                this.buffs.hurricaneSlow = true;
-                currentSpeed *= 0.4;
+                if (!(this.heroName === 'Duke' && this.isMounted && this.runTimer > 0 && this.runTimer <= 3000)) {
+                    this.buffs.hurricaneSlow = true;
+                    currentSpeed *= 0.4;
+                }
             }
         }
 
-        // Timers
         if (this.superCooldown > 0) this.superCooldown -= dt;
         if (this.stunTimer > 0) this.stunTimer -= dt;
         if (this.hunterMusketCD > 0) this.hunterMusketCD -= dt;
 
-        // Jump Buffering (Queues a jump if pressed right before landing)
-        if (keysPressed[this.controls.jump]) {
-            this.jumpBuffer = 150;
-        } else if (this.jumpBuffer > 0) {
-            this.jumpBuffer -= dt;
+        if (this.hasonSuperWindow > 0) {
+            this.hasonSuperWindow -= dt;
+            if (this.hasonSuperWindow <= 0) this.hasonSuperCharges = 0;
         }
 
-        // Coyote Time Tracking
+        if (keysPressed[this.controls.jump]) this.jumpBuffer = 150;
+        else if (this.jumpBuffer > 0) this.jumpBuffer -= dt;
+
         if (this.isGrounded) {
             this.coyoteTime = 100;
             this.jumpsLeft = this.maxJumps;
@@ -674,10 +704,9 @@ class Fighter extends Entity {
             this.coyoteTime -= dt;
         }
 
-        // Hason Ammo Recharge
         if (this.heroName === 'Hason' && this.hasonAmmo < 6) {
             this.hasonRecharge += dt;
-            let rechargeTime = this.hasonAmmo === 0 ? 2000 : 800; // longer if empty
+            let rechargeTime = this.hasonAmmo === 0 ? 2000 : 800;
             if (this.hasonRecharge >= rechargeTime) {
                 this.hasonAmmo++;
                 this.hasonRecharge = 0;
@@ -685,8 +714,11 @@ class Fighter extends Entity {
         }
 
         // --- Movement & Attack State Machine ---
-        if (this.stunTimer <= 0) {
-            let targetVx = 0;
+        // Dizzy completely overrides movement intent
+        let canAct = (this.stunTimer <= 0 && this.buffs.dizzy <= 0);
+
+        let targetVx = 0;
+        if (canAct) {
             if (keys[this.controls.left]) {
                 targetVx = -currentSpeed;
                 this.facing = -1;
@@ -695,28 +727,40 @@ class Fighter extends Entity {
                 this.facing = 1;
             }
             
-            // Dynamic Friction (Slippery platform support)
-            let friction = 0.25;
-            if (this.currentPlatform && this.currentPlatform.type === 'center') {
-                friction = 0.03; // Slippery ice-like friction
+            // Duke Running State logic
+            if (this.heroName === 'Duke' && this.isMounted) {
+                if ((keys[this.controls.left] || keys[this.controls.right]) && this.attackState === 'idle') {
+                    this.runTimer += dt;
+                } else {
+                    this.runTimer = 0;
+                }
             }
-            
-            // Smooth Friction (Allows Knockback to feel natural)
-            this.vx += (targetVx - this.vx) * friction;
+        } else {
+            // Cannot run while dizzy/stunned
+            if (this.heroName === 'Duke') this.runTimer = 0;
+        }
 
-            // Attack Phases Machine
+        let friction = 0.25;
+        if (this.currentPlatform && this.currentPlatform.type === 'center') {
+            friction = 0.03; // Ice
+        }
+        
+        if (!canAct) friction = 0.1; // slide slightly when dizzied
+        
+        this.vx += (targetVx - this.vx) * friction;
+
+        if (canAct) {
             if (this.attackState === 'windup') {
                 this.stateTimer -= dt;
                 if (this.stateTimer <= 0) {
                     this.attackState = 'active';
-                    this.stateTimer = 150; // Active frames duration
+                    this.stateTimer = 150;
                     this.maxStateTimer = 150;
                     this.executeActiveAttack();
                 }
             } else if (this.attackState === 'active') {
                 this.stateTimer -= dt;
                 
-                // Melee Collision Check
                 if (!this.hasHit && this.isMeleeAttack()) {
                     let hitBox = this.getMeleeHitbox();
                     let enemy = game.getEnemyOf(this);
@@ -725,6 +769,7 @@ class Fighter extends Entity {
                     if (!enemy.dead && checkAABB(hitBox, enemy)) {
                         enemy.takeDamage(this.getMeleeDamage(), this);
                         if (this.heroName === 'Macu' && this.buffs.battleCry > 0) enemy.buffs.poison = 30000;
+                        if (this.heroName === 'Duke' && this.isMounted) enemy.buffs.dizzy = 3000; // Duke Lance dizzy
                         hitAnything = true;
                     }
                     
@@ -734,55 +779,39 @@ class Fighter extends Entity {
                             hitAnything = true;
                         }
                     }
-                    
                     if (hitAnything) this.hasHit = true;
                 }
                 
                 if (this.stateTimer <= 0) {
                     this.attackState = 'recovery';
-                    this.stateTimer = 250; // Recovery frames duration
+                    this.stateTimer = 250;
                     this.maxStateTimer = 250;
                 }
             } else if (this.attackState === 'recovery') {
                 this.stateTimer -= dt;
-                if (this.stateTimer <= 0) {
-                    this.attackState = 'idle';
-                }
+                if (this.stateTimer <= 0) this.attackState = 'idle';
             }
 
-            // --- Actions ---
             if (keysPressed[this.controls.switch] && this.heroName === 'Hunter') {
                 this.hunterWeapon = this.hunterWeapon === 'musket' ? 'sword' : 'musket';
             }
             if (keysPressed[this.controls.attack] && this.attackState === 'idle') {
                 this.performAttack();
             }
-            if (keysPressed[this.controls.super] && this.superCooldown <= 0) {
+            if (keysPressed[this.controls.super] && (this.superCooldown <= 0 || (this.heroName === 'Hason' && this.hasonSuperCharges > 0))) {
                 this.performSuper();
             }
-        } else {
-            // Stunned Friction
-            this.vx *= 0.9;
         }
 
-        // --- Vertical Physics ---
         this.vy += GRAVITY;
-        
-        // Fast Fall (Drop faster than you rise)
-        if (this.vy > 0) {
-            this.vy += GRAVITY * 0.4;
-        }
+        if (this.vy > 0) this.vy += GRAVITY * 0.4;
 
-        // Variable Jump Height (Short Hop)
-        if (!keys[this.controls.jump] && this.vy < 0) {
-            this.vy *= 0.8; // Cut upward momentum if jump released
-        }
+        if (!keys[this.controls.jump] && this.vy < 0) this.vy *= 0.8;
 
-        // Execute Jump (Consumes Buffer, respects Coyote Time & Multi-jumps)
-        if (this.jumpBuffer > 0 && this.stunTimer <= 0) {
+        if (this.jumpBuffer > 0 && canAct) {
             if (this.coyoteTime > 0 || this.jumpsLeft > 0) {
-                if (this.coyoteTime <= 0) this.jumpsLeft--; // Used air jump
-                else this.coyoteTime = 0; // Consumed ground jump
+                if (this.coyoteTime <= 0) this.jumpsLeft--;
+                else this.coyoteTime = 0;
                 
                 this.vy = -currentJump;
                 this.isGrounded = false;
@@ -795,26 +824,22 @@ class Fighter extends Entity {
         this.x += this.vx;
         this.y += this.vy;
 
-        // Screen bounds
         if (this.x < 0) this.x = 0;
         if (this.x + this.w > CANVAS_W) this.x = CANVAS_W - this.w;
 
         this.isGrounded = false;
         this.currentPlatform = null;
 
-        // Ground collision
         if (this.y + this.h >= GROUND_Y) {
             this.y = GROUND_Y - this.h;
             this.vy = 0;
             this.isGrounded = true;
         }
 
-        // Platforms collision (only when falling)
         if (this.vy > 0) {
             for (let plat of PLATFORMS) {
                 if (this.y + this.h - this.vy <= plat.y && this.y + this.h >= plat.y) {
                     if (this.x + this.w > plat.x && this.x < plat.x + plat.w) {
-                        // allow falling through if holding down (S or DownArrow)
                         let dropKey = this.isP1 ? 'KeyS' : 'ArrowDown';
                         if (!keys[dropKey]) {
                             this.y = plat.y - this.h;
@@ -836,9 +861,10 @@ class Fighter extends Entity {
 
     getMeleeHitbox() {
         let range = 50; let yOffset = 10; let h = 40;
-        if (this.heroName === 'Macu') range = 100; // Long spear
-        if (this.heroName === 'Hunter' && this.hunterWeapon === 'sword') range = 70; // Great sword
-        if (this.heroName === 'Artu') range = 65;
+        if (this.heroName === 'Macu') range = 100;
+        if (this.heroName === 'Hunter' && this.hunterWeapon === 'sword') range = 70;
+        if (this.heroName === 'Artu' || (this.heroName === 'Duke' && !this.isMounted)) range = 65;
+        if (this.heroName === 'Duke' && this.isMounted) range = 90; // Long lance charge
         
         return {
             x: this.facing === 1 ? this.x + this.w : this.x - range,
@@ -849,375 +875,359 @@ class Fighter extends Entity {
     }
 
     getMeleeDamage() {
+        if (this.heroName === 'Duke' && this.isMounted) return 30; // 3 WRD
         if (this.heroName === 'Artu') return 20;  // 2 WRD
         if (this.heroName === 'Macu') return 17;  // 1.7 WRD
         if (this.heroName === 'Hunter') return 14; // 1.4 WRD
+        if (this.heroName === 'Duke' && !this.isMounted) return 12; // 1.2 WRD
         return 10;
     }
 
     performAttack() {
         if (this.attackState !== 'idle') return;
 
-        // Empty Gun / Reloading Checks
         if (this.heroName === 'Hason' && this.hasonAmmo <= 0) {
-            this.attackState = 'recovery'; 
-            this.stateTimer = 200; 
-            this.maxStateTimer = 200;
-            return;
+            this.attackState = 'recovery'; this.stateTimer = 200; this.maxStateTimer = 200; return;
         }
         if (this.heroName === 'Hunter' && this.hunterWeapon === 'musket' && this.hunterMusketCD > 0) return;
+        
+        if (this.heroName === 'Duke' && this.isMounted) {
+            if (this.runTimer < 3000) return; // Must be in full running state (>= 3s)
+        }
 
-        // Initialize Attack Windup
         this.attackState = 'windup';
-        this.stateTimer = (this.heroName === 'Hunter' && this.hunterWeapon === 'sword') ? 200 : 100; // Slower sword windup
+        this.stateTimer = (this.heroName === 'Hunter' && this.hunterWeapon === 'sword') ? 200 : 100;
+        
+        if (this.heroName === 'Duke' && this.isMounted) this.stateTimer = 50; // Fast windup while charging
+        
         this.maxStateTimer = this.stateTimer;
         this.hasHit = false;
         
-        // Air Stall Effect: Float briefly during windup for mid-air combos
-        if (!this.isGrounded) {
-            this.vy = Math.max(this.vy, -2);
-        }
+        if (!this.isGrounded) this.vy = Math.max(this.vy, -2);
     }
 
     executeActiveAttack() {
+        let target = game.getEnemyOf(this);
+
+        if (this.heroName === 'Hason' || this.heroName === 'Willi') {
+            let minDist = Math.hypot(target.x - this.x, target.y - this.y);
+            for (let m of game.minions) {
+                if (m.owner !== this && !m.dead) {
+                    let d = Math.hypot(m.x - this.x, m.y - this.y);
+                    if (d < minDist) {
+                        minDist = d;
+                        target = m;
+                    }
+                }
+            }
+            this.facing = (target.x + target.w/2 > this.x + this.w/2) ? 1 : -1;
+        }
+
         let px = this.facing === 1 ? this.x + this.w : this.x - 10;
         let py = this.y + 25;
 
-        // Macu Spear Lunge
-        if (this.heroName === 'Macu') {
-            this.vx = this.facing * 12; // Forward lunge burst
-        }
+        let tx = target.x + target.w/2;
+        let ty = target.y + target.h/2;
+        let aimAngle = Math.atan2(ty - py, tx - px);
+
+        if (this.heroName === 'Macu') this.vx = this.facing * 12;
 
         if (this.heroName === 'Hason') {
             this.hasonAmmo--;
             this.hasonRecharge = 0;
-            game.projectiles.push(new Projectile(px, py, 10, 5, this.facing * 20, 0, 25, this, "#FFD700")); // 2.5 WRD
-            game.particles.push(new Particle(px, py, "#FFA500", this.facing*2, 0, 100));
+            let speed = 20;
+            game.projectiles.push(new Projectile(px, py, 10, 5, Math.cos(aimAngle)*speed, Math.sin(aimAngle)*speed, 25, this, "#FFD700")); 
+            game.particles.push(new Particle(px, py, "#FFA500", Math.cos(aimAngle)*2, Math.sin(aimAngle)*2, 100));
         } 
         else if (this.heroName === 'Willi') {
-            game.projectiles.push(new Projectile(px, py, 20, 4, this.facing * 18, 0, 10, this, "#ccc", "knife")); // 1 WRD
+            let speed = 18;
+            game.projectiles.push(new Projectile(px, py, 20, 4, Math.cos(aimAngle)*speed, Math.sin(aimAngle)*speed, 10, this, "#ccc", "knife")); 
         }
         else if (this.heroName === 'Hunter' && this.hunterWeapon === 'musket') {
-            game.projectiles.push(new Projectile(px, py, 12, 12, this.facing * 25, 0, 20, this, "#222")); // 2 WRD for musket
-            this.hunterMusketCD = 6000; // 6s reload
+            game.projectiles.push(new Projectile(px, py, 12, 12, this.facing * 25, 0, 20, this, "#222"));
+            this.hunterMusketCD = 6000;
             game.particles.push(new Particle(px, py, "#FFA500", this.facing*5, -2, 150));
         }
-        // Melee logic handled in the `update` loop active frame check
     }
 
     performSuper() {
-        this.superCooldown = SUPER_COOLDOWN;
+        if (this.heroName === 'Hason') {
+            if (this.hasonSuperCharges <= 0) {
+                this.superCooldown = this.superCooldownMax;
+                this.hasonSuperCharges = 2; // 2 extra dynamites
+                this.hasonSuperWindow = 4000; // 4 seconds to use them
+            } else {
+                this.hasonSuperCharges--;
+                if (this.hasonSuperCharges <= 0) this.hasonSuperWindow = 0;
+            }
+            for(let i=0; i<20; i++) game.particles.push(new Particle(this.x+this.w/2, this.y+this.h/2, "#ffeb3b", (Math.random()-0.5)*10, (Math.random()-0.5)*10, 600));
+            game.projectiles.push(new Projectile(this.x+this.w/2, this.y, 16, 16, this.facing * 12, -8, 0, this, "", "dynamite"));
+            return;
+        }
+
+        this.superCooldown = this.superCooldownMax;
         
-        // Super effect visuals
         for(let i=0; i<20; i++) game.particles.push(new Particle(this.x+this.w/2, this.y+this.h/2, "#ffeb3b", (Math.random()-0.5)*10, (Math.random()-0.5)*10, 600));
 
-        if (this.heroName === 'Hason') {
-            game.projectiles.push(new Projectile(this.x+this.w/2, this.y, 16, 16, this.facing * 12, -8, 0, this, "", "dynamite"));
-        }
-        else if (this.heroName === 'Hunter') {
-            this.maxHp += 50;
-            this.hp += 50;
-            this.baseJump = 18;
+        if (this.heroName === 'Hunter') {
+            this.maxHp += 50; this.hp += 50; this.baseJump = 18;
             game.hurricane = new Hurricane(this);
         }
         else if (this.heroName === 'Macu') {
-            this.buffs.battleCry = 30000; // 30s
+            this.buffs.battleCry = 30000;
         }
         else if (this.heroName === 'Willi') {
-            this.buffs.shade = 20000; // 20s
+            this.buffs.shade = 20000;
         }
         else if (this.heroName === 'Artu') {
             for (let i = 0; i < 5; i++) {
-                let mx = this.x + (Math.random() * 100 - 50);
-                game.minions.push(new Minion(this, mx, this.y - 50));
+                game.minions.push(new Minion(this, this.x + (Math.random() * 100 - 50), this.y - 50));
             }
+        }
+        else if (this.heroName === 'Duke') {
+            let px = this.facing === 1 ? this.x + this.w : this.x - 10;
+            let py = this.y + 25;
+            // 10 WRD (100 damage), bullet type (no knockback)
+            game.projectiles.push(new Projectile(px, py, 14, 4, this.facing * 35, 0, 100, this, "#fff", "bullet"));
+            game.particles.push(new Particle(px, py, "#FFA500", this.facing*5, 0, 150));
         }
     }
 
     draw(ctx) {
-        if (this.buffs.shade > 0) ctx.globalAlpha = 0.15; // Invisible Willi
+        if (this.buffs.shade > 0) ctx.globalAlpha = 0.15;
 
-        ctx.save();
-        // Translate to top-center of the character for easier drawing
-        ctx.translate(this.x + this.w / 2, this.y); 
-        
-        // Flip canvas horizontally if facing left
-        // This is crucial: positive X is always "forward" now!
-        if (this.facing === -1) {
-            ctx.scale(-1, 1);
+        // Draw Dizzy Effect
+        if (this.buffs.dizzy > 0) {
+            ctx.save();
+            ctx.translate(this.x + this.w/2, this.y - 15);
+            let timeAngle = Date.now() * 0.005;
+            for(let s=0; s<3; s++) {
+                let offset = timeAngle + (s * (Math.PI*2/3));
+                ctx.fillStyle = "#FFD700";
+                ctx.fillRect(Math.cos(offset)*20, Math.sin(offset)*5, 4, 4);
+            }
+            ctx.restore();
         }
 
-        let hw = this.w / 2; // half width
-        let h = this.h;      // full height
+        ctx.save();
+        ctx.translate(this.x + this.w / 2, this.y); 
+        if (this.facing === -1) ctx.scale(-1, 1);
 
-        // Draw character shadow/outline
-        ctx.fillStyle = "rgba(0,0,0,0.4)";
-        ctx.fillRect(-hw - 2, -2, this.w + 4, h + 4);
+        let hw = this.w / 2;
+        let h = this.h;
 
-        // Draw base character body
-        ctx.fillStyle = this.color;
-        ctx.fillRect(-hw, 0, this.w, h);
+        // Duke Phase 1 (Mounted) Body Base
+        if (this.heroName === 'Duke' && this.isMounted) {
+            // Draw Horse
+            ctx.fillStyle = "#8B4513"; // Brown
+            ctx.fillRect(-hw, 30, this.w, 40); // Body
+            ctx.fillRect(hw-10, 10, 15, 25); // Neck
+            ctx.fillRect(hw-5, 5, 20, 10); // Head
+            
+            // Horse Legs (Animated if running)
+            let legOffset = 0;
+            if (this.runTimer > 0) legOffset = Math.sin(Date.now() * 0.01) * 10;
+            
+            ctx.fillStyle = "#5c2e0b";
+            ctx.fillRect(-hw+5, 70, 8, 10 + legOffset); // Back leg
+            ctx.fillRect(hw-15, 70, 8, 10 - legOffset); // Front leg
 
-        // Draw facing indicator (Eye/Visor)
+            // Duke's Upper Body
+            ctx.fillStyle = this.color;
+            ctx.fillRect(-hw+10, -10, 25, 40); // Torso
+            
+            // Re-adjust hw, h for weapon drawing offsets
+            hw = 25; h = 40;
+            ctx.translate(0, -10); // Shift weapon anchor up
+        } else {
+            // Normal Human Body
+            ctx.fillStyle = "rgba(0,0,0,0.4)";
+            ctx.fillRect(-hw - 2, -2, this.w + 4, h + 4);
+            ctx.fillStyle = this.color;
+            ctx.fillRect(-hw, 0, this.w, h);
+        }
+
         ctx.fillStyle = "#fff";
-        ctx.fillRect(hw - 12, 10, 8, 8); // Eye is always drawn on the right because of scale
+        ctx.fillRect(hw - 12, 10, 8, 8); 
         
-        // Character Specifics - Highly detailed Hero Forms
+        // Character Specifics
         if (this.heroName === 'Hason') {
-            // Cowboy Hat
             ctx.fillStyle = "#3e1f0a";
-            ctx.fillRect(-hw - 12, -5, this.w + 24, 8); // Wide brim
-            ctx.fillRect(-hw + 4, -20, this.w - 8, 15); // Crown
-            // Poncho
+            ctx.fillRect(-hw - 12, -5, this.w + 24, 8);
+            ctx.fillRect(-hw + 4, -20, this.w - 8, 15);
             ctx.fillStyle = "#a0522d";
             ctx.beginPath();
-            ctx.moveTo(-hw, 15); ctx.lineTo(hw, 15); ctx.lineTo(hw + 6, 45); ctx.lineTo(-hw - 6, 45);
-            ctx.fill();
-            // Belt
+            ctx.moveTo(-hw, 15); ctx.lineTo(hw, 15); ctx.lineTo(hw + 6, 45); ctx.lineTo(-hw - 6, 45); ctx.fill();
             ctx.fillStyle = "#222"; ctx.fillRect(-hw, h - 25, this.w, 8);
             ctx.fillStyle = "gold"; ctx.fillRect(-4, h - 26, 8, 10);
         } 
         else if (this.heroName === 'Artu') {
-            // Samurai Kabuto (Helmet) Horns
             ctx.fillStyle = "#d4af37";
             ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-18, -22); ctx.lineTo(4, -5); ctx.fill();
             ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(25, -22); ctx.lineTo(12, -5); ctx.fill();
-            // Face Plate Mask
-            ctx.fillStyle = "#600000";
-            ctx.fillRect(-hw, 15, this.w, 14);
-            // Sode (Shoulder Armor Pads)
-            ctx.fillStyle = "#b8860b";
-            ctx.fillRect(-hw - 6, 18, 10, 22);
-            ctx.fillRect(hw - 4, 18, 10, 22);
-            // Armor Slats
-            ctx.fillStyle = "#333";
-            ctx.fillRect(-hw, 35, this.w, 4);
-            ctx.fillRect(-hw, 45, this.w, 4);
-            ctx.fillRect(-hw, 55, this.w, 4);
+            ctx.fillStyle = "#600000"; ctx.fillRect(-hw, 15, this.w, 14);
+            ctx.fillStyle = "#b8860b"; ctx.fillRect(-hw - 6, 18, 10, 22); ctx.fillRect(hw - 4, 18, 10, 22);
+            ctx.fillStyle = "#333"; ctx.fillRect(-hw, 35, this.w, 4); ctx.fillRect(-hw, 45, this.w, 4); ctx.fillRect(-hw, 55, this.w, 4);
+        }
+        else if (this.heroName === 'Duke') {
+            // Uniform specifics for Duke
+            ctx.fillStyle = "#fff"; ctx.fillRect(-hw, 20, this.w, 4); // Cross belt
+            ctx.fillStyle = "#FFD700"; ctx.fillRect(-hw-2, 15, 8, 15); // Epaulettes
         }
         else if (this.heroName === 'Macu') {
-            // Ainu Headband
-            ctx.fillStyle = "#a12222";
-            ctx.fillRect(-hw, 6, this.w, 8);
-            // Tribal Body Markings
-            ctx.fillStyle = "#fff";
-            ctx.fillRect(-hw + 6, 25, this.w - 12, 4);
-            ctx.fillRect(-hw + 4, 40, this.w - 8, 4);
-            ctx.fillRect(-hw + 6, 55, this.w - 12, 4);
+            ctx.fillStyle = "#a12222"; ctx.fillRect(-hw, 6, this.w, 8);
+            ctx.fillStyle = "#fff"; ctx.fillRect(-hw + 6, 25, this.w - 12, 4); ctx.fillRect(-hw + 4, 40, this.w - 8, 4); ctx.fillRect(-hw + 6, 55, this.w - 12, 4);
         }
         else if (this.heroName === 'Hunter') {
-            // Pirate Bandana
-            ctx.fillStyle = "#cc0000";
-            ctx.fillRect(-hw, -5, this.w, 12);
-            ctx.beginPath(); ctx.moveTo(-hw, -5); ctx.lineTo(-hw - 15, 10); ctx.lineTo(-hw, 5); ctx.fill(); // Bandana tail
-            // Eyepatch
-            ctx.fillStyle = "#111";
-            ctx.fillRect(hw - 14, 8, 12, 10);
-            ctx.strokeStyle = "#111"; ctx.lineWidth = 2;
-            ctx.beginPath(); ctx.moveTo(-hw, 0); ctx.lineTo(hw, 15); ctx.stroke();
-            // Belt and Sash
-            ctx.fillStyle = "#cc0000";
-            ctx.fillRect(-hw, h - 25, this.w, 12);
-            ctx.fillStyle = "#222";
-            ctx.fillRect(-hw, h - 22, this.w, 6);
+            ctx.fillStyle = "#cc0000"; ctx.fillRect(-hw, -5, this.w, 12);
+            ctx.beginPath(); ctx.moveTo(-hw, -5); ctx.lineTo(-hw - 15, 10); ctx.lineTo(-hw, 5); ctx.fill();
+            ctx.fillStyle = "#111"; ctx.fillRect(hw - 14, 8, 12, 10);
+            ctx.strokeStyle = "#111"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-hw, 0); ctx.lineTo(hw, 15); ctx.stroke();
+            ctx.fillStyle = "#cc0000"; ctx.fillRect(-hw, h - 25, this.w, 12);
+            ctx.fillStyle = "#222"; ctx.fillRect(-hw, h - 22, this.w, 6);
         }
         else if (this.heroName === 'Willi') {
-            // Ninja Scarf / Mask
-            ctx.fillStyle = "#1a1a1a";
-            ctx.fillRect(-hw, 0, this.w, h); // Full dark suit
-            // Skin slit for eyes
-            ctx.fillStyle = "#ffe0bd";
-            ctx.fillRect(-hw + 4, 10, this.w - 8, 8);
-            // Red Scarf and trailing ribbons
-            ctx.fillStyle = "#800000";
-            ctx.fillRect(-hw, 20, this.w, 8);
+            ctx.fillStyle = "#1a1a1a"; ctx.fillRect(-hw, 0, this.w, h);
+            ctx.fillStyle = "#ffe0bd"; ctx.fillRect(-hw + 4, 10, this.w - 8, 8);
+            ctx.fillStyle = "#800000"; ctx.fillRect(-hw, 20, this.w, 8);
             ctx.beginPath(); ctx.moveTo(-hw + 5, 25); ctx.lineTo(-hw - 20, 15); ctx.lineTo(-hw - 15, 30); ctx.fill();
-            // Ninja eye
             ctx.fillStyle = "#fff"; ctx.fillRect(hw - 10, 12, 6, 4);
         }
 
-        // --- Calculate Smooth Animation Progress ---
-        // phaseProg travels 0.0 -> 1.0 during the current state
         let phaseProg = 0;
         if (this.attackState !== 'idle' && this.maxStateTimer > 0) {
             phaseProg = 1 - (this.stateTimer / this.maxStateTimer);
-            // Apply Smoothstep Easing
             phaseProg = phaseProg * phaseProg * (3 - 2 * phaseProg);
         }
 
-        // --- Dynamic Weapon Draw & Motion Trails ---
+        // Weapons
         if (this.heroName === 'Hason') {
-            ctx.save();
-            ctx.translate(hw, 25); // Hand position
-            let recoil = 0;
-            if (this.attackState === 'active') recoil = -0.5 * Math.sin(phaseProg * Math.PI); // kick up
+            ctx.save(); ctx.translate(hw, 25);
+            let recoil = this.attackState === 'active' ? -0.5 * Math.sin(phaseProg * Math.PI) : 0;
             ctx.rotate(recoil);
-            
-            ctx.fillStyle = "#aaa";
-            ctx.fillRect(0, 0, 22, 6); // Barrel
-            ctx.fillRect(0, 0, 6, 14); // Grip
+            ctx.fillStyle = "#aaa"; ctx.fillRect(0, 0, 22, 6); ctx.fillRect(0, 0, 6, 14);
+            ctx.restore();
+        }
+        else if (this.heroName === 'Duke') {
+            ctx.save();
+            ctx.translate(hw, 25);
+            if (this.isMounted) {
+                // Lance
+                let thrust = 0;
+                if (this.attackState === 'active') thrust = 40 * Math.sin(phaseProg * Math.PI);
+                ctx.fillStyle = "#654321"; // Wood
+                ctx.fillRect(0, 5, 80 + thrust, 4);
+                ctx.fillStyle = "#eee"; // Steel tip
+                ctx.beginPath(); ctx.moveTo(80+thrust, 3); ctx.lineTo(100+thrust, 7); ctx.lineTo(80+thrust, 11); ctx.fill();
+            } else {
+                // Sabre (similar to Artu's sword)
+                let angle = 0;
+                if (this.attackState === 'windup') angle = -1.0 * phaseProg;
+                else if (this.attackState === 'active') angle = -1.0 + (3.0 * phaseProg);
+                else if (this.attackState === 'recovery') angle = 2.0 - (2.0 * phaseProg);
+
+                ctx.rotate(angle);
+                if (this.attackState === 'active') {
+                    ctx.beginPath(); ctx.arc(0, 0, 60, -1.0, angle);
+                    ctx.lineWidth = 10; ctx.strokeStyle = "rgba(255, 255, 255, 0.4)"; ctx.stroke();
+                }
+                ctx.fillStyle = "#eee"; ctx.fillRect(-2, -60, 4, 60); // Curved blade approx
+                ctx.fillStyle = "#d4af37"; ctx.fillRect(-6, 0, 12, 4); // Guard
+            }
             ctx.restore();
         }
         else if (this.heroName === 'Hunter') {
             if (this.hunterWeapon === 'musket') {
-                ctx.save();
-                ctx.translate(hw - 15, 25);
-                let recoil = 0;
-                if (this.attackState === 'active') recoil = -0.2 * Math.sin(phaseProg * Math.PI);
+                ctx.save(); ctx.translate(hw - 15, 25);
+                let recoil = this.attackState === 'active' ? -0.2 * Math.sin(phaseProg * Math.PI) : 0;
                 ctx.rotate(recoil);
-
-                ctx.fillStyle = "#5c2e0e"; // Wood stock
-                ctx.fillRect(-15, 0, 50, 8);
-                ctx.fillStyle = "#222"; // Long barrel
-                ctx.fillRect(20, -2, 35, 5);
+                ctx.fillStyle = "#5c2e0e"; ctx.fillRect(-15, 0, 50, 8);
+                ctx.fillStyle = "#222"; ctx.fillRect(20, -2, 35, 5);
                 ctx.restore();
             } else {
-                // Procedural Great Sword Swing
-                ctx.save();
-                ctx.translate(0, 20); // Shoulder joint
-                
-                let angle = -0.5; // Idle resting on shoulder
-                if (this.attackState === 'windup') angle = -0.5 - (1.5 * phaseProg); // Pull back
-                else if (this.attackState === 'active') angle = -2.0 + (3.5 * phaseProg); // Huge forward swing
-                else if (this.attackState === 'recovery') angle = 1.5 - (2.0 * phaseProg); // Return to resting
-
+                ctx.save(); ctx.translate(0, 20);
+                let angle = -0.5;
+                if (this.attackState === 'windup') angle = -0.5 - (1.5 * phaseProg);
+                else if (this.attackState === 'active') angle = -2.0 + (3.5 * phaseProg);
+                else if (this.attackState === 'recovery') angle = 1.5 - (2.0 * phaseProg);
                 ctx.rotate(angle);
-
-                // Motion Trail Effect
                 if (this.attackState === 'active') {
-                    ctx.beginPath();
-                    ctx.arc(0, 0, 75, -2.0, angle);
-                    ctx.lineWidth = 15; 
-                    ctx.strokeStyle = "rgba(100, 200, 255, 0.4)"; 
-                    ctx.stroke();
+                    ctx.beginPath(); ctx.arc(0, 0, 75, -2.0, angle);
+                    ctx.lineWidth = 15; ctx.strokeStyle = "rgba(100, 200, 255, 0.4)"; ctx.stroke();
                 }
-
-                ctx.fillStyle = "#d3d3d3"; // Huge blade
-                ctx.fillRect(-8, -75, 16, 80); 
-                ctx.fillStyle = "#8b4513"; // Hilt
-                ctx.fillRect(-6, 5, 12, 20); 
-                ctx.fillStyle = "#ffd700"; // Crossguard
-                ctx.fillRect(-12, 1, 24, 4); 
-                
+                ctx.fillStyle = "#d3d3d3"; ctx.fillRect(-8, -75, 16, 80); 
+                ctx.fillStyle = "#8b4513"; ctx.fillRect(-6, 5, 12, 20); 
+                ctx.fillStyle = "#ffd700"; ctx.fillRect(-12, 1, 24, 4); 
                 ctx.restore();
             }
         }
         else if (this.heroName === 'Macu') {
-            // Procedural Spear Thrust
-            ctx.save();
-            ctx.translate(0, 20); // Hand/Shoulder joint
-            
-            let thrust = 0;
-            let angle = 0.2; // Slight diagonal idle
-            
-            if (this.attackState === 'windup') {
-                thrust = -20 * phaseProg; // pull backward
-                angle = 0.2 + (0.3 * phaseProg); // point slightly up
-            } else if (this.attackState === 'active') {
-                thrust = -20 + (100 * Math.sin(phaseProg * Math.PI)); // massive forward thrust and snap back
-                angle = 0.5 - (0.5 * Math.sin(phaseProg * Math.PI)); // level out flat during thrust
-            } else if (this.attackState === 'recovery') {
-                thrust = 0;
-                angle = 0.2 * phaseProg; // return to idle
-            }
-
+            ctx.save(); ctx.translate(0, 20);
+            let thrust = 0; let angle = 0.2;
+            if (this.attackState === 'windup') { thrust = -20 * phaseProg; angle = 0.2 + (0.3 * phaseProg); }
+            else if (this.attackState === 'active') { thrust = -20 + (100 * Math.sin(phaseProg * Math.PI)); angle = 0.5 - (0.5 * Math.sin(phaseProg * Math.PI)); }
+            else if (this.attackState === 'recovery') { thrust = 0; angle = 0.2 * phaseProg; }
             ctx.rotate(angle);
-
-            // Motion Trail Effect
             if (this.attackState === 'active') {
-                ctx.fillStyle = "rgba(200, 255, 200, 0.5)";
-                ctx.fillRect(-2, -50 - thrust, 4, thrust + 20); // Trail directly behind tip
+                ctx.fillStyle = "rgba(200, 255, 200, 0.5)"; ctx.fillRect(-2, -50 - thrust, 4, thrust + 20);
             }
-
-            ctx.fillStyle = "#8B4513"; // Wood shaft
-            ctx.fillRect(-3, -50 - thrust, 6, 120);
-            ctx.fillStyle = "#ddd"; // Metal tip
-            ctx.beginPath(); 
-            ctx.moveTo(0, -50 - thrust); 
-            ctx.lineTo(-6, -75 - thrust); 
-            ctx.lineTo(6, -75 - thrust); 
-            ctx.fill();
-
+            ctx.fillStyle = "#8B4513"; ctx.fillRect(-3, -50 - thrust, 6, 120);
+            ctx.fillStyle = "#ddd"; ctx.beginPath(); ctx.moveTo(0, -50 - thrust); ctx.lineTo(-6, -75 - thrust); ctx.lineTo(6, -75 - thrust); ctx.fill();
             ctx.restore();
         }
         else if (this.heroName === 'Artu') {
-            // Procedural Katana Slash
-            ctx.save();
-            ctx.translate(0, 25); // Waist
-            
-            let angle = 0;
-            let isDrawn = false;
-            
+            ctx.save(); ctx.translate(0, 25);
+            let angle = 0; let isDrawn = false;
             if (this.attackState === 'idle') {
-                // Sheathed Katana
-                ctx.fillStyle = "#222";
-                ctx.fillRect(-6, 0, 8, 50); // Saya (scabbard)
-                ctx.fillStyle = "#d4af37";
-                ctx.fillRect(-10, 0, 16, 4); // Tsuba
+                ctx.fillStyle = "#222"; ctx.fillRect(-6, 0, 8, 50); ctx.fillStyle = "#d4af37"; ctx.fillRect(-10, 0, 16, 4);
             } else {
                 isDrawn = true;
-                if (this.attackState === 'windup') angle = -1.0 * phaseProg; // Hand on hilt, pull back
-                else if (this.attackState === 'active') angle = -1.0 + (3.0 * phaseProg); // Fast downward slash
-                else if (this.attackState === 'recovery') angle = 2.0 - (2.0 * phaseProg); // Slowly sheathe
-
-                // Draw empty Scabbard
-                ctx.fillStyle = "#222";
-                ctx.fillRect(-6, 0, 8, 50);
-
+                if (this.attackState === 'windup') angle = -1.0 * phaseProg;
+                else if (this.attackState === 'active') angle = -1.0 + (3.0 * phaseProg);
+                else if (this.attackState === 'recovery') angle = 2.0 - (2.0 * phaseProg);
+                ctx.fillStyle = "#222"; ctx.fillRect(-6, 0, 8, 50);
                 ctx.rotate(angle);
-
-                // Motion Trail Effect
                 if (this.attackState === 'active') {
-                    ctx.beginPath();
-                    ctx.arc(0, 0, 60, -1.0, angle);
-                    ctx.lineWidth = 10;
-                    ctx.strokeStyle = "rgba(255, 200, 100, 0.4)";
-                    ctx.stroke();
+                    ctx.beginPath(); ctx.arc(0, 0, 60, -1.0, angle);
+                    ctx.lineWidth = 10; ctx.strokeStyle = "rgba(255, 200, 100, 0.4)"; ctx.stroke();
                 }
-
-                ctx.fillStyle = "#eee"; // Blade
-                ctx.fillRect(-2, -60, 4, 60); 
-                ctx.fillStyle = "#d4af37"; // Tsuba
-                ctx.fillRect(-6, 0, 12, 4); 
-                ctx.fillStyle = "#111"; // Tsuka (handle)
-                ctx.fillRect(-3, 4, 6, 15); 
+                ctx.fillStyle = "#eee"; ctx.fillRect(-2, -60, 4, 60); 
+                ctx.fillStyle = "#d4af37"; ctx.fillRect(-6, 0, 12, 4); 
+                ctx.fillStyle = "#111"; ctx.fillRect(-3, 4, 6, 15); 
             }
             ctx.restore();
         }
         else if (this.heroName === 'Willi') {
-            ctx.save();
-            ctx.translate(hw, 20); // Throwing arm
+            ctx.save(); ctx.translate(hw, 20);
             let angle = 0;
-            
             if (this.attackState !== 'idle') {
                 if (this.attackState === 'windup') angle = (-Math.PI/2) * phaseProg;
-                else if (this.attackState === 'active') angle = -Math.PI/2 + (Math.PI * phaseProg); // Quick throw arc
+                else if (this.attackState === 'active') angle = -Math.PI/2 + (Math.PI * phaseProg);
                 else if (this.attackState === 'recovery') angle = Math.PI/2 - ((Math.PI/2) * phaseProg);
-                
                 ctx.rotate(angle);
-                
-                // Ninja Arm
-                ctx.fillStyle = "#1a1a1a";
-                ctx.fillRect(-4, 0, 8, 20);
-                
-                // Held Knife during windup
+                ctx.fillStyle = "#1a1a1a"; ctx.fillRect(-4, 0, 8, 20);
                 if (this.attackState === 'windup') {
-                    ctx.fillStyle = "#ddd";
-                    ctx.beginPath(); ctx.moveTo(0, 20); ctx.lineTo(-4, 30); ctx.lineTo(4, 30); ctx.fill();
+                    ctx.fillStyle = "#ddd"; ctx.beginPath(); ctx.moveTo(0, 20); ctx.lineTo(-4, 30); ctx.lineTo(4, 30); ctx.fill();
                 }
             }
             ctx.restore();
         }
 
-        ctx.restore(); // Restore context back to absolute game positioning
+        ctx.restore();
         
-        // Status indicator visuals
         if (this.buffs.poison > 0) {
             ctx.fillStyle = "rgba(0, 255, 0, 0.3)";
             ctx.fillRect(this.x, this.y, this.w, this.h);
         }
 
-        // Health Bar above character
+        // Running aura for Duke
+        if (this.heroName === 'Duke' && this.isMounted && this.runTimer >= 3000) {
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.5)";
+            ctx.lineWidth = 2;
+            ctx.strokeRect(this.x-2, this.y-2, this.w+4, this.h+4);
+        }
+
+        // Mini Health Bar above character
         ctx.fillStyle = "red";
         ctx.fillRect(this.x, this.y - 12, this.w, 5);
         ctx.fillStyle = "#4caf50";
@@ -1231,10 +1241,10 @@ class Game {
         this.canvas = document.getElementById('gameCanvas');
         this.ctx = this.canvas.getContext('2d');
         this.lastTime = 0;
-        this.state = 'MENU'; // MENU, PLAYING, GAMEOVER
+        this.state = 'MENU'; 
         
         this.p1Choice = 'Hason';
-        this.p2Choice = 'Artu';
+        this.p2Choice = 'Duke'; // Pre-selected to showcase new hero
         
         this.setupMenu();
     }
@@ -1244,7 +1254,6 @@ class Game {
         const p2Roster = document.getElementById('p2-roster');
         
         Object.keys(HEROES).forEach(key => {
-            // P1 Buttons
             let b1 = document.createElement('button');
             b1.className = `hero-btn ${key === this.p1Choice ? 'selected' : ''}`;
             b1.innerText = `${HEROES[key].name} - ${HEROES[key].desc}`;
@@ -1255,7 +1264,6 @@ class Game {
             };
             p1Roster.appendChild(b1);
 
-            // P2 Buttons
             let b2 = document.createElement('button');
             b2.className = `hero-btn ${key === this.p2Choice ? 'selected' : ''}`;
             b2.innerText = `${HEROES[key].name} - ${HEROES[key].desc}`;
@@ -1286,7 +1294,7 @@ class Game {
         let p1Ctrl = { left: 'KeyA', right: 'KeyD', jump: 'KeyW', attack: 'Space', super: 'KeyE', switch: 'KeyT' };
         let p2Ctrl = { left: 'ArrowLeft', right: 'ArrowRight', jump: 'ArrowUp', attack: 'Numpad9', super: 'NumpadEnter', switch: 'KeyP' };
 
-        let p2StartX = CANVAS_W - 150; // Dynamic right-side placement
+        let p2StartX = CANVAS_W - 150; 
         this.p1 = new Fighter('p1', this.p1Choice, 100, p1Ctrl, true);
         this.p2 = new Fighter('p2', this.p2Choice, p2StartX, p2Ctrl, false);
         this.p2.facing = -1;
@@ -1298,10 +1306,13 @@ class Game {
         this.hitstop = 0;
         this.aiTimer = 0;
 
-        // UI Setup
         document.getElementById('p1-name').innerText = `P1: ${HEROES[this.p1Choice].name}`;
         document.getElementById('p2-name').innerText = `P2: ${HEROES[this.p2Choice].name}${isSinglePlayer ? ' [CPU]' : ''}`;
         
+        // Show/Hide horse UI based on character selections
+        document.getElementById('p1-horse-container').classList.toggle('hidden', this.p1Choice !== 'Duke');
+        document.getElementById('p2-horse-container').classList.toggle('hidden', this.p2Choice !== 'Duke');
+
         this.state = 'PLAYING';
         this.lastTime = performance.now();
         requestAnimationFrame(t => this.loop(t));
@@ -1312,21 +1323,12 @@ class Game {
     }
 
     createExplosion(x, y, radius, damage, owner) {
-        // Visual
-        for(let i=0; i<30; i++) {
-            this.particles.push(new Particle(x, y, i%2===0 ? "#ff5500" : "#555", (Math.random()-0.5)*15, (Math.random()-0.5)*15, 600));
-        }
-        
-        // Damage players and minions
+        for(let i=0; i<30; i++) this.particles.push(new Particle(x, y, i%2===0 ? "#ff5500" : "#555", (Math.random()-0.5)*15, (Math.random()-0.5)*15, 600));
         let targets = [this.p1, this.p2, ...this.minions];
         for (let t of targets) {
             if (!t.dead) {
-                // simple distance check
                 let cx = t.x + t.w/2; let cy = t.y + t.h/2;
-                let dist = Math.hypot(cx - x, cy - y);
-                if (dist <= radius) {
-                    t.takeDamage(damage, owner);
-                }
+                if (Math.hypot(cx - x, cy - y) <= radius) t.takeDamage(damage, owner);
             }
         }
     }
@@ -1334,28 +1336,44 @@ class Game {
     updateUI() {
         // P1 UI
         document.getElementById('p1-hp').style.width = `${Math.max(0, (this.p1.hp / this.p1.maxHp) * 100)}%`;
-        let p1Sup = 100 - (this.p1.superCooldown / SUPER_COOLDOWN) * 100;
+        if (this.p1.heroName === 'Duke') {
+            document.getElementById('p1-horse-hp').style.width = `${Math.max(0, (this.p1.horseHp / this.p1.maxHorseHp) * 100)}%`;
+        }
+        let p1Sup = 100 - (this.p1.superCooldown / this.p1.superCooldownMax) * 100;
         let p1Bar = document.getElementById('p1-super');
         p1Bar.style.width = `${p1Sup}%`;
         if (p1Sup >= 100) p1Bar.classList.add('ready'); else p1Bar.classList.remove('ready');
 
         let p1Stat = "";
-        if (this.p1.heroName === 'Hason') p1Stat = `Ammo: ${this.p1.hasonAmmo}/6`;
+        if (this.p1.heroName === 'Hason') {
+            p1Stat = `Ammo: ${this.p1.hasonAmmo}/6`;
+            if (this.p1.hasonSuperCharges > 0) p1Stat += ` [DYNAMITE x${this.p1.hasonSuperCharges}]`;
+        }
         if (this.p1.heroName === 'Hunter') p1Stat = `Wep: ${this.p1.hunterWeapon.toUpperCase()} ${this.p1.hunterMusketCD>0 ? '(Rld)' : ''}`;
+        if (this.p1.heroName === 'Duke') p1Stat = this.p1.isMounted ? (this.p1.runTimer >= 3000 ? "LANCE READY" : "Charging...") : "DISMOUNTED";
         if (this.p1.buffs.poison > 0) p1Stat += " [POISONED]";
+        if (this.p1.buffs.dizzy > 0) p1Stat += " [DIZZY]";
         document.getElementById('p1-status').innerText = p1Stat;
 
         // P2 UI
         document.getElementById('p2-hp').style.width = `${Math.max(0, (this.p2.hp / this.p2.maxHp) * 100)}%`;
-        let p2Sup = 100 - (this.p2.superCooldown / SUPER_COOLDOWN) * 100;
+        if (this.p2.heroName === 'Duke') {
+            document.getElementById('p2-horse-hp').style.width = `${Math.max(0, (this.p2.horseHp / this.p2.maxHorseHp) * 100)}%`;
+        }
+        let p2Sup = 100 - (this.p2.superCooldown / this.p2.superCooldownMax) * 100;
         let p2Bar = document.getElementById('p2-super');
         p2Bar.style.width = `${p2Sup}%`;
         if (p2Sup >= 100) p2Bar.classList.add('ready'); else p2Bar.classList.remove('ready');
 
         let p2Stat = "";
-        if (this.p2.heroName === 'Hason') p2Stat = `Ammo: ${this.p2.hasonAmmo}/6`;
+        if (this.p2.heroName === 'Hason') {
+            p2Stat = `Ammo: ${this.p2.hasonAmmo}/6`;
+            if (this.p2.hasonSuperCharges > 0) p2Stat += ` [DYNAMITE x${this.p2.hasonSuperCharges}]`;
+        }
         if (this.p2.heroName === 'Hunter') p2Stat = `Wep: ${this.p2.hunterWeapon.toUpperCase()} ${this.p2.hunterMusketCD>0 ? '(Rld)' : ''}`;
+        if (this.p2.heroName === 'Duke') p2Stat = this.p2.isMounted ? (this.p2.runTimer >= 3000 ? "LANCE READY" : "Charging...") : "DISMOUNTED";
         if (this.p2.buffs.poison > 0) p2Stat += " [POISONED]";
+        if (this.p2.buffs.dizzy > 0) p2Stat += " [DIZZY]";
         document.getElementById('p2-status').innerText = p2Stat;
     }
 
@@ -1366,7 +1384,7 @@ class Game {
             document.getElementById('game-ui').classList.add('hidden');
             document.getElementById('game-over-screen').classList.remove('hidden');
             document.getElementById('winner-text').innerText = `${winnerText} Wins!`;
-        }, 1500); // Dramatic pause
+        }, 1500); 
     }
 
     loop(timestamp) {
@@ -1374,14 +1392,11 @@ class Game {
         
         let dt = timestamp - this.lastTime;
         this.lastTime = timestamp;
-        if (dt > 100) dt = 16; // Prevent massive jumps if tab inactive
+        if (dt > 100) dt = 16;
 
-        // HITSTOP: Global Freeze
         if (this.hitstop > 0) {
             this.hitstop -= dt;
-            this.draw(); // keep rendering the frozen frame
-            
-            // Clear inputs during freeze to prevent accidental drops
+            this.draw(); 
             for (let k in keysPressed) delete keysPressed[k];
             requestAnimationFrame(t => this.loop(t));
             return;
@@ -1394,7 +1409,6 @@ class Game {
         this.update(dt);
         this.draw();
         
-        // Clear edge trigger inputs
         for (let k in keysPressed) delete keysPressed[k];
 
         requestAnimationFrame(t => this.loop(t));
@@ -1402,14 +1416,11 @@ class Game {
 
     updateAI(dt) {
         this.aiTimer -= dt;
-        
         let p1 = this.p1;
         let p2 = this.p2;
 
         if (this.aiTimer <= 0) {
-            // CPU "thinks" every 150-250ms (mimics human reaction time)
             this.aiTimer = 150 + Math.random() * 100; 
-            
             p2.aiIntent.left = false;
             p2.aiIntent.right = false;
             
@@ -1419,46 +1430,54 @@ class Game {
             
             let isMelee = p2.isMeleeAttack();
             let attackRange = isMelee ? 80 : 350;
-            
-            // --- 1. Movement Logic ---
-            if (dist > attackRange) {
-                // Move towards player
-                if (dx > 0) p2.aiIntent.right = true;
-                else p2.aiIntent.left = true;
-            } else if (dist < attackRange - 50 && !isMelee) {
-                // Back away if ranged hero and getting too close
-                if (dx > 0) p2.aiIntent.left = true;
-                else p2.aiIntent.right = true;
-            } else if (dist <= attackRange) {
-                // Occasional shuffling to make AI less robotic
-                if (Math.random() < 0.2) p2.aiIntent.left = true;
-                else if (Math.random() < 0.3) p2.aiIntent.right = true;
+
+            // Duke Phase 1 specific mounted AI
+            if (p2.heroName === 'Duke' && p2.isMounted) {
+                // If running state is ready, charge directly
+                if (p2.runTimer >= 3000) {
+                    if (dx > 0) p2.aiIntent.right = true; else p2.aiIntent.left = true;
+                    if (dist < 100 && Math.abs(dy) < 50) keysPressed[p2.controls.attack] = true;
+                } else {
+                    // Try to build charge by running away if too close, else run towards
+                    if (dist < 200) {
+                        if (dx > 0) p2.aiIntent.left = true; else p2.aiIntent.right = true; // flee to charge
+                    } else {
+                        if (dx > 0) p2.aiIntent.right = true; else p2.aiIntent.left = true;
+                    }
+                }
+            } 
+            else {
+                // Generic AI movement
+                if (dist > attackRange) {
+                    if (dx > 0) p2.aiIntent.right = true; else p2.aiIntent.left = true;
+                } else if (dist < attackRange - 50 && !isMelee) {
+                    if (dx > 0) p2.aiIntent.left = true; else p2.aiIntent.right = true;
+                } else if (dist <= attackRange) {
+                    if (Math.random() < 0.2) p2.aiIntent.left = true;
+                    else if (Math.random() < 0.3) p2.aiIntent.right = true;
+                }
+
+                if (dist <= attackRange && Math.abs(dy) < 80 && Math.random() < 0.8) {
+                    keysPressed[p2.controls.attack] = true;
+                }
             }
 
-            // --- 2. Jumping Logic ---
-            // If P1 is significantly higher, or randomly jump to dodge/close gaps
             if (dy < -60 || (dist < 150 && Math.random() < 0.2)) {
                 keysPressed[p2.controls.jump] = true;
             }
             
-            // --- 3. Attack Logic ---
-            if (dist <= attackRange && Math.abs(dy) < 80 && Math.random() < 0.8) {
-                keysPressed[p2.controls.attack] = true;
-            }
-            
-            // --- 4. Super Skill Logic ---
-            if (p2.superCooldown <= 0 && dist <= attackRange + 100 && Math.random() < 0.5) {
+            // Duke hand gun super range check vs normal supers
+            let superRange = (p2.heroName === 'Duke' && !p2.isMounted) ? 600 : attackRange + 100;
+            if ((p2.superCooldown <= 0 || (p2.heroName === 'Hason' && p2.hasonSuperCharges > 0)) && dist <= superRange && Math.random() < 0.5) {
                 keysPressed[p2.controls.super] = true;
             }
 
-            // --- 5. Hunter Weapon Switch ---
             if (p2.heroName === 'Hunter') {
                 if (dist < 120 && p2.hunterWeapon === 'musket') keysPressed[p2.controls.switch] = true;
                 if (dist > 200 && p2.hunterWeapon === 'sword' && p2.hunterMusketCD <= 0) keysPressed[p2.controls.switch] = true;
             }
         }
         
-        // Apply continuous intents to the global keys object every frame
         keys[p2.controls.left] = p2.aiIntent.left;
         keys[p2.controls.right] = p2.aiIntent.right;
     }
@@ -1473,60 +1492,46 @@ class Game {
         this.projectiles.forEach(p => p.update(dt));
         this.particles.forEach(p => p.update(dt));
 
-        // Cleanup dead entities
         this.minions = this.minions.filter(m => !m.dead);
         this.projectiles = this.projectiles.filter(p => !p.dead);
         this.particles = this.particles.filter(p => !p.dead);
 
         if (this.state === 'PLAYING') {
-            // TOUCHBOX: Prevent players from stacking perfectly on top of each other
             if (!this.p1.dead && !this.p2.dead && checkAABB(this.p1, this.p2)) {
                 let overlapX = (Math.min(this.p1.x + this.p1.w, this.p2.x + this.p2.w) - Math.max(this.p1.x, this.p2.x)) / 2;
-                let c1 = this.p1.x + this.p1.w/2;
-                let c2 = this.p2.x + this.p2.w/2;
+                let c1 = this.p1.x + this.p1.w/2; let c2 = this.p2.x + this.p2.w/2;
                 
-                // Nudge characters apart softly
-                if (c1 < c2) {
-                    this.p1.x -= overlapX; this.p2.x += overlapX;
-                } else {
-                    this.p1.x += overlapX; this.p2.x -= overlapX;
-                }
+                if (c1 < c2) { this.p1.x -= overlapX; this.p2.x += overlapX; }
+                else { this.p1.x += overlapX; this.p2.x -= overlapX; }
             }
-            
             this.updateUI();
         }
     }
 
     draw() {
-        // Clear background
         this.ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
 
-        // Draw Environment
         this.ctx.fillStyle = "#111820";
         this.ctx.fillRect(0, GROUND_Y, CANVAS_W, CANVAS_H - GROUND_Y);
-        this.ctx.fillStyle = "#4caf50"; // Grass line
+        this.ctx.fillStyle = "#4caf50"; 
         this.ctx.fillRect(0, GROUND_Y, CANVAS_W, 5);
 
-        // Platforms
         for (let plat of PLATFORMS) {
             if (plat.type === 'center') {
-                this.ctx.fillStyle = "#add8e6"; // Ice color (light blue)
+                this.ctx.fillStyle = "#add8e6"; 
                 this.ctx.fillRect(plat.x, plat.y, plat.w, plat.h);
                 this.ctx.fillStyle = "#87cefa";
                 this.ctx.fillRect(plat.x, plat.y + plat.h, plat.w, 10);
             } else {
-                this.ctx.fillStyle = "#5c4033"; // Wood
+                this.ctx.fillStyle = "#5c4033"; 
                 this.ctx.fillRect(plat.x, plat.y, plat.w, plat.h);
                 this.ctx.fillStyle = "#3e2723";
-                this.ctx.fillRect(plat.x, plat.y + plat.h, plat.w, 10); // shadow
+                this.ctx.fillRect(plat.x, plat.y + plat.h, plat.w, 10); 
             }
         }
 
-        // Draw Entities
         if (this.hurricane && !this.hurricane.dead) this.hurricane.draw(this.ctx);
-        
         this.minions.forEach(m => m.draw(this.ctx));
-        
         if (!this.p1.dead) this.p1.draw(this.ctx);
         if (!this.p2.dead) this.p2.draw(this.ctx);
 
@@ -1551,7 +1556,6 @@ window.addEventListener('resize', () => {
         { x: Math.min(CANVAS_W - 300, CANVAS_W * (3/4) - 100), y: GROUND_Y - 350, w: 250, h: 20, type: 'side' }
     ];
 });
-// Initial trigger
 window.dispatchEvent(new Event('resize'));
 
 </script>
