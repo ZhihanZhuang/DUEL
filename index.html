@@ -209,8 +209,8 @@
                 <div id="p2-roster"></div>
                 <div class="controls-info">
                     Move: <span>Arrows (↑, ←, ↓, →)</span><br>
-                    Attack: <span>Right Ctrl</span><br>
-                    Super Skill (45s): <span>/</span><br>
+                    Attack: <span>Num 9</span><br>
+                    Super Skill (45s): <span>Num Enter</span><br>
                     Switch Weapon: <span>P</span> (Hunter Only)
                 </div>
             </div>
@@ -1181,7 +1181,7 @@ class Game {
         document.getElementById('game-ui').classList.remove('hidden');
         
         let p1Ctrl = { left: 'KeyA', right: 'KeyD', jump: 'KeyW', attack: 'Space', super: 'KeyE', switch: 'KeyT' };
-        let p2Ctrl = { left: 'ArrowLeft', right: 'ArrowRight', jump: 'ArrowUp', attack: 'ControlRight', super: 'Slash', switch: 'KeyP' };
+        let p2Ctrl = { left: 'ArrowLeft', right: 'ArrowRight', jump: 'ArrowUp', attack: 'Numpad9', super: 'NumpadEnter', switch: 'KeyP' };
 
         this.p1 = new Fighter('p1', this.p1Choice, 100, p1Ctrl, true);
         this.p2 = new Fighter('p2', this.p2Choice, 800, p2Ctrl, false);
