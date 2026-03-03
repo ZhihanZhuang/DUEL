@@ -402,6 +402,12 @@ class Projectile extends Entity {
                 if (!t.dead && checkAABB(this, t)) {
                     let noKnockback = (this.type === "bullet"); // Duke's Handgun has no knockback exaggeration
                     t.takeDamage(this.damage, this.owner, false, noKnockback);
+                    
+                    // Willi大飞刀的5秒减速效果
+                    if (this.type === "large_knife") {
+                        t.buffs.slow = 5000;
+                    }
+
                     this.dead = true;
                     for(let i=0; i<5; i++) game.particles.push(new Particle(this.x, this.y, this.color, (Math.random()-0.5)*5, (Math.random()-0.5)*5, 300));
                     break;
@@ -635,7 +641,7 @@ class Fighter extends Entity {
         this.hasHit = false;
         
         // Status Effects & Character Specifics
-        this.buffs = { poison: 0, battleCry: 0, shade: 0, dizzy: 0, hurricaneSlow: false };
+        this.buffs = { poison: 0, battleCry: 0, shade: 0, dizzy: 0, slow: 0, hurricaneSlow: false };
         this.hasonAmmo = 6; this.hasonRecharge = 0;
         this.hasonSuperCharges = 0;
         this.hasonSuperWindow = 0;
@@ -644,6 +650,7 @@ class Fighter extends Entity {
         this.invincible = 0;
         this.hunterWeapon = 'musket';
         this.hunterMusketCD = 0;
+        this.macuNextAttackDizzy = false; // Macu眩晕攻击状态
         
         // Duke Mechanics (Phase 1)
         if (this.heroName === 'Duke') {
@@ -661,7 +668,7 @@ class Fighter extends Entity {
         if (this.dead || this.invincible > 0) return; // 位移期间无敌
         
         if (this.heroName === 'Artu') amt *= 0.9;
-        if (attacker && attacker.buffs && attacker.buffs.battleCry > 0) amt *= 1.5;
+        if (attacker && attacker.buffs && attacker.buffs.battleCry > 0) amt *= 1.4; // 大招伤害加成调整为 40%
 
         // Duke Multi-layer HP Logic
         if (this.heroName === 'Duke' && this.isMounted) {
@@ -722,6 +729,13 @@ class Fighter extends Entity {
             if (this.attackState !== 'idle') this.attackState = 'idle';
         }
         
+        // Willi减速Buff处理
+        if (this.buffs.slow > 0) {
+            this.buffs.slow -= dt;
+            currentSpeed *= 0.5; // 减速50%
+            if(Math.random()<0.1) game.particles.push(new Particle(this.x+this.w/2, this.y+this.h, "#add8e6", (Math.random()-0.5)*2, -2, 300));
+        }
+
         if (this.buffs.poison > 0) {
             this.buffs.poison -= dt;
             if (!(this.heroName === 'Duke' && this.isMounted && this.runTimer > 0 && this.runTimer <= 3000)) {
@@ -734,6 +748,7 @@ class Fighter extends Entity {
         }
         if (this.buffs.battleCry > 0) {
             this.buffs.battleCry -= dt;
+            currentJump *= 1.2; // Macu大招期间跳跃力提升20%
             if(Math.random()<0.1) game.particles.push(new Particle(this.x+this.w/2, this.y+this.h, "#ff4500", 0, -3, 300));
         }
         if (this.buffs.shade > 0) this.buffs.shade -= dt;
@@ -786,7 +801,10 @@ class Fighter extends Entity {
         let canAct = (this.stunTimer <= 0 && this.buffs.dizzy <= 0);
 
         let targetVx = 0;
-        if (canAct) {
+        if (this.heroName === 'Willi' && this.invincible > 0) {
+            // Willi位移期间强制保持高速移动，无视按键输入
+            targetVx = this.facing * 40;
+        } else if (canAct) {
             if (keys[this.controls.left]) {
                 targetVx = -currentSpeed;
                 this.facing = -1;
@@ -837,6 +855,7 @@ class Fighter extends Entity {
                     if (!enemy.dead && checkAABB(hitBox, enemy)) {
                         enemy.takeDamage(this.getMeleeDamage(), this);
                         if (this.heroName === 'Macu' && this.buffs.battleCry > 0) enemy.buffs.poison = 30000;
+                        if (this.heroName === 'Macu' && this.macuNextAttackDizzy) enemy.buffs.dizzy = 3000; // 附加3秒眩晕
                         if (this.heroName === 'Duke' && this.isMounted) enemy.buffs.dizzy = 3000; // Duke Lance dizzy
                         hitAnything = true;
                     }
@@ -844,10 +863,17 @@ class Fighter extends Entity {
                     for (let m of game.minions) {
                         if (m.owner !== this && !m.dead && checkAABB(hitBox, m)) {
                             m.takeDamage(this.getMeleeDamage(), this);
+                            if (this.heroName === 'Macu' && this.macuNextAttackDizzy) m.buffs.dizzy = 3000;
                             hitAnything = true;
                         }
                     }
-                    if (hitAnything) this.hasHit = true;
+                    if (hitAnything) {
+                        this.hasHit = true;
+                        // Macu消耗掉眩晕攻击次数
+                        if (this.heroName === 'Macu' && this.macuNextAttackDizzy) {
+                            this.macuNextAttackDizzy = false;
+                        }
+                    }
                 }
                 
                 if (this.stateTimer <= 0) {
@@ -893,8 +919,21 @@ class Fighter extends Entity {
         this.x += this.vx;
         this.y += this.vy;
 
-        if (this.x < 0) this.x = 0;
-        if (this.x + this.w > CANVAS_W) this.x = CANVAS_W - this.w;
+        // 触边检测与Willi位移反弹
+        if (this.x < 0) {
+            this.x = 0;
+            if (this.heroName === 'Willi' && this.invincible > 0) {
+                this.facing = 1; // 撞墙反弹变向
+                this.vx = 40;
+            }
+        }
+        if (this.x + this.w > CANVAS_W) {
+            this.x = CANVAS_W - this.w;
+            if (this.heroName === 'Willi' && this.invincible > 0) {
+                this.facing = -1; // 撞墙反弹变向
+                this.vx = -40;
+            }
+        }
 
         this.isGrounded = false;
         this.currentPlatform = null;
@@ -930,11 +969,26 @@ class Fighter extends Entity {
 
     getMeleeHitbox() {
         let range = 50; let yOffset = 10; let h = 40;
-        if (this.heroName === 'Macu') range = 100;
         if (this.heroName === 'Hunter' && this.hunterWeapon === 'sword') range = 70;
         if (this.heroName === 'Artu' || (this.heroName === 'Duke' && !this.isMounted)) range = 65;
         if (this.heroName === 'Duke' && this.isMounted) range = 90; // Long lance charge
         
+        if (this.heroName === 'Macu') {
+            range = 150; // 范围增大 1.5倍
+            let target = game.getEnemyOf(this);
+            let my = this.y + 20; 
+            let ey = target.y + target.h/2;
+            let dy = ey - my;
+            
+            // 限制上下追踪的最大偏角，防止Hitbox飞出天际
+            if (dy < -100) dy = -100;
+            if (dy > 100) dy = 100;
+            
+            // 动态构建一个倾斜覆盖的Hitbox
+            yOffset = Math.min(20, 20 + dy) - 20; 
+            h = Math.abs(dy) + 40; 
+        }
+
         return {
             x: this.facing === 1 ? this.x + this.w : this.x - range,
             y: this.y + yOffset,
@@ -946,7 +1000,7 @@ class Fighter extends Entity {
     getMeleeDamage() {
         if (this.heroName === 'Duke' && this.isMounted) return 30; // 3 WRD
         if (this.heroName === 'Artu') return 20;  // 2 WRD
-        if (this.heroName === 'Macu') return 17;  // 1.7 WRD
+        if (this.heroName === 'Macu') return 19;  // 1.9 WRD
         if (this.heroName === 'Hunter') return 14; // 1.4 WRD
         if (this.heroName === 'Duke' && !this.isMounted) return 12; // 1.2 WRD
         return 10;
@@ -1010,7 +1064,8 @@ class Fighter extends Entity {
         } 
         else if (this.heroName === 'Willi') {
             let speed = 18;
-            game.projectiles.push(new Projectile(px, py, 20, 4, Math.cos(aimAngle)*speed, Math.sin(aimAngle)*speed, 10, this, "#ccc", "knife")); 
+            // 普攻伤害提升至 2 WRD (20)
+            game.projectiles.push(new Projectile(px, py, 20, 4, Math.cos(aimAngle)*speed, Math.sin(aimAngle)*speed, 20, this, "#ccc", "knife")); 
         }
         else if (this.heroName === 'Hunter' && this.hunterWeapon === 'musket') {
             game.projectiles.push(new Projectile(px, py, 12, 12, this.facing * 25, 0, 17, this, "#222", "homing_bullet")); // 追踪弹+17伤害(1.7 WRD)
@@ -1043,15 +1098,18 @@ class Fighter extends Entity {
                 this.williSuperCharges--;
                 if (this.williSuperCharges <= 0) this.williSuperWindow = 0;
             }
-            this.invincible = 400; // 冲刺期间0.4秒无敌
-            this.vx = this.facing * 35; // 瞬间爆发位移
+            this.invincible = 600; // 冲刺时间延长到0.6秒，位移距离大幅增加
+            this.vx = this.facing * 40; 
             this.vy = 0;
             
             for(let i=0; i<20; i++) game.particles.push(new Particle(this.x+this.w/2, this.y+this.h/2, "#0ff", (Math.random()-0.5)*10, (Math.random()-0.5)*10, 600));
             
-            let px = this.facing === 1 ? this.x + this.w : this.x - 40;
+            // 相反方向发射强化大飞刀
+            let knifeFacing = -this.facing;
+            let px = knifeFacing === 1 ? this.x + this.w : this.x - 40;
             let py = this.y + 20;
-            game.projectiles.push(new Projectile(px, py, 40, 8, this.facing * 25, 0, 30, this, "#0ff", "large_knife"));
+            // 伤害提升至 5 WRD (50)
+            game.projectiles.push(new Projectile(px, py, 40, 8, knifeFacing * 25, 0, 50, this, "#0ff", "large_knife"));
             return;
         }
 
@@ -1066,6 +1124,7 @@ class Fighter extends Entity {
         }
         else if (this.heroName === 'Macu') {
             this.buffs.battleCry = 30000;
+            this.macuNextAttackDizzy = true; // 赋予下一次攻击眩晕效果
         }
         else if (this.heroName === 'Willi') {
             this.buffs.shade = 20000;
@@ -1255,15 +1314,40 @@ class Fighter extends Entity {
         }
         else if (this.heroName === 'Macu') {
             ctx.save(); ctx.translate(0, 20);
-            let thrust = 0; let angle = 0.2;
-            if (this.attackState === 'windup') { thrust = -20 * phaseProg; angle = 0.2 + (0.3 * phaseProg); }
-            else if (this.attackState === 'active') { thrust = -20 + (100 * Math.sin(phaseProg * Math.PI)); angle = 0.5 - (0.5 * Math.sin(phaseProg * Math.PI)); }
-            else if (this.attackState === 'recovery') { thrust = 0; angle = 0.2 * phaseProg; }
+            
+            let enemy = game.getEnemyOf(this);
+            let mx = this.x + this.w/2;
+            let my = this.y + 20;
+            let ex = enemy.x + enemy.w/2;
+            let ey = enemy.y + enemy.h/2;
+            
+            // 计算指向敌人的局部角度
+            let rDx = (ex - mx) * this.facing;
+            let rDy = ey - my;
+            let baseAimAngle = Math.atan2(rDy, rDx);
+            
+            if (baseAimAngle > Math.PI/3) baseAimAngle = Math.PI/3;
+            if (baseAimAngle < -Math.PI/3) baseAimAngle = -Math.PI/3;
+
+            let thrust = 0; let angle = baseAimAngle;
+            if (this.attackState === 'windup') { 
+                thrust = -30 * phaseProg; 
+                angle = baseAimAngle - (0.2 * phaseProg); 
+            }
+            else if (this.attackState === 'active') { 
+                thrust = -30 + (150 * Math.sin(phaseProg * Math.PI)); // 刺出距离扩大到 1.5倍
+                angle = baseAimAngle; 
+            }
+            else if (this.attackState === 'recovery') { 
+                thrust = 0; 
+                angle = baseAimAngle; 
+            }
+            
             ctx.rotate(angle);
             if (this.attackState === 'active') {
                 ctx.fillStyle = "rgba(200, 255, 200, 0.5)"; ctx.fillRect(-2, -50 - thrust, 4, thrust + 20);
             }
-            ctx.fillStyle = "#8B4513"; ctx.fillRect(-3, -50 - thrust, 6, 120);
+            ctx.fillStyle = "#8B4513"; ctx.fillRect(-3, -50 - thrust, 6, 150); // 加长长矛手柄
             ctx.fillStyle = "#ddd"; ctx.beginPath(); ctx.moveTo(0, -50 - thrust); ctx.lineTo(-6, -75 - thrust); ctx.lineTo(6, -75 - thrust); ctx.fill();
             ctx.restore();
         }
@@ -1444,8 +1528,10 @@ class Game {
         if (this.p1.heroName === 'Willi' && this.p1.williSuperCharges > 0) p1Stat += ` [DASH x${this.p1.williSuperCharges}]`;
         if (this.p1.heroName === 'Hunter') p1Stat = `Wep: ${this.p1.hunterWeapon.toUpperCase()} ${this.p1.hunterMusketCD>0 ? '(Rld)' : ''}`;
         if (this.p1.heroName === 'Duke') p1Stat = this.p1.isMounted ? (this.p1.runTimer >= 3000 ? "LANCE READY" : "Charging...") : "DISMOUNTED";
+        if (this.p1.heroName === 'Macu' && this.p1.macuNextAttackDizzy) p1Stat += " [DIZZY ATK]"; // 提示玩家眩晕攻击就绪
         if (this.p1.buffs.poison > 0) p1Stat += " [POISONED]";
         if (this.p1.buffs.dizzy > 0) p1Stat += " [DIZZY]";
+        if (this.p1.buffs.slow > 0) p1Stat += " [SLOWED]"; // 增加减速UI提示
         document.getElementById('p1-status').innerText = p1Stat;
 
         // P2 UI
@@ -1466,8 +1552,10 @@ class Game {
         if (this.p2.heroName === 'Willi' && this.p2.williSuperCharges > 0) p2Stat += ` [DASH x${this.p2.williSuperCharges}]`;
         if (this.p2.heroName === 'Hunter') p2Stat = `Wep: ${this.p2.hunterWeapon.toUpperCase()} ${this.p2.hunterMusketCD>0 ? '(Rld)' : ''}`;
         if (this.p2.heroName === 'Duke') p2Stat = this.p2.isMounted ? (this.p2.runTimer >= 3000 ? "LANCE READY" : "Charging...") : "DISMOUNTED";
+        if (this.p2.heroName === 'Macu' && this.p2.macuNextAttackDizzy) p2Stat += " [DIZZY ATK]";
         if (this.p2.buffs.poison > 0) p2Stat += " [POISONED]";
         if (this.p2.buffs.dizzy > 0) p2Stat += " [DIZZY]";
+        if (this.p2.buffs.slow > 0) p2Stat += " [SLOWED]"; // 增加减速UI提示
         document.getElementById('p2-status').innerText = p2Stat;
     }
 
