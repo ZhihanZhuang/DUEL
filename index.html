@@ -443,7 +443,7 @@ const HEROES = {
         color: "#1E90FF", maxHp: 850, speed: 5.5, jump: 15, width: 40, height: 75, superCD: 25000,
         ui: {
             hp: "85 WRD", atk: "3 WRD (Melee Combo)",
-            passive: "<span class='skill-tag'>Karate Combo</span> Every 3rd attack fires a Blue Ki Blast (5 WRD, Huge Knockback, 2s Stun).<br><span class='skill-tag'>Flip Attack</span> Double Jump quickly to backflip (6 WRD, 3s CD).",
+            passive: "<span class='skill-tag'>Karate Combo</span> Every 3rd attack fires a Blue Ki Blast (5 WRD, Huge Knockback, 0.75s Stun).<br><span class='skill-tag'>Flip Attack</span> Double Jump quickly to backflip (6 WRD, 3s CD).",
             super: "<span class='skill-tag'>2-Phase Grapple</span><br>1) Vacuum pull nearby enemies.<br>2) Press Super again within 5s to Judo Throw (13 WRD + 5s Stun)."
         }
     }
@@ -535,7 +535,7 @@ class Projectile extends Entity {
                         t.takeDamage(this.damage, this.owner, false, noKnockback);
                         if (this.type === "large_knife") t.buffs.slow = 5000;
                         if (this.type === "ki_blast") {
-                            t.buffs.dizzy = 2000; // 2s Stun
+                            t.buffs.dizzy = 750; // 0.75s Stun
                             let dir = this.vx > 0 ? 1 : -1;
                             t.vx = dir * 45; // Enhanced Knockback
                             t.vy = -8;
@@ -692,7 +692,7 @@ class Fighter extends Entity {
         // General Buffs & Mechanics
         this.buffs = { poison: 0, battleCry: 0, shade: 0, dizzy: 0, slow: 0, hurricaneSlow: false };
         this.invincible = 0; this.lastJumpTime = 0;
-        this.flipActive = 0; this.hasHitFlip = false; // 修复：为所有英雄初始化翻滚状态，防止 undefined 导致逻辑锁死
+        this.flipActive = 0; this.hasHitFlip = false; this.hasFlipped = false; // 修复：新增 hasFlipped 限制每次滞空只能翻转一次
         this.grapplePhase = 0; this.grappleTimer = 0; 
         this.grappledBy = null; // Used by victims of Kadaxi
         
@@ -851,19 +851,25 @@ class Fighter extends Entity {
         if (keysPressed[this.controls.jump]) {
             this.jumpBuffer = 150;
             // Flip Attack check
-            if (this.heroName === 'Kadaxi' && !this.isGrounded && (this.stunTimer <= 0 && this.buffs.dizzy <= 0 && this.grapplePhase === 0 && this.flipCooldown <= 0)) {
+            if (this.heroName === 'Kadaxi' && !this.isGrounded && !this.hasFlipped && (this.stunTimer <= 0 && this.buffs.dizzy <= 0 && this.grapplePhase === 0 && this.flipCooldown <= 0)) {
                 let now = performance.now();
                 if (now - this.lastJumpTime <= 500) {
                     this.flipActive = 400;
                     this.hasHitFlip = false;
+                    this.hasFlipped = true; // 标记本次滞空已使用过后空翻
                     this.vy = -10; // little bump
                     this.flipCooldown = 3000; // 3s cooldown
                 }
-                this.lastJumpTime = now;
+                // 修复核心：移除这里的 this.lastJumpTime = now; 
+                // 强制要求后空翻必须接在“真实起跳”之后，防止在空中反复双击逃课滞空
             }
         } else if (this.jumpBuffer > 0) this.jumpBuffer -= dt;
 
-        if (this.isGrounded) { this.coyoteTime = 100; this.jumpsLeft = this.maxJumps; } 
+        if (this.isGrounded) { 
+            this.coyoteTime = 100; 
+            this.jumpsLeft = this.maxJumps; 
+            this.hasFlipped = false; // 落地重置空翻状态
+        } 
         else { this.coyoteTime -= dt; }
 
         if (this.heroName === 'Hason' && this.hasonAmmo < 6) {
@@ -934,7 +940,7 @@ class Fighter extends Entity {
                 
                 if (this.stateTimer <= 0) {
                     this.attackState = 'recovery';
-                    this.stateTimer = (this.heroName === 'Hason') ? 100 : (this.heroName === 'Kadaxi' ? 120 : 250); 
+                    this.stateTimer = (this.heroName === 'Hason') ? 100 : (this.heroName === 'Kadaxi' ? 200 : 250); 
                     this.maxStateTimer = this.stateTimer;
                 }
             } else if (this.attackState === 'recovery') {
@@ -1047,7 +1053,7 @@ class Fighter extends Entity {
         
         if (this.heroName === 'Duke' && this.isMounted) this.stateTimer = 50; 
         if (this.heroName === 'Hason') this.stateTimer = 50; 
-        if (this.heroName === 'Kadaxi') this.stateTimer = 50; // Faster windup
+        if (this.heroName === 'Kadaxi') this.stateTimer = 100; // Kadaxi 攻击前摇回调至正常水平
         
         this.maxStateTimer = this.stateTimer;
         this.hasHit = false;
