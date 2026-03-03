@@ -115,9 +115,18 @@
             text-transform: uppercase;
             font-weight: bold;
             transition: transform 0.1s, background 0.2s;
+            flex: 1;
         }
         .btn-start:hover { background: #e03131; transform: scale(1.05); }
         .btn-start:active { transform: scale(0.95); }
+        
+        .mode-select {
+            display: flex;
+            gap: 20px;
+            width: 100%;
+            max-width: 600px;
+            justify-content: center;
+        }
 
         /* In-Game UI Overlay */
         #game-ui {
@@ -216,7 +225,10 @@
             </div>
         </div>
         
-        <button class="btn-start" id="btn-start">Fight!</button>
+        <div class="mode-select">
+            <button class="btn-start" id="btn-sp">1 Player (Vs CPU)</button>
+            <button class="btn-start" id="btn-mp">2 Players (Local)</button>
+        </div>
     </div>
 
     <!-- Game Over Screen -->
@@ -531,6 +543,8 @@ class Fighter extends Entity {
         this.jumpsLeft = this.maxJumps;
         this.currentPlatform = null;
         
+        this.aiIntent = { left: false, right: false }; // Used for AI control
+        
         this.attackState = 'idle'; // idle, windup, active, recovery
         this.stateTimer = 0;
         this.maxStateTimer = 0; // Used to track progress of current state
@@ -649,7 +663,6 @@ class Fighter extends Entity {
             // Dynamic Friction (Slippery platform support)
             let friction = 0.25;
             if (this.currentPlatform && this.currentPlatform.type === 'center') {
-                friction = 0.03; // Slippery ice-like friction
                 this.takeDamage(10 * (dt/1000), null, true); // Poison: 1 WRD (10 dmg) per second
                 if (Math.random() < 0.2) {
                     game.particles.push(new Particle(this.x + Math.random()*this.w, this.y + this.h, "#9932CC", 0, -1, 150));
@@ -1211,7 +1224,9 @@ class Game {
             p2Roster.appendChild(b2);
         });
 
-        document.getElementById('btn-start').onclick = () => this.startGame();
+        document.getElementById('btn-sp').onclick = () => this.startGame(true);
+        document.getElementById('btn-mp').onclick = () => this.startGame(false);
+        
         document.getElementById('btn-restart').onclick = () => {
             document.getElementById('game-over-screen').classList.add('hidden');
             document.getElementById('menu-screen').classList.remove('hidden');
@@ -1219,15 +1234,18 @@ class Game {
         };
     }
 
-    startGame() {
+    startGame(isSinglePlayer) {
         document.getElementById('menu-screen').classList.add('hidden');
         document.getElementById('game-ui').classList.remove('hidden');
+        
+        this.isSinglePlayer = isSinglePlayer;
         
         let p1Ctrl = { left: 'KeyA', right: 'KeyD', jump: 'KeyW', attack: 'Space', super: 'KeyE', switch: 'KeyT' };
         let p2Ctrl = { left: 'ArrowLeft', right: 'ArrowRight', jump: 'ArrowUp', attack: 'Numpad9', super: 'NumpadEnter', switch: 'KeyP' };
 
+        let p2StartX = CANVAS_W - 150; // Dynamic right-side placement
         this.p1 = new Fighter('p1', this.p1Choice, 100, p1Ctrl, true);
-        this.p2 = new Fighter('p2', this.p2Choice, 800, p2Ctrl, false);
+        this.p2 = new Fighter('p2', this.p2Choice, p2StartX, p2Ctrl, false);
         this.p2.facing = -1;
 
         this.projectiles = [];
@@ -1235,10 +1253,11 @@ class Game {
         this.minions = [];
         this.hurricane = null;
         this.hitstop = 0;
+        this.aiTimer = 0;
 
         // UI Setup
         document.getElementById('p1-name').innerText = `P1: ${HEROES[this.p1Choice].name}`;
-        document.getElementById('p2-name').innerText = `P2: ${HEROES[this.p2Choice].name}`;
+        document.getElementById('p2-name').innerText = `P2: ${HEROES[this.p2Choice].name}${isSinglePlayer ? ' [CPU]' : ''}`;
         
         this.state = 'PLAYING';
         this.lastTime = performance.now();
@@ -1325,6 +1344,10 @@ class Game {
             return;
         }
 
+        if (this.state === 'PLAYING' && this.isSinglePlayer && !this.p1.dead && !this.p2.dead) {
+            this.updateAI(dt);
+        }
+
         this.update(dt);
         this.draw();
         
@@ -1332,6 +1355,69 @@ class Game {
         for (let k in keysPressed) delete keysPressed[k];
 
         requestAnimationFrame(t => this.loop(t));
+    }
+
+    updateAI(dt) {
+        this.aiTimer -= dt;
+        
+        let p1 = this.p1;
+        let p2 = this.p2;
+
+        if (this.aiTimer <= 0) {
+            // CPU "thinks" every 150-250ms (mimics human reaction time)
+            this.aiTimer = 150 + Math.random() * 100; 
+            
+            p2.aiIntent.left = false;
+            p2.aiIntent.right = false;
+            
+            let dx = p1.x - p2.x;
+            let dy = p1.y - p2.y;
+            let dist = Math.abs(dx);
+            
+            let isMelee = p2.isMeleeAttack();
+            let attackRange = isMelee ? 80 : 350;
+            
+            // --- 1. Movement Logic ---
+            if (dist > attackRange) {
+                // Move towards player
+                if (dx > 0) p2.aiIntent.right = true;
+                else p2.aiIntent.left = true;
+            } else if (dist < attackRange - 50 && !isMelee) {
+                // Back away if ranged hero and getting too close
+                if (dx > 0) p2.aiIntent.left = true;
+                else p2.aiIntent.right = true;
+            } else if (dist <= attackRange) {
+                // Occasional shuffling to make AI less robotic
+                if (Math.random() < 0.2) p2.aiIntent.left = true;
+                else if (Math.random() < 0.3) p2.aiIntent.right = true;
+            }
+
+            // --- 2. Jumping Logic ---
+            // If P1 is significantly higher, or randomly jump to dodge/close gaps
+            if (dy < -60 || (dist < 150 && Math.random() < 0.2)) {
+                keysPressed[p2.controls.jump] = true;
+            }
+            
+            // --- 3. Attack Logic ---
+            if (dist <= attackRange && Math.abs(dy) < 80 && Math.random() < 0.8) {
+                keysPressed[p2.controls.attack] = true;
+            }
+            
+            // --- 4. Super Skill Logic ---
+            if (p2.superCooldown <= 0 && dist <= attackRange + 100 && Math.random() < 0.5) {
+                keysPressed[p2.controls.super] = true;
+            }
+
+            // --- 5. Hunter Weapon Switch ---
+            if (p2.heroName === 'Hunter') {
+                if (dist < 120 && p2.hunterWeapon === 'musket') keysPressed[p2.controls.switch] = true;
+                if (dist > 200 && p2.hunterWeapon === 'sword' && p2.hunterMusketCD <= 0) keysPressed[p2.controls.switch] = true;
+            }
+        }
+        
+        // Apply continuous intents to the global keys object every frame
+        keys[p2.controls.left] = p2.aiIntent.left;
+        keys[p2.controls.right] = p2.aiIntent.right;
     }
 
     update(dt) {
