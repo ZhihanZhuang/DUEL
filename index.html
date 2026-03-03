@@ -854,7 +854,7 @@ class Fighter extends Entity {
                     
                     if (!enemy.dead && checkAABB(hitBox, enemy)) {
                         enemy.takeDamage(this.getMeleeDamage(), this);
-                        if (this.heroName === 'Macu' && this.buffs.battleCry > 0) enemy.buffs.poison = 30000;
+                        if (this.heroName === 'Macu' && this.buffs.battleCry > 0) enemy.buffs.poison = 3000; // 毒性持续时间改为3秒
                         if (this.heroName === 'Macu' && this.macuNextAttackDizzy) enemy.buffs.dizzy = 3000; // 附加3秒眩晕
                         if (this.heroName === 'Duke' && this.isMounted) enemy.buffs.dizzy = 3000; // Duke Lance dizzy
                         hitAnything = true;
@@ -878,8 +878,8 @@ class Fighter extends Entity {
                 
                 if (this.stateTimer <= 0) {
                     this.attackState = 'recovery';
-                    this.stateTimer = 250;
-                    this.maxStateTimer = 250;
+                    this.stateTimer = (this.heroName === 'Hason') ? 100 : 250; // Hason 的攻击后摇缩短，加快射速
+                    this.maxStateTimer = this.stateTimer;
                 }
             } else if (this.attackState === 'recovery') {
                 this.stateTimer -= dt;
@@ -1022,6 +1022,7 @@ class Fighter extends Entity {
         this.stateTimer = (this.heroName === 'Hunter' && this.hunterWeapon === 'sword') ? 200 : 100;
         
         if (this.heroName === 'Duke' && this.isMounted) this.stateTimer = 50; // Fast windup while charging
+        if (this.heroName === 'Hason') this.stateTimer = 50; // 缩短 Hason 的开火前摇，加快射速
         
         this.maxStateTimer = this.stateTimer;
         this.hasHit = false;
