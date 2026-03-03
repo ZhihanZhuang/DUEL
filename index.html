@@ -389,7 +389,7 @@ const HEROES = {
         color: "#8B4513", maxHp: 750, speed: 5, jump: 15, width: 40, height: 70, superCD: 10000,
         ui: {
             hp: "75 WRD", atk: "2.5 WRD (Ranged)",
-            passive: "Reloads 1 bullet every 1.5s (Max 6). Fast fire rate.",
+            passive: "Empties 6 shots then reloads for 2s. Out of combat for 5s fully restores ammo.",
             super: "Throws up to 3 Dynamites (15 WRD AoE each) in quick succession."
         }
     },
@@ -440,9 +440,9 @@ const HEROES = {
     },
     Kadaxi: {
         name: "Kadaxi", desc: "Judo Master (Control & Combos)",
-        color: "#1E90FF", maxHp: 1000, speed: 5.5, jump: 15, width: 40, height: 75, superCD: 25000,
+        color: "#1E90FF", maxHp: 850, speed: 5.5, jump: 15, width: 40, height: 75, superCD: 25000,
         ui: {
-            hp: "100 WRD", atk: "3 WRD (Melee Combo)",
+            hp: "85 WRD", atk: "3 WRD (Melee Combo)",
             passive: "<span class='skill-tag'>Karate Combo</span> Every 3rd attack fires a Blue Ki Blast (5 WRD, Huge Knockback, 0.75s Stun).<br><span class='skill-tag'>Flip Attack</span> Double Jump quickly to backflip (6 WRD, 3s CD).",
             super: "<span class='skill-tag'>2-Phase Grapple</span><br>1) Vacuum pull nearby enemies.<br>2) Press Super again within 5s to Judo Throw (13 WRD + 5s Stun)."
         }
@@ -695,9 +695,11 @@ class Fighter extends Entity {
         this.flipActive = 0; this.hasHitFlip = false; this.hasFlipped = false; // 修复：新增 hasFlipped 限制每次滞空只能翻转一次
         this.grapplePhase = 0; this.grappleTimer = 0; 
         this.grappledBy = null; // Used by victims of Kadaxi
+        this.flipCooldown = 0; // 全局冷却时间初始化
+        this.timeSinceLastDamage = 0; // 通用脱战计时器
         
         // Character Specifics
-        this.hasonAmmo = 6; this.hasonRecharge = 0; this.hasonSuperCharges = 0; this.hasonSuperWindow = 0;
+        this.hasonAmmo = 6; this.hasonReloadTimer = 0; this.hasonSuperCharges = 0; this.hasonSuperWindow = 0;
         this.williSuperCharges = 0; this.williSuperWindow = 0;
         this.hunterWeapon = 'musket'; this.hunterMusketCD = 0;
         this.macuNextAttackDizzy = false; 
@@ -712,7 +714,6 @@ class Fighter extends Entity {
         if (this.heroName === 'Kadaxi') {
             this.comboCount = 0; this.comboTimer = 0;
             this.grappleTarget = null;
-            this.flipCooldown = 0;
         }
     }
 
@@ -740,6 +741,7 @@ class Fighter extends Entity {
 
         this.hp -= amt;
         this.stunTimer = 150;
+        this.timeSinceLastDamage = 0; // 受击重置脱战计时器
         
         if (!isDoT && !noKnockback && !this.grappledBy) {
             let direction = attacker ? (this.x + this.w/2 < attacker.x + attacker.w/2 ? -1 : 1) : (this.facing === 1 ? -1 : 1);
@@ -782,15 +784,17 @@ class Fighter extends Entity {
         }
 
         if (this.invincible > 0) this.invincible -= dt;
-        if (this.heroName === 'Kadaxi' && this.flipCooldown > 0) this.flipCooldown -= dt;
+        if (this.flipCooldown > 0) this.flipCooldown -= dt; // 所有人应用冷却
         
         if (this.flipActive > 0) {
             this.flipActive -= dt;
-            // Flip hitbox logic
-            let enemy = game.getEnemyOf(this);
-            if (!this.hasHitFlip && checkAABB(this, enemy)) {
-                enemy.takeDamage(60, this); // 6 WRD
-                this.hasHitFlip = true;
+            // Flip hitbox logic ONLY for Kadaxi
+            if (this.heroName === 'Kadaxi') {
+                let enemy = game.getEnemyOf(this);
+                if (!this.hasHitFlip && checkAABB(this, enemy)) {
+                    enemy.takeDamage(60, this); // 6 WRD
+                    this.hasHitFlip = true;
+                }
             }
         }
 
@@ -850,8 +854,8 @@ class Fighter extends Entity {
 
         if (keysPressed[this.controls.jump]) {
             this.jumpBuffer = 150;
-            // Flip Attack check
-            if (this.heroName === 'Kadaxi' && !this.isGrounded && !this.hasFlipped && (this.stunTimer <= 0 && this.buffs.dizzy <= 0 && this.grapplePhase === 0 && this.flipCooldown <= 0)) {
+            // Universal Flip Attack check (适用于所有英雄)
+            if (!this.isGrounded && !this.hasFlipped && (this.stunTimer <= 0 && this.buffs.dizzy <= 0 && this.grapplePhase === 0 && this.flipCooldown <= 0)) {
                 let now = performance.now();
                 if (now - this.lastJumpTime <= 500) {
                     this.flipActive = 400;
@@ -859,9 +863,8 @@ class Fighter extends Entity {
                     this.hasFlipped = true; // 标记本次滞空已使用过后空翻
                     this.vy = -10; // little bump
                     this.flipCooldown = 3000; // 3s cooldown
+                    this.jumpBuffer = 0; // 消耗掉跳跃指令，防止与常规二段跳冲突
                 }
-                // 修复核心：移除这里的 this.lastJumpTime = now; 
-                // 强制要求后空翻必须接在“真实起跳”之后，防止在空中反复双击逃课滞空
             }
         } else if (this.jumpBuffer > 0) this.jumpBuffer -= dt;
 
@@ -872,9 +875,20 @@ class Fighter extends Entity {
         } 
         else { this.coyoteTime -= dt; }
 
-        if (this.heroName === 'Hason' && this.hasonAmmo < 6) {
-            this.hasonRecharge += dt;
-            if (this.hasonRecharge >= 1500) { this.hasonAmmo++; this.hasonRecharge = 0; }
+        this.timeSinceLastDamage += dt;
+
+        if (this.heroName === 'Hason') {
+            // 弹药耗尽后，经过 2 秒统一换弹
+            if (this.hasonAmmo <= 0) {
+                this.hasonReloadTimer += dt;
+                if (this.hasonReloadTimer >= 2000) {
+                    this.hasonAmmo = 6;
+                    this.hasonReloadTimer = 0;
+                }
+            } else if (this.hasonAmmo < 6 && this.timeSinceLastDamage >= 5000) {
+                // 脱战（未受伤且未开火）5 秒自动补满子弹
+                this.hasonAmmo = 6;
+            }
         }
 
         // --- Movement & Attack State Machine ---
@@ -976,11 +990,12 @@ class Fighter extends Entity {
                 game.particles.push(new Particle(this.x+this.w/2, this.y+this.h, "#ccc", -2, 0, 200));
                 game.particles.push(new Particle(this.x+this.w/2, this.y+this.h, "#ccc", 2, 0, 200));
                 
-                if (this.heroName === 'Kadaxi') this.lastJumpTime = performance.now();
+                this.lastJumpTime = performance.now(); // 所有人记录真实起跳时间
             }
         }
 
-        this.x += this.vx; this.y += this.vy;
+        this.x += this.vx;
+        this.y += this.vy;
 
         if (this.x < 0) {
             this.x = 0;
@@ -1044,7 +1059,8 @@ class Fighter extends Entity {
 
     performAttack() {
         if (this.attackState !== 'idle') return;
-        if (this.heroName === 'Hason' && this.hasonAmmo <= 0) { this.attackState = 'recovery'; this.stateTimer = 200; this.maxStateTimer = 200; return; }
+        // Hason 如果没有子弹（正在换弹），直接取消攻击动作，允许正常走位
+        if (this.heroName === 'Hason' && this.hasonAmmo <= 0) return; 
         if (this.heroName === 'Hunter' && this.hunterWeapon === 'musket' && this.hunterMusketCD > 0) return;
         if (this.heroName === 'Duke' && this.isMounted && this.runTimer < 3000) return; 
 
@@ -1084,7 +1100,9 @@ class Fighter extends Entity {
         if (this.heroName === 'Macu') this.vx = this.facing * 12;
 
         if (this.heroName === 'Hason') {
-            this.hasonAmmo--; this.hasonRecharge = 0; let speed = 20;
+            this.hasonAmmo--; 
+            this.timeSinceLastDamage = 0; // 修复核心：开火也会重置脱战计时器，防止无限子弹
+            let speed = 20;
             game.projectiles.push(new Projectile(px, py, 10, 5, Math.cos(aimAngle)*speed, Math.sin(aimAngle)*speed, 25, this, "#FFD700")); 
             game.particles.push(new Particle(px, py, "#FFA500", Math.cos(aimAngle)*2, Math.sin(aimAngle)*2, 100));
         } 
@@ -1160,6 +1178,7 @@ class Fighter extends Entity {
                 this.hasonSuperCharges--;
                 if (this.hasonSuperCharges <= 0) this.hasonSuperWindow = 0;
             }
+            this.timeSinceLastDamage = 0; // 修复：丢炸弹也算进战斗，重置脱战计时
             for(let i=0; i<20; i++) game.particles.push(new Particle(this.x+this.w/2, this.y+this.h/2, "#ffeb3b", (Math.random()-0.5)*10, (Math.random()-0.5)*10, 600));
             game.projectiles.push(new Projectile(this.x+this.w/2, this.y, 16, 16, this.facing * 12, -8, 0, this, "", "dynamite"));
             return;
@@ -1518,7 +1537,10 @@ class Game {
         if (p1Sup >= 100) document.getElementById('p1-super').classList.add('ready'); else document.getElementById('p1-super').classList.remove('ready');
 
         let p1Stat = "";
-        if (this.p1.heroName === 'Hason') { p1Stat = `Ammo: ${this.p1.hasonAmmo}/6`; if (this.p1.hasonSuperCharges > 0) p1Stat += ` [DYNAMITE x${this.p1.hasonSuperCharges}]`; }
+        if (this.p1.heroName === 'Hason') { 
+            p1Stat = this.p1.hasonAmmo <= 0 ? `Ammo: RELOADING...` : `Ammo: ${this.p1.hasonAmmo}/6`; 
+            if (this.p1.hasonSuperCharges > 0) p1Stat += ` [DYNAMITE x${this.p1.hasonSuperCharges}]`; 
+        }
         if (this.p1.heroName === 'Willi' && this.p1.williSuperCharges > 0) p1Stat += ` [DASH x${this.p1.williSuperCharges}]`;
         if (this.p1.heroName === 'Hunter') p1Stat = `Wep: ${this.p1.hunterWeapon.toUpperCase()} ${this.p1.hunterMusketCD>0 ? '(Rld)' : ''}`;
         if (this.p1.heroName === 'Duke') p1Stat = this.p1.isMounted ? (this.p1.runTimer >= 3000 ? "LANCE READY" : "Charging...") : "DISMOUNTED";
@@ -1536,7 +1558,10 @@ class Game {
         if (p2Sup >= 100) document.getElementById('p2-super').classList.add('ready'); else document.getElementById('p2-super').classList.remove('ready');
 
         let p2Stat = "";
-        if (this.p2.heroName === 'Hason') { p2Stat = `Ammo: ${this.p2.hasonAmmo}/6`; if (this.p2.hasonSuperCharges > 0) p2Stat += ` [DYNAMITE x${this.p2.hasonSuperCharges}]`; }
+        if (this.p2.heroName === 'Hason') { 
+            p2Stat = this.p2.hasonAmmo <= 0 ? `Ammo: RELOADING...` : `Ammo: ${this.p2.hasonAmmo}/6`; 
+            if (this.p2.hasonSuperCharges > 0) p2Stat += ` [DYNAMITE x${this.p2.hasonSuperCharges}]`; 
+        }
         if (this.p2.heroName === 'Willi' && this.p2.williSuperCharges > 0) p2Stat += ` [DASH x${this.p2.williSuperCharges}]`;
         if (this.p2.heroName === 'Hunter') p2Stat = `Wep: ${this.p2.hunterWeapon.toUpperCase()} ${this.p2.hunterMusketCD>0 ? '(Rld)' : ''}`;
         if (this.p2.heroName === 'Duke') p2Stat = this.p2.isMounted ? (this.p2.runTimer >= 3000 ? "LANCE READY" : "Charging...") : "DISMOUNTED";
@@ -1589,59 +1614,173 @@ class Game {
 
     updateAI(dt) {
         this.aiTimer -= dt;
-        let p1 = this.p1; let p2 = this.p2;
+        let p1 = this.p1;
+        let p2 = this.p2;
 
         if (this.aiTimer <= 0) {
-            this.aiTimer = 150 + Math.random() * 100; 
-            p2.aiIntent.left = false; p2.aiIntent.right = false;
-            
-            let dx = p1.x - p2.x; let dy = p1.y - p2.y; let dist = Math.abs(dx);
-            let isMelee = p2.isMeleeAttack(); let attackRange = isMelee ? 80 : 350;
+            // Reaction time (Hard/Smart AI)
+            this.aiTimer = 100 + Math.random() * 100; // 100-200ms
 
-            // Kadaxi AI
+            p2.aiIntent.left = false;
+            p2.aiIntent.right = false;
+            
+            // 1. Tactical Assessment
+            let hpRatioP1 = p1.hp / p1.maxHp;
+            let hpRatioP2 = p2.hp / p2.maxHp;
+            let hpDiff = hpRatioP2 - hpRatioP1;
+            let skillReady = (p2.superCooldown <= 0 || (p2.heroName === 'Hason' && p2.hasonSuperCharges > 0) || (p2.heroName === 'Willi' && p2.williSuperCharges > 0));
+            
+            let tacticalState = 'neutral';
+            if (hpDiff > 0.2 || hpRatioP1 < 0.3 || skillReady) {
+                tacticalState = 'aggressive';
+            } else if (hpDiff < -0.25 || hpRatioP2 < 0.25) {
+                tacticalState = 'defensive';
+            }
+
+            // 2. Prediction System
+            let predX = Math.max(0, Math.min(CANVAS_W, p1.x + (p1.vx * 15)));
+            let predY = p1.y + (p1.vy * 5);
+            let dx = predX - p2.x;
+            let dy = predY - p2.y;
+            let dist = Math.abs(dx);
+            
+            let isMelee = p2.isMeleeAttack();
+            let attackRange = isMelee ? 80 : 350;
+            if (p2.heroName === 'Kadaxi') attackRange = 100;
+            if (p2.heroName === 'Duke' && p2.isMounted) attackRange = 120;
+            if (p2.heroName === 'Macu') attackRange = 160;
+
+            // Kadaxi AI (移除了硬编码的 setTimeout 跳跃，改为由下方的评分系统接管)
             if (p2.heroName === 'Kadaxi') {
                 if (p2.grapplePhase === 1) {
                     if (p2.grappleTimer <= 4500) keysPressed[p2.controls.super] = true; // Instant throw
                 } else if (dist <= 180 && Math.abs(dy) < 50 && p2.superCooldown <= 0) {
                     keysPressed[p2.controls.super] = true; // Attempt grab
-                } else if (dy < -60 && dist < 120) {
-                    keysPressed[p2.controls.jump] = true; 
-                    // Spam jump to trigger flip attack
-                    setTimeout(() => { if (!p2.dead) keysPressed[p2.controls.jump] = true; }, 200); 
                 }
             }
 
-            if (p2.heroName === 'Duke' && p2.isMounted) {
-                if (p2.runTimer >= 3000) {
-                    if (dx > 0) p2.aiIntent.right = true; else p2.aiIntent.left = true;
-                    if (dist < 100 && Math.abs(dy) < 50) keysPressed[p2.controls.attack] = true;
-                } else {
-                    if (dist < 200) { if (dx > 0) p2.aiIntent.left = true; else p2.aiIntent.right = true; } 
-                    else { if (dx > 0) p2.aiIntent.right = true; else p2.aiIntent.left = true; }
-                }
-            } 
-            else {
-                if (dist > attackRange) { if (dx > 0) p2.aiIntent.right = true; else p2.aiIntent.left = true; } 
-                else if (dist < attackRange - 50 && !isMelee) { if (dx > 0) p2.aiIntent.left = true; else p2.aiIntent.right = true; } 
-                else if (dist <= attackRange) {
-                    if (Math.random() < 0.2) p2.aiIntent.left = true; else if (Math.random() < 0.3) p2.aiIntent.right = true;
-                }
-                if (dist <= attackRange && Math.abs(dy) < 80 && Math.random() < 0.8) keysPressed[p2.controls.attack] = true;
-            }
+            // 3. Utility Scoring System
+            let scores = {
+                moveForward: 0,
+                moveBackward: 0,
+                attack: 0,
+                superSkill: 0,
+                jump: 0,
+                switch: 0
+            };
 
-            if (dy < -60 || (dist < 150 && Math.random() < 0.2)) keysPressed[p2.controls.jump] = true;
-            
+            // Edge Pressure
+            let p1EdgeDist = Math.min(p1.x, CANVAS_W - (p1.x + p1.w));
+            let nearEdge = p1EdgeDist < 100;
+
+            // --- Move Forward Score ---
+            if (dist > attackRange * 0.8) scores.moveForward += 50;
+            if (tacticalState === 'aggressive') scores.moveForward += 30;
+            if (nearEdge && tacticalState !== 'defensive') scores.moveForward += 20; // Corner pressure
+            if (p2.heroName === 'Duke' && p2.isMounted && p2.runTimer < 3000) scores.moveForward += 40; // Duke wants to run
+
+            // --- Move Backward Score ---
+            if (dist < attackRange - 30 && !isMelee) scores.moveBackward += 60; // Ranged kite
+            if (tacticalState === 'defensive') scores.moveBackward += 40;
+            if (p2.heroName === 'Kadaxi' && p2.comboCount === 2) scores.moveBackward += 20; // Space for Ki blast
+
+            // --- Attack Score ---
+            if (dist <= attackRange && Math.abs(dy) < 60) {
+                scores.attack += 80;
+            }
+            if (nearEdge) scores.attack += 15;
+            scores.attack += Math.random() * 10; // Slight variance
+
+            // --- Super Skill Score ---
             let superRange = (p2.heroName === 'Duke' && !p2.isMounted) ? 600 : attackRange + 100;
-            if ((p2.superCooldown <= 0 || (p2.heroName === 'Hason' && p2.hasonSuperCharges > 0) || (p2.heroName === 'Willi' && p2.williSuperCharges > 0)) && dist <= superRange && Math.random() < 0.5) {
-                if (p2.heroName !== 'Kadaxi') keysPressed[p2.controls.super] = true;
+            if (p2.heroName === 'Kadaxi') superRange = 200; // Kadaxi grapple range
+            
+            if (skillReady && dist <= superRange && Math.abs(dy) < 60) {
+                scores.superSkill += 100;
+                if (tacticalState === 'aggressive') scores.superSkill += 50;
+            }
+            if (p2.heroName === 'Kadaxi' && p2.grapplePhase === 1) {
+                scores.superSkill += 500; // MUST THROW
             }
 
-            if (p2.heroName === 'Hunter') { 
-                if (dist < 120 && p2.hunterWeapon === 'musket') keysPressed[p2.controls.switch] = true;
-                if (dist > 200 && p2.hunterWeapon === 'sword' && p2.hunterMusketCD <= 0) keysPressed[p2.controls.switch] = true;
+            // --- Jump Score ---
+            // 1. 追击高处目标与智能二段跳
+            if (dy < -40) {
+                if (p2.isGrounded) {
+                    scores.jump += 80;
+                } else if (p2.jumpsLeft > 0 && p2.vy > -2) {
+                    scores.jump += 80; // 在滞空到达最高点或开始下落时使用二段跳
+                }
             }
+            
+            // 2. 随机规避跳跃
+            if (dist < 100 && Math.random() < 0.2) scores.jump += 60; // 提高规避几率
+            
+            // 3. Kadaxi 空中特技接管
+            if (p2.heroName === 'Kadaxi' && !p2.isGrounded && !p2.hasFlipped && p2.flipCooldown <= 0) {
+                // 如果敌人在身边，强行拉高跳跃评分触发后空翻
+                if (dist < 150 && Math.abs(dy) < 80) scores.jump += 100;
+            }
+
+            // 4. 躲避飞行道具 (Projectile Evasion)
+            for (let proj of this.projectiles) {
+                if (proj.owner !== p2 && !proj.dead && proj.type !== "dynamite") {
+                    let dxProj = p2.x - proj.x;
+                    
+                    // 子弹是否朝向 AI
+                    let isHeadingTowards = (dxProj > 0 && proj.vx > 0) || (dxProj < 0 && proj.vx < 0);
+                    
+                    // 【优化核心】：扩大Y轴威胁判定范围（不仅是当前身体，还包括脚下80px的空间，防止AI掉下来接子弹）
+                    let isYAligned = (proj.y + proj.h > p2.y - 20) && (proj.y < p2.y + p2.h + 80);
+                    
+                    // 如果是正朝自己飞来的子弹，且进入危险距离
+                    if (isHeadingTowards && isYAligned && Math.abs(dxProj) < 300) {
+                        
+                        // 【优化核心】：二段跳滞空节奏控制
+                        if (!p2.isGrounded && p2.vy < -2 && p2.heroName !== 'Kadaxi') {
+                            // 如果已经在空中且还在快速上升，不要马上交二段跳（防止浪费高度，让它多飞一会）
+                        } else {
+                            scores.jump += 200; // 起跳，或者在最高点交出二段跳
+                        }
+                        
+                        scores.moveBackward += 80; // 配合向后拉扯
+                        
+                        // 针对所有人强制空翻滞空躲避
+                        if (!p2.isGrounded && Math.abs(dxProj) < 200) {
+                            if (!p2.hasFlipped && p2.flipCooldown <= 0) {
+                                scores.jump += 300;
+                                // 模拟人类极速双击跳跃，触发后空翻滞空
+                                setTimeout(() => { if (!p2.dead) keysPressed[p2.controls.jump] = true; }, 50);
+                            }
+                        }
+                        break;
+                    }
+                }
+            }
+
+            // --- Switch Score (Hunter) ---
+            if (p2.heroName === 'Hunter') {
+                if (dist < 120 && p2.hunterWeapon === 'musket') scores.switch += 80;
+                if (dist > 200 && p2.hunterWeapon === 'sword' && p2.hunterMusketCD <= 0) scores.switch += 80;
+            }
+
+            // 4. Execute Actions based on scores
+            if (scores.moveForward > scores.moveBackward) {
+                if (dx > 0) p2.aiIntent.right = true; else p2.aiIntent.left = true;
+            } else if (scores.moveBackward > scores.moveForward) {
+                if (dx > 0) p2.aiIntent.left = true; else p2.aiIntent.right = true;
+            }
+
+            if (scores.jump > 50) keysPressed[p2.controls.jump] = true;
+            
+            if (scores.superSkill > 80) keysPressed[p2.controls.super] = true;
+            else if (scores.attack > 60) keysPressed[p2.controls.attack] = true;
+
+            if (scores.switch > 50) keysPressed[p2.controls.switch] = true;
         }
-        keys[p2.controls.left] = p2.aiIntent.left; keys[p2.controls.right] = p2.aiIntent.right;
+        
+        keys[p2.controls.left] = p2.aiIntent.left;
+        keys[p2.controls.right] = p2.aiIntent.right;
     }
 
     update(dt) {
@@ -1710,5 +1849,3 @@ window.dispatchEvent(new Event('resize'));
 </script>
 </body>
 </html>
-
-
