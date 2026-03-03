@@ -229,7 +229,7 @@
                     Move: <span>Arrows (↑, ←, ↓, →)</span><br>
                     Attack: <span>Num 9</span><br>
                     Super Skill: <span>Num Enter</span><br>
-                    Switch Weapon: <span>P</span> (Hunter Only)
+                    Switch Weapon: <span>Num 8</span> (Hunter Only)
                 </div>
             </div>
         </div>
@@ -1469,7 +1469,7 @@ class Game {
         this.isSinglePlayer = isSinglePlayer;
         
         let p1Ctrl = { left: 'KeyA', right: 'KeyD', jump: 'KeyW', attack: 'Space', super: 'KeyE', switch: 'KeyT' };
-        let p2Ctrl = { left: 'ArrowLeft', right: 'ArrowRight', jump: 'ArrowUp', attack: 'Numpad9', super: 'NumpadEnter', switch: 'KeyP' };
+        let p2Ctrl = { left: 'ArrowLeft', right: 'ArrowRight', jump: 'ArrowUp', attack: 'Numpad9', super: 'NumpadEnter', switch: 'Numpad8' };
 
         let p2StartX = CANVAS_W - 150; 
         this.p1 = new Fighter('p1', this.p1Choice, 100, p1Ctrl, true);
