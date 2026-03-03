@@ -26,8 +26,8 @@
         }
         #game-container {
             position: relative;
-            width: 1000px;
-            height: 600px;
+            width: 100vw;
+            height: 100vh;
             box-shadow: 0 0 20px rgba(201, 42, 42, 0.3);
             background: linear-gradient(to bottom, #2b3a42 0%, #1c252a 100%);
         }
@@ -167,7 +167,7 @@
 <body>
 
 <div id="game-container">
-    <canvas id="gameCanvas" width="1000" height="600"></canvas>
+    <canvas id="gameCanvas"></canvas>
     
     <!-- Game UI Overlay -->
     <div id="game-ui" class="hidden">
@@ -234,33 +234,43 @@
  */
 
 // --- Constants & Game Data ---
-const CANVAS_W = 1000;
-const CANVAS_H = 600;
+let CANVAS_W = window.innerWidth;
+let CANVAS_H = window.innerHeight;
 const GRAVITY = 0.6;
-const GROUND_Y = 500;
-const PLATFORM = { x: 300, y: 320, w: 400, h: 20 };
+let GROUND_Y = CANVAS_H - 100;
+
+let PLATFORMS = [
+    // Center: Slippery and Poisonous
+    { x: CANVAS_W / 2 - 200, y: GROUND_Y - 180, w: 400, h: 20, type: 'center' },
+    // Left side high
+    { x: Math.max(50, CANVAS_W / 4 - 150), y: GROUND_Y - 350, w: 250, h: 20, type: 'side' },
+    // Right side high
+    { x: Math.min(CANVAS_W - 300, CANVAS_W * (3/4) - 100), y: GROUND_Y - 350, w: 250, h: 20, type: 'side' }
+];
+
 const SUPER_COOLDOWN = 45000; // 45 seconds
 
+// Stats Balanced around WRD (1 WRD = 10 Game Units)
 const HEROES = {
     Hason: {
         name: "Hason", desc: "Cowboy with Colt Revolver & Dynamite",
-        color: "#8B4513", maxHp: 200, speed: 5, jump: 15, width: 40, height: 70
+        color: "#8B4513", maxHp: 750, speed: 5, jump: 15, width: 40, height: 70
     },
     Hunter: {
         name: "Hunter", desc: "Pirate with Musket & Great Sword",
-        color: "#008080", maxHp: 220, speed: 4.5, jump: 14, width: 45, height: 70
+        color: "#008080", maxHp: 750, speed: 4.5, jump: 14, width: 45, height: 70
     },
     Macu: {
         name: "Macu", desc: "Ainu Warrior with Long Spear & Poison",
-        color: "#2E8B57", maxHp: 250, speed: 4, jump: 14, width: 40, height: 75
+        color: "#2E8B57", maxHp: 900, speed: 4, jump: 16, width: 40, height: 75 // Jump same as Willi
     },
     Willi: {
         name: "Willi", desc: "Ninja with Throwing Knives & Invisibility",
-        color: "#2F4F4F", maxHp: 180, speed: 6.5, jump: 16, width: 35, height: 65
+        color: "#2F4F4F", maxHp: 500, speed: 6.5, jump: 16, width: 35, height: 65
     },
     Artu: {
         name: "Artu", desc: "Daimyo with Great Armor & Ashigaru Summons",
-        color: "#8B0000", maxHp: 300, speed: 3.5, jump: 13, width: 50, height: 75
+        color: "#8B0000", maxHp: 1000, speed: 3.5, jump: 13, width: 50, height: 75
     }
 };
 
@@ -407,11 +417,16 @@ class Minion extends Entity {
             this.y = GROUND_Y - this.h;
             this.vy = 0;
         }
+        
         // Platform Collision
-        if (this.vy > 0 && this.y + this.h - this.vy <= PLATFORM.y && this.y + this.h >= PLATFORM.y) {
-            if (this.x + this.w > PLATFORM.x && this.x < PLATFORM.x + PLATFORM.w) {
-                this.y = PLATFORM.y - this.h;
-                this.vy = 0;
+        if (this.vy > 0) {
+            for (let plat of PLATFORMS) {
+                if (this.y + this.h - this.vy <= plat.y && this.y + this.h >= plat.y) {
+                    if (this.x + this.w > plat.x && this.x < plat.x + plat.w) {
+                        this.y = plat.y - this.h;
+                        this.vy = 0;
+                    }
+                }
             }
         }
 
@@ -426,7 +441,7 @@ class Minion extends Entity {
                 let ex = enemy.x + enemy.w/2; let ey = enemy.y + enemy.h/2;
                 let angle = Math.atan2(ey - cy, ex - cx);
                 let speed = 12;
-                game.projectiles.push(new Projectile(cx, cy, 6, 6, Math.cos(angle)*speed, Math.sin(angle)*speed, 10, this.owner, "#222"));
+                game.projectiles.push(new Projectile(cx, cy, 6, 6, Math.cos(angle)*speed, Math.sin(angle)*speed, 10, this.owner, "#222")); // 1 WRD
                 // Muzzle flash
                 game.particles.push(new Particle(cx + Math.cos(angle)*15, cy + Math.sin(angle)*15, "#FFA500", 0, 0, 100));
             }
@@ -463,7 +478,7 @@ class Hurricane extends Entity {
             this.tickTimer = 0;
             let enemy = game.getEnemyOf(this.owner);
             if (checkAABB(this, enemy)) {
-                enemy.takeDamage(3, this.owner, true); // true = isDoT (no knockback/hitstop)
+                enemy.takeDamage(0.6, this.owner, true); // 0.6 per tick * 5 ticks = 3 dmg/sec (0.3 WRD/s)
                 // Apply slow is handled in Player update
             }
         }
@@ -514,6 +529,7 @@ class Fighter extends Entity {
         this.jumpBuffer = 0;
         this.maxJumps = heroName === 'Willi' ? 2 : 1; // Willi gets double jump
         this.jumpsLeft = this.maxJumps;
+        this.currentPlatform = null;
         
         this.attackState = 'idle'; // idle, windup, active, recovery
         this.stateTimer = 0;
@@ -630,8 +646,18 @@ class Fighter extends Entity {
                 this.facing = 1;
             }
             
+            // Dynamic Friction (Slippery platform support)
+            let friction = 0.25;
+            if (this.currentPlatform && this.currentPlatform.type === 'center') {
+                friction = 0.03; // Slippery ice-like friction
+                this.takeDamage(10 * (dt/1000), null, true); // Poison: 1 WRD (10 dmg) per second
+                if (Math.random() < 0.2) {
+                    game.particles.push(new Particle(this.x + Math.random()*this.w, this.y + this.h, "#9932CC", 0, -1, 150));
+                }
+            }
+            
             // Smooth Friction (Allows Knockback to feel natural)
-            this.vx += (targetVx - this.vx) * 0.25;
+            this.vx += (targetVx - this.vx) * friction;
 
             // Attack Phases Machine
             if (this.attackState === 'windup') {
@@ -718,6 +744,7 @@ class Fighter extends Entity {
         if (this.x + this.w > CANVAS_W) this.x = CANVAS_W - this.w;
 
         this.isGrounded = false;
+        this.currentPlatform = null;
 
         // Ground collision
         if (this.y + this.h >= GROUND_Y) {
@@ -726,15 +753,20 @@ class Fighter extends Entity {
             this.isGrounded = true;
         }
 
-        // Platform collision (only when falling)
-        if (this.vy > 0 && this.y + this.h - this.vy <= PLATFORM.y && this.y + this.h >= PLATFORM.y) {
-            if (this.x + this.w > PLATFORM.x && this.x < PLATFORM.x + PLATFORM.w) {
-                // allow falling through if holding down (S or DownArrow)
-                let dropKey = this.isP1 ? 'KeyS' : 'ArrowDown';
-                if (!keys[dropKey]) {
-                    this.y = PLATFORM.y - this.h;
-                    this.vy = 0;
-                    this.isGrounded = true;
+        // Platforms collision (only when falling)
+        if (this.vy > 0) {
+            for (let plat of PLATFORMS) {
+                if (this.y + this.h - this.vy <= plat.y && this.y + this.h >= plat.y) {
+                    if (this.x + this.w > plat.x && this.x < plat.x + plat.w) {
+                        // allow falling through if holding down (S or DownArrow)
+                        let dropKey = this.isP1 ? 'KeyS' : 'ArrowDown';
+                        if (!keys[dropKey]) {
+                            this.y = plat.y - this.h;
+                            this.vy = 0;
+                            this.isGrounded = true;
+                            this.currentPlatform = plat;
+                        }
+                    }
                 }
             }
         }
@@ -761,9 +793,9 @@ class Fighter extends Entity {
     }
 
     getMeleeDamage() {
-        if (this.heroName === 'Artu') return 18;
-        if (this.heroName === 'Macu') return 15;
-        if (this.heroName === 'Hunter') return 25; // Slow great sword
+        if (this.heroName === 'Artu') return 20;  // 2 WRD
+        if (this.heroName === 'Macu') return 17;  // 1.7 WRD
+        if (this.heroName === 'Hunter') return 14; // 1.4 WRD
         return 10;
     }
 
@@ -795,17 +827,22 @@ class Fighter extends Entity {
         let px = this.facing === 1 ? this.x + this.w : this.x - 10;
         let py = this.y + 25;
 
+        // Macu Spear Lunge
+        if (this.heroName === 'Macu') {
+            this.vx = this.facing * 12; // Forward lunge burst
+        }
+
         if (this.heroName === 'Hason') {
             this.hasonAmmo--;
             this.hasonRecharge = 0;
-            game.projectiles.push(new Projectile(px, py, 10, 5, this.facing * 20, 0, 15, this, "#FFD700"));
+            game.projectiles.push(new Projectile(px, py, 10, 5, this.facing * 20, 0, 25, this, "#FFD700")); // 2.5 WRD
             game.particles.push(new Particle(px, py, "#FFA500", this.facing*2, 0, 100));
         } 
         else if (this.heroName === 'Willi') {
-            game.projectiles.push(new Projectile(px, py, 20, 4, this.facing * 18, 0, 12, this, "#ccc", "knife"));
+            game.projectiles.push(new Projectile(px, py, 20, 4, this.facing * 18, 0, 10, this, "#ccc", "knife")); // 1 WRD
         }
         else if (this.heroName === 'Hunter' && this.hunterWeapon === 'musket') {
-            game.projectiles.push(new Projectile(px, py, 12, 12, this.facing * 25, 0, 35, this, "#222"));
+            game.projectiles.push(new Projectile(px, py, 12, 12, this.facing * 25, 0, 20, this, "#222")); // 2 WRD for musket
             this.hunterMusketCD = 6000; // 6s reload
             game.particles.push(new Particle(px, py, "#FFA500", this.facing*5, -2, 150));
         }
@@ -1123,6 +1160,12 @@ class Fighter extends Entity {
             ctx.fillStyle = "rgba(0, 255, 0, 0.3)";
             ctx.fillRect(this.x, this.y, this.w, this.h);
         }
+
+        // Health Bar above character
+        ctx.fillStyle = "red";
+        ctx.fillRect(this.x, this.y - 12, this.w, 5);
+        ctx.fillStyle = "#4caf50";
+        ctx.fillRect(this.x, this.y - 12, this.w * (this.hp / this.maxHp), 5);
     }
 }
 
@@ -1335,11 +1378,23 @@ class Game {
         this.ctx.fillStyle = "#4caf50"; // Grass line
         this.ctx.fillRect(0, GROUND_Y, CANVAS_W, 5);
 
-        // Platform
-        this.ctx.fillStyle = "#5c4033"; // Wood
-        this.ctx.fillRect(PLATFORM.x, PLATFORM.y, PLATFORM.w, PLATFORM.h);
-        this.ctx.fillStyle = "#3e2723";
-        this.ctx.fillRect(PLATFORM.x, PLATFORM.y + PLATFORM.h, PLATFORM.w, 10); // shadow
+        // Platforms
+        for (let plat of PLATFORMS) {
+            if (plat.type === 'center') {
+                this.ctx.fillStyle = "#5D3FD3"; // Poison/Slippery color (purple)
+                this.ctx.fillRect(plat.x, plat.y, plat.w, plat.h);
+                this.ctx.fillStyle = "#301934";
+                this.ctx.fillRect(plat.x, plat.y + plat.h, plat.w, 10);
+                
+                // Poison mist visual
+                if (Math.random() < 0.1) this.particles.push(new Particle(plat.x + Math.random()*plat.w, plat.y - 5, "#9932CC", 0, -0.5, 300));
+            } else {
+                this.ctx.fillStyle = "#5c4033"; // Wood
+                this.ctx.fillRect(plat.x, plat.y, plat.w, plat.h);
+                this.ctx.fillStyle = "#3e2723";
+                this.ctx.fillRect(plat.x, plat.y + plat.h, plat.w, 10); // shadow
+            }
+        }
 
         // Draw Entities
         if (this.hurricane && !this.hurricane.dead) this.hurricane.draw(this.ctx);
@@ -1356,6 +1411,22 @@ class Game {
 
 // Initialize Game Engine
 const game = new Game();
+
+window.addEventListener('resize', () => {
+    CANVAS_W = window.innerWidth;
+    CANVAS_H = window.innerHeight;
+    game.canvas.width = CANVAS_W;
+    game.canvas.height = CANVAS_H;
+    GROUND_Y = CANVAS_H - 100;
+    
+    PLATFORMS = [
+        { x: CANVAS_W / 2 - 200, y: GROUND_Y - 180, w: 400, h: 20, type: 'center' },
+        { x: Math.max(50, CANVAS_W / 4 - 150), y: GROUND_Y - 350, w: 250, h: 20, type: 'side' },
+        { x: Math.min(CANVAS_W - 300, CANVAS_W * (3/4) - 100), y: GROUND_Y - 350, w: 250, h: 20, type: 'side' }
+    ];
+});
+// Initial trigger
+window.dispatchEvent(new Event('resize'));
 
 </script>
 </body>
