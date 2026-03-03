@@ -307,7 +307,7 @@ function saveBinds() {
     updateControlsDisplay();
 }
 
-let listeningKey = null; // { player: 'p1', action: 'jump', btn: HTMLElement }
+let listeningKey = null;
 
 window.addEventListener('keydown', e => {
     if (listeningKey) {
@@ -382,7 +382,6 @@ let PLATFORMS = [
     { x: Math.min(CANVAS_W - 300, CANVAS_W * (3/4) - 100), y: GROUND_Y - 350, w: 250, h: 20, type: 'side' }
 ];
 
-// Stats Balanced around WRD (1 WRD = 10 Game Units)
 const HEROES = {
     Hason: {
         name: "Hason", desc: "Cowboy with Colt Revolver",
@@ -408,7 +407,7 @@ const HEROES = {
         ui: {
             hp: "90 WRD", atk: "2.2 WRD (Long Range Melee)",
             passive: "Spear dynamically tracks the closest enemy's height. Extended melee range.",
-            super: "[BattleCry] +40% Speed, +20% Jump, +40% Damage. Grants 3s Poison on hit. Next attack applies a 3s Stun."
+            super: "[BattleCry] +40% Speed, +20% Jump, +40% Damage. Grants 3s Poison on hit."
         }
     },
     Willi: {
@@ -416,7 +415,7 @@ const HEROES = {
         color: "#2F4F4F", maxHp: 500, speed: 6.5, jump: 16, width: 35, height: 65, superCD: 12000,
         ui: {
             hp: "50 WRD", atk: "2.3 WRD (Ranged)",
-            passive: "Can Double Jump. Auto-aims throwing knives.",
+            passive: "Double Jump. Every 3rd attack knocks back & slows. Below 50% HP for the first time, gains 5s of +1 WRD Lifesteal.",
             super: "Invincible Dash. Press twice! (1s CD between dashes). Leaves a Giant Knife (5.3 WRD + 5s Slow)."
         }
     },
@@ -434,7 +433,7 @@ const HEROES = {
         color: "#4682B4", maxHp: 750, speed: 6.5, jump: 12, width: 45, height: 70, superCD: 20000,
         ui: {
             hp: "Horse 50 WRD / Duke 75 WRD", atk: "3.3 WRD (Lance) / 1.5 WRD (Sabre)",
-            passive: "Must run continuously for 3s to charge Lance (Causes 3s Stun). Dismounts when horse dies (Sabre blocks 50% projectiles and heals 10 WRD on hit).",
+            passive: "Run continuously for 3s to charge Lance (3s Stun). Dismounts when horse dies (Sabre blocks 50% projectiles and heals 2 WRD on hit).",
             super: "Fires a deadly precise Handgun bullet (10.3 WRD) with no knockback."
         }
     },
@@ -451,9 +450,9 @@ const HEROES = {
         name: "Euclid", desc: "Necromantic Geometric Mage",
         color: "#8A2BE2", maxHp: 700, speed: 4.5, jump: 14, width: 40, height: 70, superCD: 10000,
         ui: {
-            hp: "70 WRD", atk: "10.3 WRD (Burst) / Heal Skeletons",
-            passive: "<span class='skill-tag'>Resource Conversion</span> Basic attack takes 3s. If no enemy in range, converts 10 WRD damage to heal nearby skeletons. Kills on Artu's minions turn them into skeletons.",
-            super: "<span class='skill-tag'>Necromantic Summoning</span> 3s cast to summon up to 5 ultra-fast melee skeletons. Skeletons deal 3 WRD damage and explode on death (2.3 WRD)."
+            hp: "70 WRD", atk: "1.2 WRD (Sword) / 10.3 WRD (Homing Burst)",
+            passive: "Press [Switch] for Melee/Ranged (2s Invincible Channel). Magic takes 1s to cast, homes in, or heals skeletons if out of range.",
+            super: "<span class='skill-tag'>Necromantic Summoning</span> 3s cast to summon 8 ultra-fast melee skeletons. Skeletons deal 3 WRD damage and explode on death (2.3 WRD)."
         }
     }
 };
@@ -503,9 +502,9 @@ class Projectile extends Entity {
             this.timer += dt;
             if (this.timer >= 1500) {
                 this.dead = true;
-                game.createExplosion(this.x + this.w/2, this.y + this.h/2, 120, 153, this.owner); // 炸药伤害: 150 -> 153
+                game.createExplosion(this.x + this.w/2, this.y + this.h/2, 120, 153, this.owner); 
             }
-        } else if (this.type === "homing_bullet") {
+        } else if (this.type === "homing_bullet" || this.type === "magic_burst") {
             let target = game.getEnemyOf(this.owner);
             let minDist = Math.hypot(target.x - this.x, target.y - this.y);
             for (let m of game.minions) {
@@ -517,23 +516,22 @@ class Projectile extends Entity {
             if (!target.dead && target.invincible <= 0) {
                 let tx = target.x + target.w/2; let ty = target.y + target.h/2;
                 let angle = Math.atan2(ty - (this.y + this.h/2), tx - (this.x + this.w/2));
-                let speed = 25;
-                this.vx += (Math.cos(angle) * speed - this.vx) * 0.15;
-                this.vy += (Math.sin(angle) * speed - this.vy) * 0.15;
+                let speed = this.type === "magic_burst" ? 18 : 25; 
+                let turnSpeed = this.type === "magic_burst" ? 0.08 : 0.15;
+                this.vx += (Math.cos(angle) * speed - this.vx) * turnSpeed;
+                this.vy += (Math.sin(angle) * speed - this.vy) * turnSpeed;
             }
-        } else if (this.type === "knife" || this.type === "large_knife" || this.type === "ki_blast" || this.type === "magic_burst") {
-            // Ki blast and Magic burst have no gravity drop
-            if (this.type !== "ki_blast" && this.type !== "magic_burst") this.vy += GRAVITY * 0.1;
+        } else if (this.type === "knife" || this.type === "large_knife" || this.type === "enhanced_knife" || this.type === "ki_blast") {
+            if (this.type !== "ki_blast") this.vy += GRAVITY * 0.1;
         }
 
         if (this.x < -100 || this.x > CANVAS_W + 100 || this.y > CANVAS_H || this.y < -100) this.dead = true;
 
-        // Hunter Hurricane Projectile Block (龙卷风摧毁敌方飞行道具)
         if (!this.dead && game.hurricane && !game.hurricane.dead && this.owner !== game.hurricane.owner) {
             if (checkAABB(this, game.hurricane)) {
                 this.dead = true;
                 for(let i=0; i<5; i++) game.particles.push(new Particle(this.x, this.y, "#aaddff", (Math.random()-0.5)*8, (Math.random()-0.5)*8, 200));
-                return; // 飞行道具被风墙抵挡，直接销毁
+                return; 
             }
         }
 
@@ -547,17 +545,21 @@ class Projectile extends Entity {
                     }
 
                     if (isBlocked) {
-                        // 强化格挡特效，巨大且明亮的火花
                         for(let i=0; i<15; i++) game.particles.push(new Particle(this.x, this.y, "#ffffff", (Math.random()-0.5)*20, (Math.random()-0.5)*20, 300, 6));
                         for(let i=0; i<10; i++) game.particles.push(new Particle(this.x, this.y, "#ffd700", (Math.random()-0.5)*15, (Math.random()-0.5)*15, 400, 4));
                     } else {
                         let noKnockback = (this.type === "bullet" || this.type === "ki_blast" || this.type === "magic_burst"); 
                         t.takeDamage(this.damage, this.owner, false, noKnockback);
-                        if (this.type === "large_knife") t.buffs.slow = 5000;
-                        if (this.type === "ki_blast") {
-                            t.buffs.dizzy = 750; // 0.75s Stun
+                        if (this.type === "large_knife" || this.type === "enhanced_knife") t.buffs.slow = 5000;
+                        if (this.type === "enhanced_knife") {
                             let dir = this.vx > 0 ? 1 : -1;
-                            t.vx = dir * 45; // Enhanced Knockback
+                            t.vx = dir * 30; // Knockback
+                            t.vy = -5;
+                        }
+                        if (this.type === "ki_blast") {
+                            t.buffs.dizzy = 750; 
+                            let dir = this.vx > 0 ? 1 : -1;
+                            t.vx = dir * 45; 
                             t.vy = -8;
                         }
                         for(let i=0; i<5; i++) game.particles.push(new Particle(this.x, this.y, this.color, (Math.random()-0.5)*5, (Math.random()-0.5)*5, 300));
@@ -573,12 +575,16 @@ class Projectile extends Entity {
         if (this.type === "dynamite") {
             ctx.fillStyle = "#ff3333"; ctx.fillRect(this.x, this.y, this.w, this.h);
             ctx.fillStyle = "#ffff00"; ctx.fillRect(this.x + this.w/2, this.y - 5, 2, 5);
-        } else if (this.type === "knife" || this.type === "large_knife") {
+        } else if (this.type === "knife" || this.type === "large_knife" || this.type === "enhanced_knife") {
             ctx.save(); ctx.translate(this.x + this.w/2, this.y + this.h/2);
             ctx.rotate(this.vx > 0 ? this.timer*0.02 : -this.timer*0.02);
-            if (this.type === "large_knife") { ctx.scale(2, 2); ctx.fillStyle = "#0ff"; } else ctx.fillStyle = "#ddd";
+            if (this.type === "large_knife") { ctx.scale(2, 2); ctx.fillStyle = "#0ff"; } 
+            else if (this.type === "enhanced_knife") { ctx.scale(1.5, 1.5); ctx.fillStyle = "#ff5500"; }
+            else ctx.fillStyle = "#ddd";
             ctx.beginPath(); ctx.moveTo(-10, -2); ctx.lineTo(10, 0); ctx.lineTo(-10, 2); ctx.fill();
             ctx.restore(); this.timer += 16;
+            
+            if (this.type === "enhanced_knife") game.particles.push(new Particle(this.x + this.w/2, this.y + this.h/2, "#ff5500", 0, 0, 150, 4));
         } else if (this.type === "ki_blast") {
             ctx.save(); ctx.translate(this.x + this.w/2, this.y + this.h/2);
             ctx.fillStyle = "rgba(0, 191, 255, 0.8)";
@@ -586,7 +592,6 @@ class Projectile extends Entity {
             ctx.fillStyle = "#fff";
             ctx.beginPath(); ctx.ellipse(0, 0, this.w/4, this.h/4, 0, 0, Math.PI*2); ctx.fill();
             ctx.restore();
-            // Trail
             game.particles.push(new Particle(this.x + this.w/2, this.y + this.h/2, "#00bfff", 0, 0, 150, 6));
         } else if (this.type === "magic_burst") {
             ctx.save(); ctx.translate(this.x + this.w/2, this.y + this.h/2);
@@ -616,12 +621,11 @@ class Minion extends Entity {
         this.buffs = { dizzy: 0 }; this.invincible = 0;
     }
     takeDamage(amt, attacker) {
-        if (this.grappledBy) return; // Immune if grabbed (shouldn't happen to minions but safe fallback)
+        if (this.grappledBy) return; 
         this.hp -= amt;
         if (this.hp <= 0) {
             this.dead = true;
             if (attacker && attacker.heroName === 'Euclid') {
-                // Euclid converts killed minion into a Skeleton
                 game.minions.push(new Skeleton(attacker, this.x, this.y));
                 for(let i=0; i<15; i++) game.particles.push(new Particle(this.x+this.w/2, this.y+this.h/2, "#8A2BE2", (Math.random()-0.5)*10, -Math.random()*10, 500, 6));
             } else {
@@ -650,7 +654,6 @@ class Minion extends Entity {
                 let cx = this.x + this.w/2; let cy = this.y + 25;
                 let ex = enemy.x + enemy.w/2; let ey = enemy.y + enemy.h/2;
                 let angle = Math.atan2(ey - cy, ex - cx);
-                // 小兵子弹伤害: 10 -> 13
                 game.projectiles.push(new Projectile(cx, cy, 6, 6, Math.cos(angle)*12, Math.sin(angle)*12, 13, this.owner, "#FFFF00")); 
                 game.particles.push(new Particle(cx + Math.cos(angle)*15, cy + Math.sin(angle)*15, "#FFA500", 0, 0, 100));
             }
@@ -685,11 +688,11 @@ class Skeleton extends Entity {
         super(x, y, 35, 60);
         this.owner = owner;
         this.type = "skeleton";
-        this.hp = 20; // Base 2 WRD
-        this.maxHp = 100; // Can be healed up to 10 WRD
+        this.hp = 20; 
+        this.maxHp = 100; 
         this.color = "#e0e0e0";
-        this.speed = 7; // 速度降低 30% (由 10 改为 7)
-        this.jumpPower = 20; // High jump
+        this.speed = 7; 
+        this.jumpPower = 20; 
         this.attackCooldown = 0;
         this.buffs = { dizzy: 0 };
         this.invincible = 0;
@@ -699,7 +702,6 @@ class Skeleton extends Entity {
         this.hp -= amt;
         if (this.hp <= 0) {
             this.dead = true;
-            // Skeleton death explosion (2.3 WRD)，并设置友军免伤 (false) 防止炸死其他骷髅或 Euclid
             game.createExplosion(this.x + this.w/2, this.y + this.h/2, 60, 23, this.owner, false); 
             for(let i=0; i<15; i++) game.particles.push(new Particle(this.x+this.w/2, this.y+this.h/2, "#aaa", (Math.random()-0.5)*10, Math.random()*-15, 500, 6));
         }
@@ -736,7 +738,7 @@ class Skeleton extends Entity {
 
             if (this.attackCooldown > 0) this.attackCooldown -= dt;
             if (dist < 50 && Math.abs(dy) < 60 && this.attackCooldown <= 0) {
-                enemy.takeDamage(30, this.owner); // 3 WRD damage!
+                enemy.takeDamage(30, this.owner); 
                 this.attackCooldown = 1000;
                 game.particles.push(new Particle(this.x + this.w/2, this.y, "#8A2BE2", dx>0?5:-5, 0, 200, 8));
             }
@@ -756,23 +758,20 @@ class Skeleton extends Entity {
             ctx.restore();
         }
         
-        // Body (Ribs)
         ctx.fillStyle = this.color;
         ctx.fillRect(this.x + 5, this.y + 18, this.w - 10, this.h - 18); 
-        ctx.fillStyle = "#111"; // gaps between ribs
+        ctx.fillStyle = "#111"; 
         ctx.fillRect(this.x + 5, this.y + 25, this.w - 10, 4);
         ctx.fillRect(this.x + 5, this.y + 35, this.w - 10, 4);
         ctx.fillRect(this.x + 5, this.y + 45, this.w - 10, 4);
         
-        // Skull
         ctx.fillStyle = "#fff";
         ctx.fillRect(this.x + 2, this.y, this.w - 4, 18); 
-        ctx.fillStyle = "#8A2BE2"; // Glowing purple eyes
+        ctx.fillStyle = "#8A2BE2"; 
         let enemy = game.getEnemyOf(this.owner);
         let dir = (enemy && enemy.x > this.x) ? 1 : -1;
         ctx.fillRect(this.x + (dir>0?20:10), this.y + 4, 6, 6);
         
-        // Health Bar
         ctx.fillStyle = "red"; ctx.fillRect(this.x, this.y - 12, this.w, 4);
         ctx.fillStyle = "#8A2BE2"; ctx.fillRect(this.x, this.y - 12, this.w * (this.hp/this.maxHp), 4);
     }
@@ -825,7 +824,6 @@ class Fighter extends Entity {
         this.currentPlatform = null; this.aiIntent = { left: false, right: false };
         this.attackState = 'idle'; this.stateTimer = 0; this.maxStateTimer = 0; this.hasHit = false;
         
-        // General Buffs & Mechanics
         this.buffs = { poison: 0, battleCry: 0, shade: 0, dizzy: 0, slow: 0, hurricaneSlow: false };
         this.invincible = 0; this.lastJumpTime = 0;
         this.flipActive = 0; this.hasHitFlip = false; this.hasFlipped = false; 
@@ -837,9 +835,11 @@ class Fighter extends Entity {
         // Character Specifics
         this.hasonAmmo = 6; this.hasonReloadTimer = 0; this.hasonSuperCharges = 0; this.hasonSuperWindow = 0;
         this.williSuperCharges = 0; this.williSuperWindow = 0; this.williDashCooldown = 0; 
+        this.williComboCount = 0; this.williHealBuffTimer = 0; this.williHasTriggeredHeal = false;
+        
         this.hunterWeapon = 'musket'; this.hunterMusketCD = 0;
-        this.macuNextAttackDizzy = false; 
-        this.superWindupTimer = 0; // Euclid's super channeling
+        
+        this.euclidWeapon = 'magic'; this.euclidSwitchTimer = 0; this.superWindupTimer = 0; 
         
         if (this.heroName === 'Duke') {
             this.isMounted = true; this.maxHorseHp = 500; this.horseHp = 500; this.runTimer = 0;
@@ -877,6 +877,13 @@ class Fighter extends Entity {
         this.stunTimer = 150;
         this.timeSinceLastDamage = 0; 
         
+        // Willi First-Time Low HP Trigger
+        if (this.heroName === 'Willi' && this.hp < this.maxHp * 0.5 && !this.williHasTriggeredHeal) {
+            this.williHasTriggeredHeal = true;
+            this.williHealBuffTimer = 5000; // 5s buff
+            for(let i=0; i<30; i++) game.particles.push(new Particle(this.x+this.w/2, this.y+this.h/2, "#FF0000", (Math.random()-0.5)*10, (Math.random()-0.5)*10, 800, 6));
+        }
+
         // Interrupt Euclid Channeling/Windup
         if (this.heroName === 'Euclid') {
             this.attackState = 'idle';
@@ -926,6 +933,10 @@ class Fighter extends Entity {
         if (this.invincible > 0) this.invincible -= dt;
         if (this.flipCooldown > 0) this.flipCooldown -= dt; 
         if (this.williDashCooldown > 0) this.williDashCooldown -= dt; 
+        if (this.williHealBuffTimer > 0) {
+            this.williHealBuffTimer -= dt;
+            if (Math.random() < 0.2) game.particles.push(new Particle(this.x + Math.random()*this.w, this.y + Math.random()*this.h, "#FF0000", 0, -2, 300, 3));
+        }
         
         if (this.flipActive > 0) {
             this.flipActive -= dt;
@@ -947,6 +958,12 @@ class Fighter extends Entity {
                 this.grappleTimer -= dt;
                 if (Math.random() < 0.3) game.particles.push(new Particle(this.x + this.facing*50 + Math.random()*20, this.y + Math.random()*this.h, "#1E90FF", -this.facing*5, 0, 200));
                 if (this.grappleTimer <= 0) this.breakGrapple(); 
+            }
+        }
+
+        if (this.heroName === 'Euclid') {
+            if (this.euclidSwitchTimer > 0) {
+                this.euclidSwitchTimer -= dt;
             }
         }
 
@@ -991,9 +1008,11 @@ class Fighter extends Entity {
         if (this.hasonSuperWindow > 0) { this.hasonSuperWindow -= dt; if (this.hasonSuperWindow <= 0) this.hasonSuperCharges = 0; }
         if (this.williSuperWindow > 0) { this.williSuperWindow -= dt; if (this.williSuperWindow <= 0) this.williSuperCharges = 0; }
 
+        let canAct = (this.stunTimer <= 0 && this.buffs.dizzy <= 0 && this.grapplePhase !== 1 && this.superWindupTimer <= 0 && this.euclidSwitchTimer <= 0);
+
         if (keysPressed[this.controls.jump]) {
             this.jumpBuffer = 150;
-            if (!this.isGrounded && !this.hasFlipped && (this.stunTimer <= 0 && this.buffs.dizzy <= 0 && this.grapplePhase === 0 && this.flipCooldown <= 0 && this.superWindupTimer <= 0)) {
+            if (!this.isGrounded && !this.hasFlipped && (canAct && this.flipCooldown <= 0)) {
                 let now = performance.now();
                 if (now - this.lastJumpTime <= 500) {
                     this.flipActive = 400;
@@ -1034,22 +1053,18 @@ class Fighter extends Entity {
             
             if (this.superWindupTimer <= 0) {
                 this.superCooldown = this.superCooldownMax;
-                // Kill old skeletons (直接将其标为死亡，不触发 takeDamage，避免覆盖召唤时的群体自爆卡顿)
                 let currentSkeletons = game.minions.filter(m => m.type === 'skeleton' && m.owner === this);
                 currentSkeletons.forEach(s => s.dead = true);
                 
-                for (let i = 0; i < 5; i++) {
-                    // 在场地范围内随机 X 坐标生成
+                // Euclid spawns 8 skeletons
+                for (let i = 0; i < 8; i++) {
                     let randomX = 50 + Math.random() * (CANVAS_W - 100);
                     game.minions.push(new Skeleton(this, randomX, GROUND_Y - 60));
-                    // 召唤时的入场特效
                     for(let j=0; j<10; j++) game.particles.push(new Particle(randomX + 17, GROUND_Y - 30, "#8A2BE2", (Math.random()-0.5)*8, (Math.random()-0.5)*8, 400));
                 }
-                game.createExplosion(this.x + this.w/2, this.y + this.h/2, 100, 0, this); // Just visual blast
+                game.createExplosion(this.x + this.w/2, this.y + this.h/2, 100, 0, this); 
             }
         }
-
-        let canAct = (this.stunTimer <= 0 && this.buffs.dizzy <= 0 && this.grapplePhase !== 1 && this.superWindupTimer <= 0);
 
         let targetVx = 0;
         if (this.heroName === 'Willi' && this.invincible > 0) {
@@ -1058,7 +1073,6 @@ class Fighter extends Entity {
             if (keys[this.controls.left]) { targetVx = -currentSpeed; this.facing = -1; } 
             else if (keys[this.controls.right]) { targetVx = currentSpeed; this.facing = 1; }
             
-            // Euclid cannot move while casting normal attack
             if (this.attackState === 'windup' && this.heroName === 'Euclid') targetVx = 0;
 
             if (this.heroName === 'Duke' && this.isMounted) {
@@ -1094,7 +1108,6 @@ class Fighter extends Entity {
                     if (!enemy.dead && checkAABB(hitBox, enemy)) {
                         enemy.takeDamage(this.getMeleeDamage(), this);
                         if (this.heroName === 'Macu' && this.buffs.battleCry > 0) enemy.buffs.poison = 3000;
-                        if (this.heroName === 'Macu' && this.macuNextAttackDizzy) enemy.buffs.dizzy = 3000; 
                         if (this.heroName === 'Duke' && this.isMounted) enemy.buffs.dizzy = 3000; 
                         hitAnything = true;
                     }
@@ -1102,16 +1115,14 @@ class Fighter extends Entity {
                     for (let m of game.minions) {
                         if (m.owner !== this && !m.dead && checkAABB(hitBox, m)) {
                             m.takeDamage(this.getMeleeDamage(), this);
-                            if (this.heroName === 'Macu' && this.macuNextAttackDizzy) m.buffs.dizzy = 3000;
                             hitAnything = true;
                         }
                     }
                     if (hitAnything) {
                         this.hasHit = true;
-                        if (this.heroName === 'Macu' && this.macuNextAttackDizzy) this.macuNextAttackDizzy = false;
                         
                         if (this.heroName === 'Duke' && !this.isMounted) {
-                            this.hp = Math.min(this.maxHp, this.hp + 100); // 回血 10 WRD
+                            this.hp = Math.min(this.maxHp, this.hp + 20); // 步战回血减少为 2 WRD
                             for(let i=0; i<8; i++) game.particles.push(new Particle(this.x + Math.random()*this.w, this.y + Math.random()*this.h, "#32CD32", 0, -Math.random()*4, 500, 5));
                         }
                     }
@@ -1127,9 +1138,17 @@ class Fighter extends Entity {
                 if (this.stateTimer <= 0) this.attackState = 'idle';
             }
 
-            if (keysPressed[this.controls.switch] && this.heroName === 'Hunter') {
-                this.hunterWeapon = this.hunterWeapon === 'musket' ? 'sword' : 'musket';
-                this.hunterMusketCD = 0; 
+            if (keysPressed[this.controls.switch]) {
+                if (this.heroName === 'Hunter') {
+                    this.hunterWeapon = this.hunterWeapon === 'musket' ? 'sword' : 'musket';
+                    this.hunterMusketCD = 0; 
+                } else if (this.heroName === 'Euclid') {
+                    this.euclidWeapon = this.euclidWeapon === 'magic' ? 'sword' : 'magic';
+                    this.euclidSwitchTimer = 2000;
+                    this.invincible = 2000;
+                    this.attackState = 'idle';
+                    for(let i=0; i<20; i++) game.particles.push(new Particle(this.x+this.w/2, this.y+this.h/2, "#8A2BE2", (Math.random()-0.5)*15, (Math.random()-0.5)*15, 800, 6));
+                }
             }
             if (keysPressed[this.controls.attack] && this.attackState === 'idle') {
                 this.performAttack();
@@ -1183,7 +1202,8 @@ class Fighter extends Entity {
     }
 
     isMeleeAttack() {
-        if (this.heroName === 'Hason' || this.heroName === 'Willi' || this.heroName === 'Euclid') return false;
+        if (this.heroName === 'Hason' || this.heroName === 'Willi') return false;
+        if (this.heroName === 'Euclid' && this.euclidWeapon === 'magic') return false;
         if (this.heroName === 'Hunter' && this.hunterWeapon === 'musket') return false;
         if (this.heroName === 'Kadaxi' && this.comboCount === 3) return false; 
         return true;
@@ -1194,6 +1214,7 @@ class Fighter extends Entity {
         if (this.heroName === 'Hunter' && this.hunterWeapon === 'sword') range = 70;
         if (this.heroName === 'Artu' || (this.heroName === 'Duke' && !this.isMounted) || this.heroName === 'Kadaxi') range = 65;
         if (this.heroName === 'Duke' && this.isMounted) range = 90; 
+        if (this.heroName === 'Euclid' && this.euclidWeapon === 'sword') range = 50;
         
         if (this.heroName === 'Macu') {
             range = 110; 
@@ -1212,6 +1233,7 @@ class Fighter extends Entity {
         if (this.heroName === 'Hunter') return 17; 
         if (this.heroName === 'Duke' && !this.isMounted) return 15; 
         if (this.heroName === 'Kadaxi') return 33; 
+        if (this.heroName === 'Euclid') return 12; // Sword damage 1.2 WRD
         return 13;
     }
 
@@ -1227,7 +1249,7 @@ class Fighter extends Entity {
         if (this.heroName === 'Duke' && this.isMounted) this.stateTimer = 50; 
         if (this.heroName === 'Hason') this.stateTimer = 50; 
         if (this.heroName === 'Kadaxi') this.stateTimer = 100; 
-        if (this.heroName === 'Euclid') this.stateTimer = 3000; // Euclid 极长的前摇
+        if (this.heroName === 'Euclid') this.stateTimer = (this.euclidWeapon === 'sword') ? 50 : 1000; // Euclid 魔法1秒前摇，剑极快
         
         this.maxStateTimer = this.stateTimer;
         this.hasHit = false;
@@ -1265,8 +1287,20 @@ class Fighter extends Entity {
             game.particles.push(new Particle(px, py, "#FFA500", Math.cos(aimAngle)*2, Math.sin(aimAngle)*2, 100));
         } 
         else if (this.heroName === 'Willi') {
+            // 吸血 Buff 触发
+            if (this.williHealBuffTimer > 0) {
+                this.hp = Math.min(this.maxHp, this.hp + 10); // 1 WRD Heal
+                for(let i=0; i<5; i++) game.particles.push(new Particle(this.x + Math.random()*this.w, this.y + Math.random()*this.h, "#32CD32", 0, -2, 300, 4));
+            }
+            
+            this.williComboCount++;
             let speed = 18;
-            game.projectiles.push(new Projectile(px, py, 20, 4, Math.cos(aimAngle)*speed, Math.sin(aimAngle)*speed, 23, this, "#ccc", "knife")); 
+            if (this.williComboCount >= 3) {
+                this.williComboCount = 0; // 强化飞刀
+                game.projectiles.push(new Projectile(px, py, 25, 6, Math.cos(aimAngle)*speed, Math.sin(aimAngle)*speed, 30, this, "#0ff", "enhanced_knife")); 
+            } else {
+                game.projectiles.push(new Projectile(px, py, 20, 4, Math.cos(aimAngle)*speed, Math.sin(aimAngle)*speed, 23, this, "#ccc", "knife")); 
+            }
         }
         else if (this.heroName === 'Hunter' && this.hunterWeapon === 'musket') {
             game.projectiles.push(new Projectile(px, py, 12, 12, this.facing * 25, 0, 20, this, "#222", "homing_bullet")); 
@@ -1284,24 +1318,27 @@ class Fighter extends Entity {
             }
         }
         else if (this.heroName === 'Euclid') {
-            let dist = Math.hypot(tx - px, ty - py);
-            let inRange = dist < 400 && Math.abs(ty - py) < 150; // 攻击检测范围
+            if (this.euclidWeapon === 'magic') {
+                let dist = Math.hypot(tx - px, ty - py);
+                let inRange = dist < 600 && Math.abs(ty - py) < 300; // 追踪弹需要较大的锁定范围
 
-            if (inRange) {
-                // 如果敌人在范围内，正常发射魔法爆裂
-                let speed = 25;
-                game.projectiles.push(new Projectile(px, py, 25, 25, Math.cos(aimAngle)*speed, Math.sin(aimAngle)*speed, 103, this, "#8A2BE2", "magic_burst"));
-            } else {
-                // 敌人不在范围内，伤害转化为全场存活骷髅的治疗量
-                let skeletons = game.minions.filter(m => m.type === 'skeleton' && m.owner === this);
-                if (skeletons.length > 0) {
-                    let healAmt = 100 / skeletons.length; // 10 WRD 均分
-                    skeletons.forEach(s => {
-                        s.hp = Math.min(s.maxHp, s.hp + healAmt);
-                        // 治疗特效
-                        for(let i=0; i<8; i++) game.particles.push(new Particle(s.x + Math.random()*s.w, s.y + Math.random()*s.h, "#00ff00", 0, -3, 400, 5));
-                    });
+                if (inRange) {
+                    let speed = 15;
+                    game.projectiles.push(new Projectile(px, py, 25, 25, Math.cos(aimAngle)*speed, Math.sin(aimAngle)*speed, 103, this, "#8A2BE2", "magic_burst"));
+                } else {
+                    // 没有目标时转化为骷髅回血
+                    let skeletons = game.minions.filter(m => m.type === 'skeleton' && m.owner === this);
+                    if (skeletons.length > 0) {
+                        let healAmt = 100 / skeletons.length; // 10 WRD 均分
+                        skeletons.forEach(s => {
+                            s.hp = Math.min(s.maxHp, s.hp + healAmt);
+                            for(let i=0; i<8; i++) game.particles.push(new Particle(s.x + Math.random()*s.w, s.y + Math.random()*s.h, "#00ff00", 0, -3, 400, 5));
+                        });
+                    }
                 }
+            } else {
+                // Sword mode VFX (Hitbox takes care of damage)
+                game.particles.push(new Particle(px, py, "#8A2BE2", this.facing*5, 0, 150, 5));
             }
         }
     }
@@ -1309,7 +1346,7 @@ class Fighter extends Entity {
     performSuper() {
         if (this.heroName === 'Euclid') {
             if (this.superCooldown <= 0 && this.superWindupTimer <= 0) {
-                this.superWindupTimer = 3000; // 开始3秒读条
+                this.superWindupTimer = 3000; 
             }
             return;
         }
@@ -1396,7 +1433,7 @@ class Fighter extends Entity {
             game.hurricane = new Hurricane(this, hx, GROUND_Y - 300); 
         }
         else if (this.heroName === 'Macu') {
-            this.buffs.battleCry = 30000; this.macuNextAttackDizzy = true; 
+            this.buffs.battleCry = 30000;
         }
         else if (this.heroName === 'Artu') {
             for (let i = 0; i < 5; i++) game.minions.push(new Minion(this, this.x + (Math.random() * 100 - 50), this.y - 50));
@@ -1425,9 +1462,20 @@ class Fighter extends Entity {
         ctx.save();
         ctx.translate(this.x + this.w / 2, this.y + this.h/2); 
         
-        // Euclid's Magic Geometry Visuals (During Channeling / Windup)
-        if (this.superWindupTimer > 0 || (this.attackState === 'windup' && this.heroName === 'Euclid')) {
-            let prog = this.superWindupTimer > 0 ? this.superWindupTimer / 3000 : 1 - (this.stateTimer / 3000);
+        // Euclid Switch Channeling & Shield
+        if (this.euclidSwitchTimer > 0) {
+            ctx.save();
+            ctx.rotate(-Date.now() * 0.005);
+            ctx.strokeStyle = "rgba(138, 43, 226, 0.8)";
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.arc(0, 0, 50 + Math.random() * 10, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.restore();
+        }
+        
+        if (this.superWindupTimer > 0 || (this.attackState === 'windup' && this.heroName === 'Euclid' && this.euclidWeapon === 'magic')) {
+            let prog = this.superWindupTimer > 0 ? this.superWindupTimer / 3000 : 1 - (this.stateTimer / 1000);
             ctx.save();
             ctx.rotate(Date.now() * 0.003);
             ctx.strokeStyle = `rgba(138, 43, 226, ${Math.min(1, Math.max(0.2, prog*2))})`;
@@ -1460,7 +1508,6 @@ class Fighter extends Entity {
             ctx.fillStyle = this.color; ctx.fillRect(-hw+10, -10, 25, 40); 
             hw = 25; h = 40; ctx.translate(0, -10); 
         } else if (this.heroName === 'Euclid') {
-            // Euclid Robes
             ctx.fillStyle = "#2E0854"; ctx.fillRect(-hw, 10, this.w, h-10);
             ctx.fillStyle = "#8A2BE2"; ctx.fillRect(-hw+5, 10, this.w-10, h-10);
             ctx.fillStyle = "#000"; ctx.beginPath(); ctx.moveTo(-hw, 10); ctx.lineTo(hw, 10); ctx.lineTo(0, 30); ctx.fill();
@@ -1579,6 +1626,18 @@ class Fighter extends Entity {
                 if (this.attackState === 'windup') { ctx.fillStyle = "#ddd"; ctx.beginPath(); ctx.moveTo(0, 20); ctx.lineTo(-4, 30); ctx.lineTo(4, 30); ctx.fill(); }
             } ctx.restore();
         }
+        else if (this.heroName === 'Euclid') {
+            if (this.euclidWeapon === 'sword') {
+                ctx.save(); ctx.translate(hw, 25); let angle = 0;
+                if (this.attackState === 'windup') angle = -1.0 * phaseProg; 
+                else if (this.attackState === 'active') angle = -1.0 + (3.0 * phaseProg); 
+                else if (this.attackState === 'recovery') angle = 2.0 - (2.0 * phaseProg);
+                ctx.rotate(angle);
+                if (this.attackState === 'active') { ctx.beginPath(); ctx.arc(0, 0, 50, -1.0, angle); ctx.lineWidth = 8; ctx.strokeStyle = "rgba(138, 43, 226, 0.4)"; ctx.stroke(); }
+                ctx.fillStyle = "#8A2BE2"; ctx.fillRect(-2, -50, 4, 50); ctx.fillStyle = "#fff"; ctx.fillRect(-6, 0, 12, 4); 
+                ctx.restore();
+            }
+        }
         else if (this.heroName === 'Kadaxi') {
             if (this.attackState === 'active') {
                 ctx.fillStyle = "rgba(0, 191, 255, 0.5)";
@@ -1604,6 +1663,10 @@ class Fighter extends Entity {
 
         if (this.heroName === 'Duke' && this.isMounted && this.runTimer >= 3000) {
             ctx.strokeStyle = "rgba(255, 255, 255, 0.5)"; ctx.lineWidth = 2; ctx.strokeRect(this.x-2, this.y-2, this.w+4, this.h+4);
+        }
+        
+        if (this.heroName === 'Willi' && this.williHealBuffTimer > 0) {
+            ctx.strokeStyle = "rgba(255, 0, 0, 0.6)"; ctx.lineWidth = 3; ctx.strokeRect(this.x-2, this.y-2, this.w+4, this.h+4);
         }
 
         ctx.fillStyle = "red"; ctx.fillRect(this.x, this.y - 12, this.w, 5);
@@ -1724,9 +1787,7 @@ class Game {
         for(let i=0; i<30; i++) this.particles.push(new Particle(x, y, i%2===0 ? "#ff5500" : "#555", (Math.random()-0.5)*15, (Math.random()-0.5)*15, 600));
         let targets = [this.p1, this.p2, ...this.minions];
         for (let t of targets) {
-            // 如果开启了友军免伤机制，且目标是 owner 本身或同属一个阵营（比如骷髅），则跳过爆炸伤害
             if (!friendlyFire && (t === owner || t.owner === owner)) continue;
-            
             if (!t.dead && Math.hypot((t.x + t.w/2) - x, (t.y + t.h/2) - y) <= radius) t.takeDamage(damage, owner);
         }
     }
@@ -1743,16 +1804,19 @@ class Game {
             p1Stat = this.p1.hasonAmmo <= 0 ? `Ammo: RELOADING...` : `Ammo: ${this.p1.hasonAmmo}/6`; 
             if (this.p1.hasonSuperCharges > 0) p1Stat += ` [DYNAMITE x${this.p1.hasonSuperCharges}]`; 
         }
-        if (this.p1.heroName === 'Willi' && this.p1.williSuperCharges > 0) p1Stat += ` [DASH x${this.p1.williSuperCharges}]`;
+        if (this.p1.heroName === 'Willi') {
+            if (this.p1.williSuperCharges > 0) p1Stat += ` [DASH x${this.p1.williSuperCharges}]`;
+            if (this.p1.williHealBuffTimer > 0) p1Stat += ` [LIFESTEAL ACTIVE]`;
+        }
         if (this.p1.heroName === 'Hunter') p1Stat = `Wep: ${this.p1.hunterWeapon.toUpperCase()} ${this.p1.hunterMusketCD>0 ? '(Rld)' : ''}`;
         if (this.p1.heroName === 'Duke') p1Stat = this.p1.isMounted ? (this.p1.runTimer >= 3000 ? "LANCE READY" : "Charging...") : "DISMOUNTED";
-        if (this.p1.heroName === 'Macu' && this.p1.macuNextAttackDizzy) p1Stat += " [DIZZY ATK]"; 
         if (this.p1.heroName === 'Kadaxi' && this.p1.comboCount > 0) p1Stat += ` [COMBO: ${this.p1.comboCount}/2]`;
         if (this.p1.heroName === 'Euclid') {
             let skelCount = this.minions.filter(m => m.type === 'skeleton' && m.owner === this.p1).length;
-            p1Stat += ` [Skulls: ${skelCount}/5]`;
-            if (this.p1.superWindupTimer > 0) p1Stat += ` (SUMMONING)`;
-            else if (this.p1.attackState === 'windup') p1Stat += ` (CASTING)`;
+            p1Stat += `Wep: ${this.p1.euclidWeapon.toUpperCase()} [Skulls: ${skelCount}/8]`;
+            if (this.p1.euclidSwitchTimer > 0) p1Stat += ` (SWITCHING)`;
+            else if (this.p1.superWindupTimer > 0) p1Stat += ` (SUMMONING)`;
+            else if (this.p1.attackState === 'windup' && this.p1.euclidWeapon === 'magic') p1Stat += ` (CASTING)`;
         }
         if (this.p1.buffs.poison > 0) p1Stat += " [POISONED]";
         if (this.p1.buffs.dizzy > 0) p1Stat += " [DIZZY]";
@@ -1770,16 +1834,19 @@ class Game {
             p2Stat = this.p2.hasonAmmo <= 0 ? `Ammo: RELOADING...` : `Ammo: ${this.p2.hasonAmmo}/6`; 
             if (this.p2.hasonSuperCharges > 0) p2Stat += ` [DYNAMITE x${this.p2.hasonSuperCharges}]`; 
         }
-        if (this.p2.heroName === 'Willi' && this.p2.williSuperCharges > 0) p2Stat += ` [DASH x${this.p2.williSuperCharges}]`;
+        if (this.p2.heroName === 'Willi') {
+            if (this.p2.williSuperCharges > 0) p2Stat += ` [DASH x${this.p2.williSuperCharges}]`;
+            if (this.p2.williHealBuffTimer > 0) p2Stat += ` [LIFESTEAL ACTIVE]`;
+        }
         if (this.p2.heroName === 'Hunter') p2Stat = `Wep: ${this.p2.hunterWeapon.toUpperCase()} ${this.p2.hunterMusketCD>0 ? '(Rld)' : ''}`;
         if (this.p2.heroName === 'Duke') p2Stat = this.p2.isMounted ? (this.p2.runTimer >= 3000 ? "LANCE READY" : "Charging...") : "DISMOUNTED";
-        if (this.p2.heroName === 'Macu' && this.p2.macuNextAttackDizzy) p2Stat += " [DIZZY ATK]";
         if (this.p2.heroName === 'Kadaxi' && this.p2.comboCount > 0) p2Stat += ` [COMBO: ${this.p2.comboCount}/2]`;
         if (this.p2.heroName === 'Euclid') {
             let skelCount = this.minions.filter(m => m.type === 'skeleton' && m.owner === this.p2).length;
-            p2Stat += ` [Skulls: ${skelCount}/5]`;
-            if (this.p2.superWindupTimer > 0) p2Stat += ` (SUMMONING)`;
-            else if (this.p2.attackState === 'windup') p2Stat += ` (CASTING)`;
+            p2Stat += `Wep: ${this.p2.euclidWeapon.toUpperCase()} [Skulls: ${skelCount}/8]`;
+            if (this.p2.euclidSwitchTimer > 0) p2Stat += ` (SWITCHING)`;
+            else if (this.p2.superWindupTimer > 0) p2Stat += ` (SUMMONING)`;
+            else if (this.p2.attackState === 'windup' && this.p2.euclidWeapon === 'magic') p2Stat += ` (CASTING)`;
         }
         if (this.p2.buffs.poison > 0) p2Stat += " [POISONED]";
         if (this.p2.buffs.dizzy > 0) p2Stat += " [DIZZY]";
@@ -1859,7 +1926,7 @@ class Game {
             if (p2.heroName === 'Kadaxi') attackRange = 100;
             if (p2.heroName === 'Duke' && p2.isMounted) attackRange = 120;
             if (p2.heroName === 'Macu') attackRange = 160;
-            if (p2.heroName === 'Euclid') attackRange = 400; 
+            if (p2.heroName === 'Euclid' && p2.euclidWeapon === 'magic') attackRange = 400; 
 
             if (p2.heroName === 'Kadaxi') {
                 if (p2.grapplePhase === 1) {
@@ -1891,8 +1958,13 @@ class Game {
             if (p2.heroName === 'Kadaxi' && p2.comboCount === 2) scores.moveBackward += 20; 
             
             if (p2.heroName === 'Euclid') {
-                scores.moveBackward += 60; // 永远倾向于保持距离
-                if (p2.superCooldown <= 0 && dist > 300) scores.superSkill += 150; // 安全距离优先摇人
+                if (p2.euclidWeapon === 'magic') {
+                    scores.moveBackward += 60; 
+                    if (p2.superCooldown <= 0 && dist > 300) scores.superSkill += 150; 
+                    if (dist < 100 && p2.euclidSwitchTimer <= 0) scores.switch += 90; // Too close, switch to sword
+                } else {
+                    if (dist > 250 && p2.euclidSwitchTimer <= 0) scores.switch += 90; // Too far, switch to magic
+                }
             }
 
             if (dist <= attackRange && Math.abs(dy) < 60) {
