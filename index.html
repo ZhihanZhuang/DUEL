@@ -686,6 +686,9 @@ class Fighter extends Entity {
         // General Buffs & Mechanics
         this.buffs = { poison: 0, battleCry: 0, shade: 0, dizzy: 0, slow: 0, hurricaneSlow: false };
         this.invincible = 0; this.lastJumpTime = 0;
+        this.flipActive = 0; this.hasHitFlip = false; // 修复：为所有英雄初始化翻滚状态，防止 undefined 导致逻辑锁死
+        this.grapplePhase = 0; this.grappleTimer = 0; 
+        this.grappledBy = null; // Used by victims of Kadaxi
         
         // Character Specifics
         this.hasonAmmo = 6; this.hasonRecharge = 0; this.hasonSuperCharges = 0; this.hasonSuperWindow = 0;
@@ -702,10 +705,8 @@ class Fighter extends Entity {
         // Kadaxi Mechanics
         if (this.heroName === 'Kadaxi') {
             this.comboCount = 0; this.comboTimer = 0;
-            this.grapplePhase = 0; this.grappleTimer = 0; this.grappleTarget = null;
-            this.flipActive = 0; this.hasHitFlip = false;
+            this.grappleTarget = null;
         }
-        this.grappledBy = null; // Used by victims of Kadaxi
     }
 
     takeDamage(amt, attacker, isDoT = false, noKnockback = false) {
