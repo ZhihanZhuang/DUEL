@@ -289,7 +289,7 @@ const HEROES = {
     },
     Artu: {
         name: "Artu", desc: "Daimyo with Great Armor & Ashigaru",
-        color: "#8B0000", maxHp: 1000, speed: 6.5, jump: 13, width: 50, height: 75, superCD: 60000 // +20s CD
+        color: "#8B0000", maxHp: 1000, speed: 3.5, jump: 13, width: 50, height: 75, superCD: 65000 // +20s CD
     },
     Duke: {
         name: "Duke", desc: "Cavalry Rider with Lance & Handgun",
@@ -400,16 +400,29 @@ class Projectile extends Entity {
             let targets = [game.getEnemyOf(this.owner), ...game.minions.filter(m => m.owner !== this.owner)];
             for (let t of targets) {
                 if (!t.dead && checkAABB(this, t)) {
-                    let noKnockback = (this.type === "bullet"); // Duke's Handgun has no knockback exaggeration
-                    t.takeDamage(this.damage, this.owner, false, noKnockback);
-                    
-                    // Willi大飞刀的5秒减速效果
-                    if (this.type === "large_knife") {
-                        t.buffs.slow = 5000;
+                    // Check for Block (Artu & Dismounted Duke during active melee attack)
+                    let isBlocked = false;
+                    if (t.attackState === 'active' && t.isMeleeAttack() && (t.heroName === 'Artu' || (t.heroName === 'Duke' && !t.isMounted))) {
+                        if (Math.random() < 0.5) {
+                            isBlocked = true; // 50% 概率格挡成功
+                        }
+                    }
+
+                    if (isBlocked) {
+                        // 播放格挡成功的白色金属火花
+                        for(let i=0; i<8; i++) game.particles.push(new Particle(this.x, this.y, "#ffffff", (Math.random()-0.5)*10, (Math.random()-0.5)*10, 200));
+                    } else {
+                        let noKnockback = (this.type === "bullet"); // Duke's Handgun has no knockback exaggeration
+                        t.takeDamage(this.damage, this.owner, false, noKnockback);
+                        
+                        // Willi大飞刀的5秒减速效果
+                        if (this.type === "large_knife") {
+                            t.buffs.slow = 5000;
+                        }
+                        for(let i=0; i<5; i++) game.particles.push(new Particle(this.x, this.y, this.color, (Math.random()-0.5)*5, (Math.random()-0.5)*5, 300));
                     }
 
                     this.dead = true;
-                    for(let i=0; i<5; i++) game.particles.push(new Particle(this.x, this.y, this.color, (Math.random()-0.5)*5, (Math.random()-0.5)*5, 300));
                     break;
                 }
             }
@@ -999,7 +1012,7 @@ class Fighter extends Entity {
 
     getMeleeDamage() {
         if (this.heroName === 'Duke' && this.isMounted) return 30; // 3 WRD
-        if (this.heroName === 'Artu') return 20;  // 2 WRD
+        if (this.heroName === 'Artu') return 70;  // 增加 5 WRD (20 + 50 = 70伤害)
         if (this.heroName === 'Macu') return 19;  // 1.9 WRD
         if (this.heroName === 'Hunter') return 14; // 1.4 WRD
         if (this.heroName === 'Duke' && !this.isMounted) return 12; // 1.2 WRD
@@ -1744,4 +1757,3 @@ window.dispatchEvent(new Event('resize'));
 </script>
 </body>
 </html>
-
