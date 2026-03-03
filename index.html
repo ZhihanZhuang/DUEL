@@ -273,27 +273,27 @@ let PLATFORMS = [
 const HEROES = {
     Hason: {
         name: "Hason", desc: "Cowboy with Colt Revolver",
-        color: "#8B4513", maxHp: 750, speed: 5, jump: 16, width: 40, height: 70, superCD: 45000
+        color: "#8B4513", maxHp: 750, speed: 5, jump: 15, width: 40, height: 70, superCD: 45000
     },
     Hunter: {
         name: "Hunter", desc: "Pirate with Musket & Great Sword",
-        color: "#008080", maxHp: 750, speed: 7, jump: 18, width: 45, height: 70, superCD: 30000
+        color: "#008080", maxHp: 750, speed: 4.5, jump: 14, width: 45, height: 70, superCD: 45000
     },
     Macu: {
         name: "Macu", desc: "Ainu Warrior with Long Spear",
-        color: "#2E8B57", maxHp: 900, speed: 4, jump: 17, width: 40, height: 75, superCD: 30000
+        color: "#2E8B57", maxHp: 900, speed: 4, jump: 16, width: 40, height: 75, superCD: 45000
     },
     Willi: {
         name: "Willi", desc: "Ninja with Throwing Knives",
-        color: "#2F4F4F", maxHp: 600, speed: 7.5, jump: 18, width: 35, height: 65, superCD: 35000
+        color: "#2F4F4F", maxHp: 500, speed: 6.5, jump: 16, width: 35, height: 65, superCD: 45000
     },
     Artu: {
         name: "Artu", desc: "Daimyo with Great Armor & Ashigaru",
-        color: "#8B0000", maxHp: 1000, speed: 3.5, jump: 15, width: 50, height: 75, superCD: 65000 // +20s CD
+        color: "#8B0000", maxHp: 1000, speed: 3.5, jump: 13, width: 50, height: 75, superCD: 65000 // +20s CD
     },
     Duke: {
         name: "Duke", desc: "Cavalry Rider with Lance & Handgun",
-        color: "#4682B4", maxHp: 750, speed: 6.5, jump: 16, width: 45, height: 70, superCD: 20000 // Fast CD
+        color: "#4682B4", maxHp: 750, speed: 6.5, jump: 12, width: 45, height: 70, superCD: 20000 // Fast CD
     }
 };
 
@@ -369,7 +369,24 @@ class Projectile extends Entity {
                 this.dead = true;
                 game.createExplosion(this.x + this.w/2, this.y + this.h/2, 120, 150, this.owner);
             }
-        } else if (this.type === "knife") {
+        } else if (this.type === "homing_bullet") {
+            let target = game.getEnemyOf(this.owner);
+            let minDist = Math.hypot(target.x - this.x, target.y - this.y);
+            for (let m of game.minions) {
+                if (m.owner !== this.owner && !m.dead) {
+                    let d = Math.hypot(m.x - this.x, m.y - this.y);
+                    if (d < minDist) { minDist = d; target = m; }
+                }
+            }
+            if (!target.dead) {
+                let tx = target.x + target.w/2;
+                let ty = target.y + target.h/2;
+                let angle = Math.atan2(ty - (this.y + this.h/2), tx - (this.x + this.w/2));
+                let speed = 25;
+                this.vx += (Math.cos(angle) * speed - this.vx) * 0.15;
+                this.vy += (Math.sin(angle) * speed - this.vy) * 0.15;
+            }
+        } else if (this.type === "knife" || this.type === "large_knife") {
             this.vy += GRAVITY * 0.1; // slight drop
         }
 
@@ -399,17 +416,22 @@ class Projectile extends Entity {
             ctx.fillRect(this.x, this.y, this.w, this.h);
             ctx.fillStyle = "#ffff00";
             ctx.fillRect(this.x + this.w/2, this.y - 5, 2, 5);
-        } else if (this.type === "knife") {
+        } else if (this.type === "knife" || this.type === "large_knife") {
             ctx.save();
             ctx.translate(this.x + this.w/2, this.y + this.h/2);
             ctx.rotate(this.vx > 0 ? this.timer*0.02 : -this.timer*0.02);
-            ctx.fillStyle = "#ddd";
+            if (this.type === "large_knife") {
+                ctx.scale(2, 2);
+                ctx.fillStyle = "#0ff";
+            } else {
+                ctx.fillStyle = "#ddd";
+            }
             ctx.beginPath();
             ctx.moveTo(-10, -2); ctx.lineTo(10, 0); ctx.lineTo(-10, 2); ctx.fill();
             ctx.restore();
             this.timer += 16;
-        } else if (this.type === "bullet") {
-            ctx.fillStyle = "#fff"; // Bright fast bullet
+        } else if (this.type === "bullet" || this.type === "homing_bullet") {
+            ctx.fillStyle = this.type === "homing_bullet" ? "#ff5500" : "#fff"; 
             ctx.fillRect(this.x, this.y, this.w, this.h);
         } else {
             ctx.fillRect(this.x, this.y, this.w, this.h);
@@ -425,6 +447,7 @@ class Minion extends Entity {
         this.maxHp = this.hp;
         this.shootTimer = Math.random() * 1000;
         this.color = "#f4f4f4"; // White peasant robe
+        this.buffs = { dizzy: 0 };
     }
     takeDamage(amt, attacker) {
         this.hp -= amt;
@@ -434,6 +457,11 @@ class Minion extends Entity {
         }
     }
     update(dt) {
+        if (this.buffs.dizzy > 0) {
+            this.buffs.dizzy -= dt;
+            return; // 眩晕跳过行动
+        }
+
         this.vy += GRAVITY;
         this.y += this.vy;
         
@@ -468,6 +496,18 @@ class Minion extends Entity {
         }
     }
     draw(ctx) {
+        if (this.buffs.dizzy > 0) {
+            ctx.save();
+            ctx.translate(this.x + this.w/2, this.y - 15);
+            let timeAngle = Date.now() * 0.005;
+            for(let s=0; s<3; s++) {
+                let offset = timeAngle + (s * (Math.PI*2/3));
+                ctx.fillStyle = "#FFD700";
+                ctx.fillRect(Math.cos(offset)*15, Math.sin(offset)*4, 3, 3);
+            }
+            ctx.restore();
+        }
+
         ctx.fillStyle = this.color;
         ctx.fillRect(this.x, this.y, this.w, this.h);
         ctx.fillStyle = "#333";
@@ -504,11 +544,12 @@ class Minion extends Entity {
 }
 
 class Hurricane extends Entity {
-    constructor(owner) {
-        super(CANVAS_W/2 - 50, GROUND_Y - 300, 100, 300);
+    constructor(owner, x, y) {
+        super(x, y, 100, 300);
         this.owner = owner;
         this.timer = 15000;
         this.tickTimer = 0;
+        this.stunTickTimer = 0;
     }
     update(dt) {
         this.timer -= dt;
@@ -520,6 +561,23 @@ class Hurricane extends Entity {
             let enemy = game.getEnemyOf(this.owner);
             if (checkAABB(this, enemy)) {
                 enemy.takeDamage(0.6, this.owner, true);
+            }
+            for (let m of game.minions) {
+                if (m.owner !== this.owner && !m.dead && checkAABB(this, m)) {
+                    m.takeDamage(0.6, this.owner, true);
+                }
+            }
+        }
+
+        this.stunTickTimer += dt;
+        if (this.stunTickTimer >= 1000) {
+            this.stunTickTimer = 0;
+            let targets = [game.getEnemyOf(this.owner), ...game.minions.filter(m => m.owner !== this.owner)];
+            for (let t of targets) {
+                if (!t.dead && checkAABB(this, t)) {
+                    t.buffs = t.buffs || {};
+                    t.buffs.dizzy = 500; // 0.5s stun per second
+                }
             }
         }
         
@@ -581,6 +639,9 @@ class Fighter extends Entity {
         this.hasonAmmo = 6; this.hasonRecharge = 0;
         this.hasonSuperCharges = 0;
         this.hasonSuperWindow = 0;
+        this.williSuperCharges = 0;
+        this.williSuperWindow = 0;
+        this.invincible = 0;
         this.hunterWeapon = 'musket';
         this.hunterMusketCD = 0;
         
@@ -597,7 +658,7 @@ class Fighter extends Entity {
     }
 
     takeDamage(amt, attacker, isDoT = false, noKnockback = false) {
-        if (this.dead) return;
+        if (this.dead || this.invincible > 0) return; // 位移期间无敌
         
         if (this.heroName === 'Artu') amt *= 0.9;
         if (attacker && attacker.buffs && attacker.buffs.battleCry > 0) amt *= 1.5;
@@ -650,6 +711,8 @@ class Fighter extends Entity {
     update(dt) {
         if (this.dead) return;
 
+        if (this.invincible > 0) this.invincible -= dt;
+
         let currentSpeed = this.baseSpeed;
         let currentJump = this.baseJump;
         
@@ -692,6 +755,11 @@ class Fighter extends Entity {
         if (this.hasonSuperWindow > 0) {
             this.hasonSuperWindow -= dt;
             if (this.hasonSuperWindow <= 0) this.hasonSuperCharges = 0;
+        }
+
+        if (this.williSuperWindow > 0) {
+            this.williSuperWindow -= dt;
+            if (this.williSuperWindow <= 0) this.williSuperCharges = 0;
         }
 
         if (keysPressed[this.controls.jump]) this.jumpBuffer = 150;
@@ -794,11 +862,12 @@ class Fighter extends Entity {
 
             if (keysPressed[this.controls.switch] && this.heroName === 'Hunter') {
                 this.hunterWeapon = this.hunterWeapon === 'musket' ? 'sword' : 'musket';
+                this.hunterMusketCD = 0; // 切换武器秒清冷却
             }
             if (keysPressed[this.controls.attack] && this.attackState === 'idle') {
                 this.performAttack();
             }
-            if (keysPressed[this.controls.super] && (this.superCooldown <= 0 || (this.heroName === 'Hason' && this.hasonSuperCharges > 0))) {
+            if (keysPressed[this.controls.super] && (this.superCooldown <= 0 || (this.heroName === 'Hason' && this.hasonSuperCharges > 0) || (this.heroName === 'Willi' && this.williSuperCharges > 0))) {
                 this.performSuper();
             }
         }
@@ -944,8 +1013,8 @@ class Fighter extends Entity {
             game.projectiles.push(new Projectile(px, py, 20, 4, Math.cos(aimAngle)*speed, Math.sin(aimAngle)*speed, 10, this, "#ccc", "knife")); 
         }
         else if (this.heroName === 'Hunter' && this.hunterWeapon === 'musket') {
-            game.projectiles.push(new Projectile(px, py, 12, 12, this.facing * 25, 0, 20, this, "#222"));
-            this.hunterMusketCD = 6000;
+            game.projectiles.push(new Projectile(px, py, 12, 12, this.facing * 25, 0, 17, this, "#222", "homing_bullet")); // 追踪弹+17伤害(1.7 WRD)
+            this.hunterMusketCD = 3000; // 冷却降低至3秒
             game.particles.push(new Particle(px, py, "#FFA500", this.facing*5, -2, 150));
         }
     }
@@ -965,13 +1034,35 @@ class Fighter extends Entity {
             return;
         }
 
+        if (this.heroName === 'Willi') {
+            if (this.williSuperCharges <= 0) {
+                this.superCooldown = this.superCooldownMax;
+                this.williSuperCharges = 1; // 加上本次共有两次
+                this.williSuperWindow = 3000; 
+            } else {
+                this.williSuperCharges--;
+                if (this.williSuperCharges <= 0) this.williSuperWindow = 0;
+            }
+            this.invincible = 400; // 冲刺期间0.4秒无敌
+            this.vx = this.facing * 35; // 瞬间爆发位移
+            this.vy = 0;
+            
+            for(let i=0; i<20; i++) game.particles.push(new Particle(this.x+this.w/2, this.y+this.h/2, "#0ff", (Math.random()-0.5)*10, (Math.random()-0.5)*10, 600));
+            
+            let px = this.facing === 1 ? this.x + this.w : this.x - 40;
+            let py = this.y + 20;
+            game.projectiles.push(new Projectile(px, py, 40, 8, this.facing * 25, 0, 30, this, "#0ff", "large_knife"));
+            return;
+        }
+
         this.superCooldown = this.superCooldownMax;
         
         for(let i=0; i<20; i++) game.particles.push(new Particle(this.x+this.w/2, this.y+this.h/2, "#ffeb3b", (Math.random()-0.5)*10, (Math.random()-0.5)*10, 600));
 
         if (this.heroName === 'Hunter') {
             this.maxHp += 50; this.hp += 50; this.baseJump = 18;
-            game.hurricane = new Hurricane(this);
+            let hx = this.facing === 1 ? this.x + this.w + 10 : this.x - 110;
+            game.hurricane = new Hurricane(this, hx, GROUND_Y - 300); // 放置在前方
         }
         else if (this.heroName === 'Macu') {
             this.buffs.battleCry = 30000;
@@ -995,6 +1086,7 @@ class Fighter extends Entity {
 
     draw(ctx) {
         if (this.buffs.shade > 0) ctx.globalAlpha = 0.15;
+        if (this.invincible > 0) ctx.globalAlpha = 0.5; // 位移时带有虚化效果
 
         // Draw Dizzy Effect
         if (this.buffs.dizzy > 0) {
@@ -1349,6 +1441,7 @@ class Game {
             p1Stat = `Ammo: ${this.p1.hasonAmmo}/6`;
             if (this.p1.hasonSuperCharges > 0) p1Stat += ` [DYNAMITE x${this.p1.hasonSuperCharges}]`;
         }
+        if (this.p1.heroName === 'Willi' && this.p1.williSuperCharges > 0) p1Stat += ` [DASH x${this.p1.williSuperCharges}]`;
         if (this.p1.heroName === 'Hunter') p1Stat = `Wep: ${this.p1.hunterWeapon.toUpperCase()} ${this.p1.hunterMusketCD>0 ? '(Rld)' : ''}`;
         if (this.p1.heroName === 'Duke') p1Stat = this.p1.isMounted ? (this.p1.runTimer >= 3000 ? "LANCE READY" : "Charging...") : "DISMOUNTED";
         if (this.p1.buffs.poison > 0) p1Stat += " [POISONED]";
@@ -1370,6 +1463,7 @@ class Game {
             p2Stat = `Ammo: ${this.p2.hasonAmmo}/6`;
             if (this.p2.hasonSuperCharges > 0) p2Stat += ` [DYNAMITE x${this.p2.hasonSuperCharges}]`;
         }
+        if (this.p2.heroName === 'Willi' && this.p2.williSuperCharges > 0) p2Stat += ` [DASH x${this.p2.williSuperCharges}]`;
         if (this.p2.heroName === 'Hunter') p2Stat = `Wep: ${this.p2.hunterWeapon.toUpperCase()} ${this.p2.hunterMusketCD>0 ? '(Rld)' : ''}`;
         if (this.p2.heroName === 'Duke') p2Stat = this.p2.isMounted ? (this.p2.runTimer >= 3000 ? "LANCE READY" : "Charging...") : "DISMOUNTED";
         if (this.p2.buffs.poison > 0) p2Stat += " [POISONED]";
@@ -1468,7 +1562,7 @@ class Game {
             
             // Duke hand gun super range check vs normal supers
             let superRange = (p2.heroName === 'Duke' && !p2.isMounted) ? 600 : attackRange + 100;
-            if ((p2.superCooldown <= 0 || (p2.heroName === 'Hason' && p2.hasonSuperCharges > 0)) && dist <= superRange && Math.random() < 0.5) {
+            if ((p2.superCooldown <= 0 || (p2.heroName === 'Hason' && p2.hasonSuperCharges > 0) || (p2.heroName === 'Willi' && p2.williSuperCharges > 0)) && dist <= superRange && Math.random() < 0.5) {
                 keysPressed[p2.controls.super] = true;
             }
 
@@ -1561,5 +1655,3 @@ window.dispatchEvent(new Event('resize'));
 </script>
 </body>
 </html>
-
-
