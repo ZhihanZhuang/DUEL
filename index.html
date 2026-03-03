@@ -453,7 +453,7 @@ const HEROES = {
         ui: {
             hp: "70 WRD", atk: "10.3 WRD (Burst) / Heal Skeletons",
             passive: "<span class='skill-tag'>Resource Conversion</span> Basic attack takes 3s. If no enemy in range, converts 10 WRD damage to heal nearby skeletons. Kills on Artu's minions turn them into skeletons.",
-            super: "<span class='skill-tag'>Necromantic Summoning</span> 3s cast to summon up to 5 ultra-fast melee skeletons. Skeletons deal 10.3 WRD damage and explode on death (2.3 WRD)."
+            super: "<span class='skill-tag'>Necromantic Summoning</span> 3s cast to summon up to 5 ultra-fast melee skeletons. Skeletons deal 3 WRD damage and explode on death (2.3 WRD)."
         }
     }
 };
@@ -688,7 +688,7 @@ class Skeleton extends Entity {
         this.hp = 20; // Base 2 WRD
         this.maxHp = 100; // Can be healed up to 10 WRD
         this.color = "#e0e0e0";
-        this.speed = 10; // Extremely fast
+        this.speed = 7; // 速度降低 30% (由 10 改为 7)
         this.jumpPower = 20; // High jump
         this.attackCooldown = 0;
         this.buffs = { dizzy: 0 };
@@ -699,8 +699,8 @@ class Skeleton extends Entity {
         this.hp -= amt;
         if (this.hp <= 0) {
             this.dead = true;
-            // Skeleton death explosion (2.3 WRD)
-            game.createExplosion(this.x + this.w/2, this.y + this.h/2, 60, 23, this.owner); 
+            // Skeleton death explosion (2.3 WRD)，并设置友军免伤 (false) 防止炸死其他骷髅或 Euclid
+            game.createExplosion(this.x + this.w/2, this.y + this.h/2, 60, 23, this.owner, false); 
             for(let i=0; i<15; i++) game.particles.push(new Particle(this.x+this.w/2, this.y+this.h/2, "#aaa", (Math.random()-0.5)*10, Math.random()*-15, 500, 6));
         }
     }
@@ -736,7 +736,7 @@ class Skeleton extends Entity {
 
             if (this.attackCooldown > 0) this.attackCooldown -= dt;
             if (dist < 50 && Math.abs(dy) < 60 && this.attackCooldown <= 0) {
-                enemy.takeDamage(103, this.owner); // 10.3 WRD damage!
+                enemy.takeDamage(30, this.owner); // 3 WRD damage!
                 this.attackCooldown = 1000;
                 game.particles.push(new Particle(this.x + this.w/2, this.y, "#8A2BE2", dx>0?5:-5, 0, 200, 8));
             }
@@ -1034,12 +1034,16 @@ class Fighter extends Entity {
             
             if (this.superWindupTimer <= 0) {
                 this.superCooldown = this.superCooldownMax;
-                // Kill old skeletons
+                // Kill old skeletons (直接将其标为死亡，不触发 takeDamage，避免覆盖召唤时的群体自爆卡顿)
                 let currentSkeletons = game.minions.filter(m => m.type === 'skeleton' && m.owner === this);
                 currentSkeletons.forEach(s => s.dead = true);
                 
                 for (let i = 0; i < 5; i++) {
-                    game.minions.push(new Skeleton(this, this.x + (Math.random() * 100 - 50), this.y - 20));
+                    // 在场地范围内随机 X 坐标生成
+                    let randomX = 50 + Math.random() * (CANVAS_W - 100);
+                    game.minions.push(new Skeleton(this, randomX, GROUND_Y - 60));
+                    // 召唤时的入场特效
+                    for(let j=0; j<10; j++) game.particles.push(new Particle(randomX + 17, GROUND_Y - 30, "#8A2BE2", (Math.random()-0.5)*8, (Math.random()-0.5)*8, 400));
                 }
                 game.createExplosion(this.x + this.w/2, this.y + this.h/2, 100, 0, this); // Just visual blast
             }
@@ -1716,10 +1720,13 @@ class Game {
 
     getEnemyOf(fighter) { return fighter === this.p1 ? this.p2 : this.p1; }
 
-    createExplosion(x, y, radius, damage, owner) {
+    createExplosion(x, y, radius, damage, owner, friendlyFire = true) {
         for(let i=0; i<30; i++) this.particles.push(new Particle(x, y, i%2===0 ? "#ff5500" : "#555", (Math.random()-0.5)*15, (Math.random()-0.5)*15, 600));
         let targets = [this.p1, this.p2, ...this.minions];
         for (let t of targets) {
+            // 如果开启了友军免伤机制，且目标是 owner 本身或同属一个阵营（比如骷髅），则跳过爆炸伤害
+            if (!friendlyFire && (t === owner || t.owner === owner)) continue;
+            
             if (!t.dead && Math.hypot((t.x + t.w/2) - x, (t.y + t.h/2) - y) <= radius) t.takeDamage(damage, owner);
         }
     }
