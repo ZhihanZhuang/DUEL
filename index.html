@@ -443,8 +443,8 @@ const HEROES = {
         color: "#1E90FF", maxHp: 850, speed: 5.5, jump: 15, width: 40, height: 75, superCD: 25000,
         ui: {
             hp: "85 WRD", atk: "3 WRD (Melee Combo)",
-            passive: "<span class='skill-tag'>Karate Combo</span> Every 4th attack fires a Blue Ki Blast (5 WRD).<br><span class='skill-tag'>Flip Attack</span> Double Jump quickly to trigger a damaging backflip (2 WRD).",
-            super: "<span class='skill-tag'>2-Phase Grapple</span><br>1) Vacuum pull nearby enemies.<br>2) Press Super again within 5s to Judo Throw (8 WRD + 3s Stun)."
+            passive: "<span class='skill-tag'>Karate Combo</span> Every 3rd attack fires a Blue Ki Blast (5 WRD, Huge Knockback, 2s Stun).<br><span class='skill-tag'>Flip Attack</span> Double Jump quickly to backflip (6 WRD, 3s CD).",
+            super: "<span class='skill-tag'>2-Phase Grapple</span><br>1) Vacuum pull nearby enemies.<br>2) Press Super again within 5s to Judo Throw (13 WRD + 5s Stun)."
         }
     }
 };
@@ -531,9 +531,15 @@ class Projectile extends Entity {
                     if (isBlocked) {
                         for(let i=0; i<8; i++) game.particles.push(new Particle(this.x, this.y, "#ffffff", (Math.random()-0.5)*10, (Math.random()-0.5)*10, 200));
                     } else {
-                        let noKnockback = (this.type === "bullet"); 
+                        let noKnockback = (this.type === "bullet" || this.type === "ki_blast"); 
                         t.takeDamage(this.damage, this.owner, false, noKnockback);
                         if (this.type === "large_knife") t.buffs.slow = 5000;
+                        if (this.type === "ki_blast") {
+                            t.buffs.dizzy = 2000; // 2s Stun
+                            let dir = this.vx > 0 ? 1 : -1;
+                            t.vx = dir * 45; // Enhanced Knockback
+                            t.vy = -8;
+                        }
                         for(let i=0; i<5; i++) game.particles.push(new Particle(this.x, this.y, this.color, (Math.random()-0.5)*5, (Math.random()-0.5)*5, 300));
                     }
                     this.dead = true;
@@ -706,6 +712,7 @@ class Fighter extends Entity {
         if (this.heroName === 'Kadaxi') {
             this.comboCount = 0; this.comboTimer = 0;
             this.grappleTarget = null;
+            this.flipCooldown = 0;
         }
     }
 
@@ -775,12 +782,14 @@ class Fighter extends Entity {
         }
 
         if (this.invincible > 0) this.invincible -= dt;
+        if (this.heroName === 'Kadaxi' && this.flipCooldown > 0) this.flipCooldown -= dt;
+        
         if (this.flipActive > 0) {
             this.flipActive -= dt;
             // Flip hitbox logic
             let enemy = game.getEnemyOf(this);
             if (!this.hasHitFlip && checkAABB(this, enemy)) {
-                enemy.takeDamage(20, this); // 2 WRD
+                enemy.takeDamage(60, this); // 6 WRD
                 this.hasHitFlip = true;
             }
         }
@@ -842,12 +851,13 @@ class Fighter extends Entity {
         if (keysPressed[this.controls.jump]) {
             this.jumpBuffer = 150;
             // Flip Attack check
-            if (this.heroName === 'Kadaxi' && !this.isGrounded && (this.stunTimer <= 0 && this.buffs.dizzy <= 0 && this.grapplePhase === 0)) {
+            if (this.heroName === 'Kadaxi' && !this.isGrounded && (this.stunTimer <= 0 && this.buffs.dizzy <= 0 && this.grapplePhase === 0 && this.flipCooldown <= 0)) {
                 let now = performance.now();
                 if (now - this.lastJumpTime <= 500) {
                     this.flipActive = 400;
                     this.hasHitFlip = false;
                     this.vy = -10; // little bump
+                    this.flipCooldown = 3000; // 3s cooldown
                 }
                 this.lastJumpTime = now;
             }
@@ -924,7 +934,7 @@ class Fighter extends Entity {
                 
                 if (this.stateTimer <= 0) {
                     this.attackState = 'recovery';
-                    this.stateTimer = (this.heroName === 'Hason') ? 100 : 250; 
+                    this.stateTimer = (this.heroName === 'Hason') ? 100 : (this.heroName === 'Kadaxi' ? 120 : 250); 
                     this.maxStateTimer = this.stateTimer;
                 }
             } else if (this.attackState === 'recovery') {
@@ -1037,7 +1047,7 @@ class Fighter extends Entity {
         
         if (this.heroName === 'Duke' && this.isMounted) this.stateTimer = 50; 
         if (this.heroName === 'Hason') this.stateTimer = 50; 
-        if (this.heroName === 'Kadaxi') this.stateTimer = 80;
+        if (this.heroName === 'Kadaxi') this.stateTimer = 50; // Faster windup
         
         this.maxStateTimer = this.stateTimer;
         this.hasHit = false;
@@ -1082,7 +1092,7 @@ class Fighter extends Entity {
             game.particles.push(new Particle(px, py, "#FFA500", this.facing*5, -2, 150));
         }
         else if (this.heroName === 'Kadaxi') {
-            if (this.comboCount === 3) {
+            if (this.comboCount >= 2) {
                 // Ki Blast
                 this.comboCount = 0;
                 let speed = 22;
@@ -1121,8 +1131,8 @@ class Fighter extends Entity {
                     
                     let enemy = this.grappleTarget;
                     enemy.grappledBy = null;
-                    enemy.takeDamage(80, this); // 8 WRD
-                    enemy.buffs.dizzy = 3000; // 3s Stun
+                    enemy.takeDamage(130, this); // 13 WRD
+                    enemy.buffs.dizzy = 5000; // 5s Stun
                     
                     // Ground impact visual
                     game.createExplosion(this.x + this.w/2 + this.facing*40, GROUND_Y, 80, 0, this); 
@@ -1507,7 +1517,7 @@ class Game {
         if (this.p1.heroName === 'Hunter') p1Stat = `Wep: ${this.p1.hunterWeapon.toUpperCase()} ${this.p1.hunterMusketCD>0 ? '(Rld)' : ''}`;
         if (this.p1.heroName === 'Duke') p1Stat = this.p1.isMounted ? (this.p1.runTimer >= 3000 ? "LANCE READY" : "Charging...") : "DISMOUNTED";
         if (this.p1.heroName === 'Macu' && this.p1.macuNextAttackDizzy) p1Stat += " [DIZZY ATK]"; 
-        if (this.p1.heroName === 'Kadaxi' && this.p1.comboCount > 0) p1Stat += ` [COMBO: ${this.p1.comboCount}/3]`;
+        if (this.p1.heroName === 'Kadaxi' && this.p1.comboCount > 0) p1Stat += ` [COMBO: ${this.p1.comboCount}/2]`;
         if (this.p1.buffs.poison > 0) p1Stat += " [POISONED]";
         if (this.p1.buffs.dizzy > 0) p1Stat += " [DIZZY]";
         if (this.p1.buffs.slow > 0) p1Stat += " [SLOWED]";
@@ -1525,7 +1535,7 @@ class Game {
         if (this.p2.heroName === 'Hunter') p2Stat = `Wep: ${this.p2.hunterWeapon.toUpperCase()} ${this.p2.hunterMusketCD>0 ? '(Rld)' : ''}`;
         if (this.p2.heroName === 'Duke') p2Stat = this.p2.isMounted ? (this.p2.runTimer >= 3000 ? "LANCE READY" : "Charging...") : "DISMOUNTED";
         if (this.p2.heroName === 'Macu' && this.p2.macuNextAttackDizzy) p2Stat += " [DIZZY ATK]";
-        if (this.p2.heroName === 'Kadaxi' && this.p2.comboCount > 0) p2Stat += ` [COMBO: ${this.p2.comboCount}/3]`;
+        if (this.p2.heroName === 'Kadaxi' && this.p2.comboCount > 0) p2Stat += ` [COMBO: ${this.p2.comboCount}/2]`;
         if (this.p2.buffs.poison > 0) p2Stat += " [POISONED]";
         if (this.p2.buffs.dizzy > 0) p2Stat += " [DIZZY]";
         if (this.p2.buffs.slow > 0) p2Stat += " [SLOWED]";
