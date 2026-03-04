@@ -437,12 +437,12 @@ const HEROES = {
     Ugo: {
         name: "Ugo", desc: "Puppet Master Mage",
         color: "#E6E6FA", maxHp: 700, speed: 4.5, jump: 14, width: 40, height: 70, superCD: 15000,
-        ui: { hp: "70 WRD", atk: "1.7 WRD (Paper Planes)", passive: "Press [Switch] to summon Puppet. Ugo cannot move/attack while active. Detonate with [Switch] (3 WRD + Stun). Stunned for 3s if puppet dies.", super: "With Puppet: Instantly swap positions (0.2s invincibility). Without Puppet: Long backstep & fires a piercing Blue Plane (5 WRD)." }
+        ui: { hp: "70 WRD", atk: "1.7 WRD (Paper Planes) / 2.0 WRD (Puppet)", passive: "Press [Switch] to summon Puppet. You take control of the Puppet while Ugo stands still. Detonate with [Switch] for massive 10 WRD AoE + 0.5s Stun. Stunned for 3s if puppet dies.", super: "With Puppet: Instantly swap positions (0.2s invincibility). Without Puppet: Long backstep & fires a piercing Blue Plane (5 WRD)." }
     },
     Kila: {
         name: "Kila", desc: "Elemental Stance Mage",
         color: "#555555", maxHp: 750, speed: 4.8, jump: 14, width: 40, height: 70, superCD: 18000,
-        ui: { hp: "75 WRD", atk: "3~5 WRD (Multi)", passive: "按 [Switch] 切换元素姿态 (火->水->土)。切换期间无敌2秒但大幅减速且无法攻击。切换冷却 8秒。", super: "火：自动追踪自爆火龙。 水：大范围控制海啸。 土：全图平台地刺。" }
+        ui: { hp: "75 WRD", atk: "3~5 WRD (Multi)", passive: "Press [Switch] to rotate Elements (Fire->Water->Earth). 2s Invincibility while switching, but heavily slowed and cannot attack. 8s CD.", super: "Fire: Homing explosive Dragon. Water: Massive CC Wave. Earth: Spawns spikes on all platforms." }
     }
 };
 
@@ -507,7 +507,7 @@ class Hazard extends Entity {
     draw(ctx) {
         if (this.delay > 0) {
             ctx.fillStyle = "rgba(255,0,0,0.3)";
-            ctx.fillRect(this.x, this.y + this.h - 5, this.w, 5); // Warning indicator
+            ctx.fillRect(this.x, this.y + this.h - 5, this.w, 5);
         } else {
             ctx.fillStyle = this.color;
             for(let i=0; i<this.w; i+=15) {
@@ -535,7 +535,6 @@ class FireDragon extends Entity {
         this.hp -= amt;
         if (this.hp <= 0) {
             this.dead = true;
-            // No explosion damage, just visuals if killed
             for(let i=0; i<20; i++) game.particles.push(new Particle(this.x+this.w/2, this.y+this.h/2, "#ff4500", (Math.random()-0.5)*10, (Math.random()-0.5)*10, 400));
         }
     }
@@ -921,6 +920,12 @@ class Puppet extends Entity {
         this.attackCooldown = 0;
         this.buffs = { dizzy: 0 };
         this.invincible = 0;
+        this.targetVx = 0;
+        this.facing = owner.facing;
+        this.attackState = 'idle';
+        this.stateTimer = 0;
+        this.hasHit = false;
+        this.isGrounded = false;
     }
     takeDamage(amt, attacker) {
         if (this.grappledBy) return;
@@ -934,46 +939,73 @@ class Puppet extends Entity {
             }
         }
     }
+    doJump() {
+        if (this.isGrounded && this.attackState === 'idle') {
+            this.vy = -this.jumpPower;
+            this.isGrounded = false;
+        }
+    }
+    doAttack() {
+        if (this.attackState === 'idle') {
+            this.attackState = 'windup';
+            this.stateTimer = 100;
+            this.hasHit = false;
+        }
+    }
     update(dt) {
         if (this.buffs.dizzy > 0) { this.buffs.dizzy -= dt; return; }
 
         this.vy += GRAVITY;
-        this.y += this.vy;
-        if (this.y + this.h >= GROUND_Y) { this.y = GROUND_Y - this.h; this.vy = 0; }
         
-        if (this.vy >= 0) {
+        if (this.attackState !== 'idle') this.targetVx = 0;
+        this.vx += (this.targetVx - this.vx) * 0.25;
+        
+        this.x += this.vx;
+        this.y += this.vy;
+        
+        if (this.y + this.h >= GROUND_Y) { this.y = GROUND_Y - this.h; this.vy = 0; this.isGrounded = true; }
+        else this.isGrounded = false;
+        
+        if (this.vy > 0) {
             for (let plat of PLATFORMS) {
                 if (this.y + this.h - this.vy <= plat.y && this.y + this.h >= plat.y && this.x + this.w > plat.x && this.x < plat.x + plat.w) {
-                    this.y = plat.y - this.h; this.vy = 0;
+                    this.y = plat.y - this.h; this.vy = 0; this.isGrounded = true;
                 }
-            }
-        }
-
-        let enemy = game.getEnemyOf(this.owner);
-        if (enemy && !enemy.dead) {
-            let dx = enemy.x + enemy.w/2 - (this.x + this.w/2);
-            let dy = enemy.y + enemy.h/2 - (this.y + this.h/2);
-            let dist = Math.abs(dx);
-
-            if (dist > 30) {
-                this.vx = (dx > 0 ? 1 : -1) * this.speed;
-                this.x += this.vx;
-            }
-
-            if (dy < -40 && this.vy === 0 && dist < 150) {
-                this.vy = -this.jumpPower;
-            }
-
-            if (this.attackCooldown > 0) this.attackCooldown -= dt;
-            if (dist < 50 && Math.abs(dy) < 60 && this.attackCooldown <= 0) {
-                enemy.takeDamage(20, this.owner); 
-                this.attackCooldown = 1200; 
-                game.particles.push(new Particle(this.x + this.w/2, this.y, "#fff", dx>0?5:-5, 0, 200, 6));
             }
         }
         
         if (this.x < 0) this.x = 0;
         if (this.x > CANVAS_W - this.w) this.x = CANVAS_W - this.w;
+
+        if (this.attackState === 'windup') {
+            this.stateTimer -= dt;
+            if (this.stateTimer <= 0) {
+                this.attackState = 'active';
+                this.stateTimer = 100;
+                
+                let px = this.facing === 1 ? this.x + this.w : this.x - 40;
+                let hitBox = { x: px, y: this.y + 10, w: 40, h: 40 };
+                let enemy = game.getEnemyOf(this.owner);
+                let targetsHit = [];
+                if (!enemy.dead && checkAABB(hitBox, enemy)) targetsHit.push(enemy);
+                for (let m of game.minions) {
+                    if (m.owner !== this.owner && !m.dead && checkAABB(hitBox, m)) targetsHit.push(m);
+                }
+                if (targetsHit.length > 0) {
+                    this.hasHit = true;
+                    targetsHit.forEach(t => t.takeDamage(20, this.owner)); 
+                }
+            }
+        } else if (this.attackState === 'active') {
+            this.stateTimer -= dt;
+            if (this.stateTimer <= 0) {
+                this.attackState = 'recovery';
+                this.stateTimer = 150;
+            }
+        } else if (this.attackState === 'recovery') {
+            this.stateTimer -= dt;
+            if (this.stateTimer <= 0) this.attackState = 'idle';
+        }
     }
     draw(ctx) {
         if (this.buffs.dizzy > 0) {
@@ -986,17 +1018,27 @@ class Puppet extends Entity {
             ctx.restore();
         }
         
+        ctx.save();
+        ctx.translate(this.x + this.w/2, this.y + this.h/2);
+        if (this.facing === -1) ctx.scale(-1, 1);
+        
         ctx.fillStyle = this.color;
-        ctx.fillRect(this.x, this.y, this.w, this.h);
+        ctx.fillRect(-this.w/2, -this.h/2, this.w, this.h);
         
         ctx.strokeStyle = "#333"; ctx.lineWidth = 2;
-        ctx.beginPath(); ctx.moveTo(this.x, this.y+20); ctx.lineTo(this.x+this.w, this.y+20); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(this.x, this.y+40); ctx.lineTo(this.x+this.w, this.y+40); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(-this.w/2, -this.h/2 + 20); ctx.lineTo(this.w/2, -this.h/2 + 20); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(-this.w/2, -this.h/2 + 40); ctx.lineTo(this.w/2, -this.h/2 + 40); ctx.stroke();
         
         ctx.fillStyle = "#fff";
-        let enemy = game.getEnemyOf(this.owner);
-        let dir = (enemy && enemy.x > this.x) ? 1 : -1;
-        ctx.beginPath(); ctx.arc(this.x + (dir>0?25:10), this.y + 10, 4, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(10, -this.h/2 + 10, 4, 0, Math.PI*2); ctx.fill();
+
+        if (this.attackState !== 'idle') {
+            ctx.fillStyle = "rgba(255, 255, 255, 0.5)";
+            let ext = this.attackState === 'active' ? 30 : (this.attackState === 'windup' ? 0 : 10);
+            ctx.fillRect(this.w/2, -10, ext, 10); 
+        }
+        
+        ctx.restore();
 
         ctx.fillStyle = "red"; ctx.fillRect(this.x, this.y - 12, this.w, 4);
         ctx.fillStyle = "#fff"; ctx.fillRect(this.x, this.y - 12, this.w * (this.hp/this.maxHp), 4);
@@ -1212,9 +1254,11 @@ class Fighter extends Entity {
             if (this.kaeAggroTimer > 0) this.kaeAggroTimer -= dt;
         }
 
+        let activePuppet = null;
         let hasPuppet = false;
         if (this.heroName === 'Ugo') {
-            hasPuppet = game.minions.some(m => m.type === 'puppet' && m.owner === this && !m.dead);
+            activePuppet = game.minions.find(m => m.type === 'puppet' && m.owner === this && !m.dead);
+            hasPuppet = !!activePuppet;
         }
         
         if (this.buffs.bloodFrenzy > 0) {
@@ -1304,16 +1348,20 @@ class Fighter extends Entity {
         let canMoveAndAttack = canAct && !hasPuppet;
 
         if (keysPressed[this.controls.jump]) {
-            this.jumpBuffer = 150;
-            if (!this.isGrounded && !this.hasFlipped && (canMoveAndAttack && this.flipCooldown <= 0)) {
-                let now = performance.now();
-                if (now - this.lastJumpTime <= 500) {
-                    this.flipActive = 400;
-                    this.hasHitFlip = false;
-                    this.hasFlipped = true; 
-                    this.vy = -10; 
-                    this.flipCooldown = 3000; 
-                    this.jumpBuffer = 0; 
+            if (hasPuppet && canAct) {
+                activePuppet.doJump();
+            } else {
+                this.jumpBuffer = 150;
+                if (!this.isGrounded && !this.hasFlipped && (canMoveAndAttack && this.flipCooldown <= 0)) {
+                    let now = performance.now();
+                    if (now - this.lastJumpTime <= 500) {
+                        this.flipActive = 400;
+                        this.hasHitFlip = false;
+                        this.hasFlipped = true; 
+                        this.vy = -10; 
+                        this.flipCooldown = 3000; 
+                        this.jumpBuffer = 0; 
+                    }
                 }
             }
         } else if (this.jumpBuffer > 0) this.jumpBuffer -= dt;
@@ -1400,7 +1448,7 @@ class Fighter extends Entity {
         let targetVx = 0;
         if (this.heroName === 'Willi' && this.invincible > 0) {
             targetVx = this.facing * 40;
-        } else if ((canMoveAndAttack || isKilaSwitching) && this.flipActive <= 0) {
+        } else if (canMoveAndAttack && this.flipActive <= 0) {
             if (keys[this.controls.left]) { targetVx = -currentSpeed; this.facing = -1; } 
             else if (keys[this.controls.right]) { targetVx = currentSpeed; this.facing = 1; }
             
@@ -1412,6 +1460,14 @@ class Fighter extends Entity {
             }
         } else {
             if (this.heroName === 'Duke') this.runTimer = 0;
+        }
+
+        if (hasPuppet && canAct) {
+            if (keys[this.controls.left]) { activePuppet.targetVx = -activePuppet.speed; activePuppet.facing = -1; }
+            else if (keys[this.controls.right]) { activePuppet.targetVx = activePuppet.speed; activePuppet.facing = 1; }
+            else { activePuppet.targetVx = 0; }
+        } else if (activePuppet) {
+            activePuppet.targetVx = 0;
         }
 
         let friction = 0.25;
@@ -1531,10 +1587,9 @@ class Fighter extends Entity {
                     this.attackState = 'idle';
                     for(let i=0; i<20; i++) game.particles.push(new Particle(this.x+this.w/2, this.y+this.h/2, "#8A2BE2", (Math.random()-0.5)*15, (Math.random()-0.5)*15, 800, 6));
                 } else if (this.heroName === 'Ugo' && this.attackState === 'idle') {
-                    let activePuppet = game.minions.find(m => m.type === 'puppet' && m.owner === this && !m.dead);
                     if (activePuppet) {
                         activePuppet.dead = true; 
-                        game.createExplosion(activePuppet.x + activePuppet.w/2, activePuppet.y + activePuppet.h/2, 90, 30, this, false, 500);
+                        game.createExplosion(activePuppet.x + activePuppet.w/2, activePuppet.y + activePuppet.h/2, 90, 100, this, false, 500); // 100 dmg = 10 WRD
                         for(let i=0; i<30; i++) game.particles.push(new Particle(activePuppet.x+activePuppet.w/2, activePuppet.y+activePuppet.h/2, "#fff", (Math.random()-0.5)*15, (Math.random()-0.5)*15, 600, 5));
                     } else {
                         this.attackState = 'windup';
@@ -1552,8 +1607,12 @@ class Fighter extends Entity {
                     }
                 }
             }
-            if (keysPressed[this.controls.attack] && this.attackState === 'idle' && !hasPuppet) {
-                this.performAttack();
+            if (keysPressed[this.controls.attack] && this.attackState === 'idle') {
+                if (hasPuppet) {
+                    activePuppet.doAttack();
+                } else {
+                    this.performAttack();
+                }
             }
         }
         
@@ -2039,8 +2098,8 @@ class Fighter extends Entity {
 
             ctx.fillStyle = suitColor; ctx.fillRect(-hw - 2, -2, this.w + 4, h + 4); 
             ctx.fillStyle = bodyColor; ctx.fillRect(-hw, 0, this.w, h);
-            ctx.fillStyle = "#000"; ctx.fillRect(-hw, 20, this.w, 6); // belt
-            ctx.fillStyle = visorColor; ctx.fillRect(hw - 12, 10, 8, 4); // Visor slit
+            ctx.fillStyle = "#000"; ctx.fillRect(-hw, 20, this.w, 6); 
+            ctx.fillStyle = visorColor; ctx.fillRect(hw - 12, 10, 8, 4); 
             
             if (this.kaeComboCount > 0) {
                 ctx.fillStyle = this.kaeAwakened ? "#ff0000" : "#00FFFF";
@@ -2213,6 +2272,7 @@ class Fighter extends Entity {
             else if (this.attackState === 'active') angle = -1.0 + (3.0 * phaseProg);
             else if (this.attackState === 'recovery') angle = 2.0 - (2.0 * phaseProg);
 
+            // 挥砍的半月形特效轨迹
             if (this.attackState === 'active') {
                 ctx.beginPath();
                 ctx.arc(0, 0, 55, -1.0, angle);
@@ -2221,7 +2281,7 @@ class Fighter extends Entity {
                 ctx.stroke();
             }
 
-            drawHatchet(angle); 
+            drawHatchet(angle); // Right hand
 
             if (this.buffs.bloodFrenzy > 0) {
                 ctx.translate(-this.w, 0); 
@@ -2232,7 +2292,7 @@ class Fighter extends Entity {
                     ctx.strokeStyle = "rgba(255, 50, 50, 0.7)";
                     ctx.stroke();
                 }
-                drawHatchet(angle + Math.PI/4); 
+                drawHatchet(angle + Math.PI/4); // Left hand dual wield offset
             }
             ctx.restore();
         }
@@ -2280,8 +2340,8 @@ class Game {
         this.lastTime = 0;
         this.state = 'MENU'; 
         
-        this.p1Choice = 'Kila';
-        this.p2Choice = 'Ugo'; 
+        this.p1Choice = 'Ugo';
+        this.p2Choice = 'Kae'; 
         
         this.setupMenu();
         updateControlsDisplay();
@@ -2563,13 +2623,27 @@ class Game {
                 tacticalState = 'defensive';
             }
 
-            let predX = Math.max(0, Math.min(CANVAS_W, p1.x + (p1.vx * 15)));
-            let predY = p1.y + (p1.vy * 5);
-            let dx = predX - p2.x;
-            let dy = predY - p2.y;
+            let targetEntity = p1;
+            let p1Puppet = this.minions.find(m => m.type === 'puppet' && m.owner === p1 && !m.dead);
+            if (p1Puppet) {
+                targetEntity = p1Puppet; 
+            }
+
+            let sourceEntity = p2;
+            let p2Puppet = this.minions.find(m => m.type === 'puppet' && m.owner === p2 && !m.dead);
+            if (p2Puppet) {
+                sourceEntity = p2Puppet; 
+            }
+
+            let predX = Math.max(0, Math.min(CANVAS_W, targetEntity.x + (targetEntity.vx * 15)));
+            let predY = targetEntity.y + (targetEntity.vy * 5);
+            let dx = predX - sourceEntity.x;
+            let dy = predY - sourceEntity.y;
             let dist = Math.abs(dx);
             
             let isMelee = p2.isMeleeAttack();
+            if (p2.heroName === 'Ugo' && p2Puppet) isMelee = true; 
+
             let attackRange = isMelee ? 80 : 350;
             if (p2.heroName === 'Kadaxi') attackRange = 100;
             if (p2.heroName === 'Duke' && p2.isMounted) attackRange = 120;
@@ -2577,6 +2651,7 @@ class Game {
             if (p2.heroName === 'Lique') attackRange = 65;
             if (p2.heroName === 'Kae') attackRange = 55;
             if (p2.heroName === 'Euclid' && p2.euclidWeapon === 'magic') attackRange = 400; 
+            if (p2.heroName === 'Ugo' && p2Puppet) attackRange = 60; 
 
             if (p2.heroName === 'Kadaxi') {
                 if (p2.grapplePhase === 1) {
@@ -2625,12 +2700,12 @@ class Game {
             }
 
             if (p2.heroName === 'Ugo') {
-                let p2Puppet = this.minions.find(m => m.type === 'puppet' && m.owner === p2 && !m.dead);
                 if (p2Puppet) {
-                    scores.moveBackward += 50;
+                    scores.moveForward += 100;
                     scores.attack += 30;
-                    let distToPuppet = Math.hypot((p1.x+p1.w/2) - (p2Puppet.x+p2Puppet.w/2), (p1.y+p1.h/2) - (p2Puppet.y+p2Puppet.h/2));
-                    if (distToPuppet < 80) scores.switch += 150;
+                    let distToPuppet = Math.hypot((p2.x+p2.w/2) - (p2Puppet.x+p2Puppet.w/2), (p2.y+p2.h/2) - (p2Puppet.y+p2Puppet.h/2));
+                    if (distToPuppet < 80 && dist > 150) scores.switch += 150; 
+                    if (dist < 60) scores.switch += 200; 
                     if (dist < 100 && p2.superCooldown <= 0) scores.superSkill += 200;
                 } else {
                     scores.moveBackward += 60;
@@ -2711,19 +2786,19 @@ class Game {
 
             for (let proj of this.projectiles) {
                 if (proj.owner !== p2 && !proj.dead && proj.type !== "dynamite") {
-                    let dxProj = p2.x - proj.x;
+                    let dxProj = sourceEntity.x - proj.x;
                     let isHeadingTowards = (dxProj > 0 && proj.vx > 0) || (dxProj < 0 && proj.vx < 0);
-                    let isYAligned = (proj.y + proj.h > p2.y - 20) && (proj.y < p2.y + p2.h + 80);
+                    let isYAligned = (proj.y + proj.h > sourceEntity.y - 20) && (proj.y < sourceEntity.y + sourceEntity.h + 80);
                     
                     if (isHeadingTowards && isYAligned && Math.abs(dxProj) < 300) {
-                        if (!p2.isGrounded && p2.vy < -2 && p2.heroName !== 'Kadaxi') {
+                        if (!sourceEntity.isGrounded && sourceEntity.vy < -2 && p2.heroName !== 'Kadaxi') {
                         } else {
                             scores.jump += 200; 
                         }
                         
                         scores.moveBackward += 80; 
                         
-                        if (!p2.isGrounded && Math.abs(dxProj) < 200) {
+                        if (!sourceEntity.isGrounded && Math.abs(dxProj) < 200) {
                             if (!p2.hasFlipped && p2.flipCooldown <= 0) {
                                 scores.jump += 300;
                                 setTimeout(() => { if (!p2.dead) keysPressed[p2.controls.jump] = true; }, 50);
