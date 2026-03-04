@@ -431,7 +431,7 @@ const HEROES = {
     Kae: {
         name: "Kae", desc: "Assassin of Thunder",
         color: "#00CED1", maxHp: 650, speed: 6.0, jump: 16, width: 35, height: 65, superCD: 12000,
-        ui: { hp: "65 WRD", atk: "2.0 WRD (Thunder Fist)", passive: "Fast melee. Every 4th hit deals +1 WRD & slows target. Below 50% HP, turns into a shadow, doubling ATK & move speed.", super: "<span class='skill-tag'>Shadow Thunder Step</span> Teleports behind an enemy anywhere in the arena and stuns them for 1s. 0.3s cast time." }
+        ui: { hp: "65 WRD", atk: "2.0 WRD (Thunder Fist)", passive: "Fast melee. Every 4th hit deals +1 WRD & stuns target for 0.5s. Below 50% HP, turns into a shadow, doubling ATK & move speed.", super: "<span class='skill-tag'>Shadow Thunder Step</span> Teleports behind an enemy anywhere in the arena and stuns them for 1s. 0.3s cast time." }
     }
 };
 
@@ -1205,7 +1205,7 @@ class Fighter extends Entity {
                                 this.kaeComboCount = 0;
                                 targetsHit.forEach(t => {
                                     t.takeDamage(10, this);
-                                    t.buffs.slow = 1000;
+                                    t.buffs.dizzy = 500; // 强化普攻附带 0.5 秒眩晕
                                     for(let i=0; i<10; i++) game.particles.push(new Particle(t.x + t.w/2, t.y + t.h/2, "#00FFFF", (Math.random()-0.5)*10, (Math.random()-0.5)*10, 300, 5));
                                 });
                             } else {
