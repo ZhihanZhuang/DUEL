@@ -437,7 +437,7 @@ const HEROES = {
     Ugo: {
         name: "Ugo", desc: "Puppet Master Mage",
         color: "#E6E6FA", maxHp: 700, speed: 4.5, jump: 14, width: 40, height: 70, superCD: 15000,
-        ui: { hp: "70 WRD", atk: "1.7 WRD (Paper Planes)", passive: "Press [Switch] to channel (0.8s) and summon a Puppet (25 WRD HP). Press [Switch] again to detonate it (3 WRD AoE + 0.5s Stun).", super: "With Puppet: Instantly swap positions (0.2s invincibility). Without Puppet: Long backstep & fires a piercing Blue Plane (5 WRD)." }
+        ui: { hp: "70 WRD", atk: "1.7 WRD (Paper Planes)", passive: "Press [Switch] to summon Puppet. Ugo cannot move/attack while active. Detonate with [Switch] (3 WRD + Stun). Stunned for 3s if puppet dies.", super: "With Puppet: Instantly swap positions (0.2s invincibility). Without Puppet: Long backstep & fires a piercing Blue Plane (5 WRD)." }
     }
 };
 
@@ -814,6 +814,12 @@ class Puppet extends Entity {
             this.dead = true;
             // 被击杀时普通死亡不触发大范围爆炸伤害，只掉落粒子
             for(let i=0; i<15; i++) game.particles.push(new Particle(this.x+this.w/2, this.y+this.h/2, "#fff", (Math.random()-0.5)*10, Math.random()*-15, 500, 4));
+            
+            // 傀儡被打死时，本体Ugo被眩晕3秒
+            if (this.owner && !this.owner.dead) {
+                this.owner.buffs.dizzy = 3000;
+                this.owner.attackState = 'idle';
+            }
         }
     }
     update(dt) {
@@ -1091,6 +1097,11 @@ class Fighter extends Entity {
         if (this.heroName === 'Kae') {
             if (this.kaeAggroTimer > 0) this.kaeAggroTimer -= dt;
         }
+
+        let hasPuppet = false;
+        if (this.heroName === 'Ugo') {
+            hasPuppet = game.minions.some(m => m.type === 'puppet' && m.owner === this && !m.dead);
+        }
         
         // Lique Super Loop
         if (this.buffs.bloodFrenzy > 0) {
@@ -1156,10 +1167,11 @@ class Fighter extends Entity {
         if (this.williSuperWindow > 0) { this.williSuperWindow -= dt; if (this.williSuperWindow <= 0) this.williSuperCharges = 0; }
 
         let canAct = (this.stunTimer <= 0 && this.buffs.dizzy <= 0 && this.grapplePhase !== 1 && this.superWindupTimer <= 0 && this.euclidSwitchTimer <= 0);
+        let canMoveAndAttack = canAct && !hasPuppet;
 
         if (keysPressed[this.controls.jump]) {
             this.jumpBuffer = 150;
-            if (!this.isGrounded && !this.hasFlipped && (canAct && this.flipCooldown <= 0)) {
+            if (!this.isGrounded && !this.hasFlipped && (canMoveAndAttack && this.flipCooldown <= 0)) {
                 let now = performance.now();
                 if (now - this.lastJumpTime <= 500) {
                     this.flipActive = 400;
@@ -1256,7 +1268,7 @@ class Fighter extends Entity {
         let targetVx = 0;
         if (this.heroName === 'Willi' && this.invincible > 0) {
             targetVx = this.facing * 40;
-        } else if (canAct && this.flipActive <= 0) {
+        } else if (canMoveAndAttack && this.flipActive <= 0) {
             if (keys[this.controls.left]) { targetVx = -currentSpeed; this.facing = -1; } 
             else if (keys[this.controls.right]) { targetVx = currentSpeed; this.facing = 1; }
             
@@ -1272,7 +1284,7 @@ class Fighter extends Entity {
 
         let friction = 0.25;
         if (this.currentPlatform && this.currentPlatform.type === 'center') friction = 0.03; 
-        if (!canAct || ((this.heroName === 'Euclid' || this.heroName === 'Kae' || this.heroName === 'Ugo') && this.attackState === 'windup')) friction = 0.1; 
+        if (!canAct || ((this.heroName === 'Euclid' || this.heroName === 'Kae' || this.heroName === 'Ugo') && this.attackState === 'windup') || hasPuppet) friction = 0.1; 
         
         this.vx += (targetVx - this.vx) * friction;
 
@@ -1389,7 +1401,7 @@ class Fighter extends Entity {
                 } else if (this.heroName === 'Ugo' && this.attackState === 'idle') {
                     let activePuppet = game.minions.find(m => m.type === 'puppet' && m.owner === this && !m.dead);
                     if (activePuppet) {
-                        activePuppet.dead = true;
+                        activePuppet.dead = true; // 玩家主动引爆，不会触发takeDamage，因此不会眩晕本体
                         game.createExplosion(activePuppet.x + activePuppet.w/2, activePuppet.y + activePuppet.h/2, 90, 30, this, false, 500);
                         for(let i=0; i<30; i++) game.particles.push(new Particle(activePuppet.x+activePuppet.w/2, activePuppet.y+activePuppet.h/2, "#fff", (Math.random()-0.5)*15, (Math.random()-0.5)*15, 600, 5));
                     } else {
@@ -1401,7 +1413,7 @@ class Fighter extends Entity {
                     }
                 }
             }
-            if (keysPressed[this.controls.attack] && this.attackState === 'idle') {
+            if (keysPressed[this.controls.attack] && this.attackState === 'idle' && !hasPuppet) {
                 this.performAttack();
             }
         }
@@ -1417,7 +1429,7 @@ class Fighter extends Entity {
 
         if (!keys[this.controls.jump] && this.vy < 0) this.vy *= 0.8;
 
-        if (this.jumpBuffer > 0 && canAct) {
+        if (this.jumpBuffer > 0 && canMoveAndAttack) {
             if (this.coyoteTime > 0 || this.jumpsLeft > 0) {
                 if (this.coyoteTime <= 0) this.jumpsLeft--; else this.coyoteTime = 0;
                 this.vy = -currentJump; this.isGrounded = false; this.jumpBuffer = 0;
