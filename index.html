@@ -430,7 +430,7 @@ const HEROES = {
     },
     Duke: {
         name: "Duke", desc: "Cavalry Rider with Lance & Handgun",
-        color: "#4682B4", maxHp: 900, speed: 6.5, jump: 12, width: 45, height: 70, superCD: 20000,
+        color: "#4682B4", maxHp: 750, speed: 6.5, jump: 12, width: 45, height: 70, superCD: 20000,
         ui: {
             hp: "Horse 50 WRD / Duke 75 WRD", atk: "3.3 WRD (Lance) / 1.5 WRD (Sabre)",
             passive: "Run continuously for 3s to charge Lance (3s Stun). Dismounts when horse dies (Sabre blocks 50% projectiles and heals 2 WRD on hit).",
@@ -457,7 +457,7 @@ const HEROES = {
     },
     Lique: {
         name: "Lique", desc: "Berserker with Hatchets",
-        color: "#B22222", maxHp: 780, speed: 5.5, jump: 13, width: 40, height: 70, superCD: 35000,
+        color: "#B22222", maxHp: 950, speed: 5.5, jump: 13, width: 40, height: 70, superCD: 25000,
         ui: {
             hp: "95 WRD", atk: "1.8 WRD (Fast Melee)",
             passive: "Pure relentless melee pressure with virtually no attack windup.",
@@ -984,12 +984,12 @@ class Fighter extends Entity {
                 this.euclidSwitchTimer -= dt;
             }
         }
-
+        
         // Lique Super Loop
         if (this.buffs.bloodFrenzy > 0) {
             this.buffs.bloodFrenzy -= dt;
             if (Math.random() < 0.3) game.particles.push(new Particle(this.x + Math.random()*this.w, this.y + Math.random()*this.h, "#B22222", 0, -3, 300, 4));
-
+            
             if (this.buffs.bloodFrenzy <= 0) {
                 // Throws axe at end
                 let px = this.facing === 1 ? this.x + this.w : this.x - 10;
@@ -1022,7 +1022,7 @@ class Fighter extends Entity {
             if(Math.random()<0.1) game.particles.push(new Particle(this.x+this.w/2, this.y+this.h, "#ff4500", 0, -3, 300));
         }
         if (this.buffs.shade > 0) this.buffs.shade -= dt;
-
+        
         if (this.buffs.bloodFrenzy > 0) {
             currentSpeed *= 0.9; // 10% speed penalty during frenzy
         }
@@ -1130,7 +1130,7 @@ class Fighter extends Entity {
                 if (this.stateTimer <= 0) {
                     let activeTime = 150;
                     if (this.heroName === 'Lique') activeTime = this.buffs.bloodFrenzy > 0 ? 50 : 100;
-
+                    
                     this.attackState = 'active';
                     this.stateTimer = activeTime; this.maxStateTimer = activeTime;
                     this.executeActiveAttack();
@@ -1147,13 +1147,13 @@ class Fighter extends Entity {
                         enemy.takeDamage(this.getMeleeDamage(), this);
                         if (this.heroName === 'Macu' && this.buffs.battleCry > 0) enemy.buffs.poison = 3000;
                         if (this.heroName === 'Duke' && this.isMounted) enemy.buffs.dizzy = 3000; 
-
+                        
                         // Lique Blood Frenzy Lifesteal (Only works on Enemy Hero, avoids minion abuse)
                         if (this.heroName === 'Lique' && this.buffs.bloodFrenzy > 0 && enemy.heroName) {
                             this.hp = Math.min(this.maxHp, this.hp + 5); // 0.5 WRD = 5 HP
                             for(let i=0; i<5; i++) game.particles.push(new Particle(this.x + Math.random()*this.w, this.y + Math.random()*this.h, "#ff0000", 0, -2, 300, 3));
                         }
-
+                        
                         hitAnything = true;
                     }
                     
@@ -1178,7 +1178,7 @@ class Fighter extends Entity {
                     if (this.heroName === 'Hason') recTime = 100;
                     if (this.heroName === 'Kadaxi') recTime = 200;
                     if (this.heroName === 'Lique') recTime = this.buffs.bloodFrenzy > 0 ? 90 : 180;
-
+                    
                     this.attackState = 'recovery';
                     this.stateTimer = recTime; 
                     this.maxStateTimer = this.stateTimer;
@@ -1391,6 +1391,11 @@ class Fighter extends Entity {
                 game.particles.push(new Particle(px, py, "#8A2BE2", this.facing*5, 0, 150, 5));
             }
         }
+        else if (this.heroName === 'Lique') {
+            // 每次挥斧时爆出少量力量特效，增加打击感
+            let color = this.buffs.bloodFrenzy > 0 ? "#ff0000" : "#ffffff";
+            for(let i=0; i<4; i++) game.particles.push(new Particle(px, py, color, this.facing*(Math.random()*5+5), (Math.random()-0.5)*5, 150, 3));
+        }
     }
 
     performSuper() {
@@ -1529,13 +1534,13 @@ class Fighter extends Entity {
             ctx.stroke();
             ctx.restore();
         }
-        
+
         let phaseProg = 0;
         if (this.attackState !== 'idle' && this.maxStateTimer > 0) {
             phaseProg = 1 - (this.stateTimer / this.maxStateTimer);
             phaseProg = phaseProg * phaseProg * (3 - 2 * phaseProg);
         }
-
+        
         if (this.superWindupTimer > 0 || (this.attackState === 'windup' && this.heroName === 'Euclid' && this.euclidWeapon === 'magic')) {
             let prog = this.superWindupTimer > 0 ? this.superWindupTimer / 3000 : 1 - (this.stateTimer / 1000);
             ctx.save();
@@ -1561,7 +1566,7 @@ class Fighter extends Entity {
         let hw = this.w / 2;
         let h = this.h;
 
-        // Visuals
+        // Visuals (Body)
         if (this.heroName === 'Duke' && this.isMounted) {
             ctx.fillStyle = "#8B4513"; ctx.fillRect(-hw, 30, this.w, 40); 
             ctx.fillRect(hw-10, 10, 15, 25); ctx.fillRect(hw-5, 5, 20, 10); 
@@ -1588,6 +1593,7 @@ class Fighter extends Entity {
 
         ctx.fillStyle = "#fff"; ctx.fillRect(hw - 12, 10, 8, 8); 
         
+        // Visuals (Hats / Clothes)
         if (this.heroName === 'Hason') {
             ctx.fillStyle = "#3e1f0a"; ctx.fillRect(-hw - 12, -5, this.w + 24, 8); ctx.fillRect(-hw + 4, -20, this.w - 8, 15);
             ctx.fillStyle = "#a0522d"; ctx.beginPath(); ctx.moveTo(-hw, 15); ctx.lineTo(hw, 15); ctx.lineTo(hw + 6, 45); ctx.lineTo(-hw - 6, 45); ctx.fill();
@@ -1613,6 +1619,82 @@ class Fighter extends Entity {
             ctx.fillStyle = "#1a1a1a"; ctx.fillRect(-hw, 0, this.w, h); ctx.fillStyle = "#ffe0bd"; ctx.fillRect(-hw + 4, 10, this.w - 8, 8);
             ctx.fillStyle = "#800000"; ctx.fillRect(-hw, 20, this.w, 8); ctx.beginPath(); ctx.moveTo(-hw + 5, 25); ctx.lineTo(-hw - 20, 15); ctx.lineTo(-hw - 15, 30); ctx.fill();
             ctx.fillStyle = "#fff"; ctx.fillRect(hw - 10, 12, 6, 4);
+        }
+        else if (this.heroName === 'Kadaxi') {
+            ctx.fillStyle = "#fff"; ctx.fillRect(-hw, 15, this.w, 20); 
+            ctx.fillStyle = "#000"; ctx.fillRect(-hw, 30, this.w, 8); 
+            ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.moveTo(-hw, 15); ctx.lineTo(hw, 15); ctx.lineTo(0, 30); ctx.fill();
+            if (this.comboCount > 0) {
+                ctx.fillStyle = "#0ff";
+                for(let i=0; i<this.comboCount; i++) ctx.fillRect(-hw + i*10, -10, 6, 4);
+            }
+        }
+
+        // Weapons / Active animations
+        if (this.heroName === 'Hason') {
+            ctx.save(); ctx.translate(hw, 25);
+            let recoil = this.attackState === 'active' ? -0.5 * Math.sin(phaseProg * Math.PI) : 0;
+            ctx.rotate(recoil); ctx.fillStyle = "#aaa"; ctx.fillRect(0, 0, 22, 6); ctx.fillRect(0, 0, 6, 14); ctx.restore();
+        }
+        else if (this.heroName === 'Duke') {
+            ctx.save(); ctx.translate(hw, 25);
+            if (this.isMounted) {
+                let thrust = this.attackState === 'active' ? 40 * Math.sin(phaseProg * Math.PI) : 0;
+                ctx.fillStyle = "#654321"; ctx.fillRect(0, 5, 80 + thrust, 4); ctx.fillStyle = "#eee"; ctx.beginPath(); ctx.moveTo(80+thrust, 3); ctx.lineTo(100+thrust, 7); ctx.lineTo(80+thrust, 11); ctx.fill();
+            } else {
+                let angle = 0;
+                if (this.attackState === 'windup') angle = -1.0 * phaseProg; else if (this.attackState === 'active') angle = -1.0 + (3.0 * phaseProg); else if (this.attackState === 'recovery') angle = 2.0 - (2.0 * phaseProg);
+                ctx.rotate(angle);
+                if (this.attackState === 'active') { ctx.beginPath(); ctx.arc(0, 0, 60, -1.0, angle); ctx.lineWidth = 10; ctx.strokeStyle = "rgba(255, 255, 255, 0.4)"; ctx.stroke(); }
+                ctx.fillStyle = "#eee"; ctx.fillRect(-2, -60, 4, 60); ctx.fillStyle = "#d4af37"; ctx.fillRect(-6, 0, 12, 4); 
+            }
+            ctx.restore();
+        }
+        else if (this.heroName === 'Hunter') {
+            if (this.hunterWeapon === 'musket') {
+                ctx.save(); ctx.translate(hw - 15, 25);
+                let recoil = this.attackState === 'active' ? -0.2 * Math.sin(phaseProg * Math.PI) : 0;
+                ctx.rotate(recoil); ctx.fillStyle = "#5c2e0e"; ctx.fillRect(-15, 0, 50, 8); ctx.fillStyle = "#222"; ctx.fillRect(20, -2, 35, 5); ctx.restore();
+            } else {
+                ctx.save(); ctx.translate(0, 20);
+                let angle = -0.5;
+                if (this.attackState === 'windup') angle = -0.5 - (1.5 * phaseProg); else if (this.attackState === 'active') angle = -2.0 + (3.5 * phaseProg); else if (this.attackState === 'recovery') angle = 1.5 - (2.0 * phaseProg);
+                ctx.rotate(angle);
+                if (this.attackState === 'active') { ctx.beginPath(); ctx.arc(0, 0, 75, -2.0, angle); ctx.lineWidth = 15; ctx.strokeStyle = "rgba(100, 200, 255, 0.4)"; ctx.stroke(); }
+                ctx.fillStyle = "#d3d3d3"; ctx.fillRect(-8, -75, 16, 80); ctx.fillStyle = "#8b4513"; ctx.fillRect(-6, 5, 12, 20); ctx.fillStyle = "#ffd700"; ctx.fillRect(-12, 1, 24, 4); ctx.restore();
+            }
+        }
+        else if (this.heroName === 'Macu') {
+            ctx.save(); ctx.translate(0, 20);
+            let enemy = game.getEnemyOf(this); let mx = this.x + this.w/2; let my = this.y + 20; let ex = enemy.x + enemy.w/2; let ey = enemy.y + enemy.h/2;
+            let rDx = (ex - mx) * this.facing; let rDy = ey - my; let baseAimAngle = Math.atan2(rDy, rDx);
+            if (baseAimAngle > Math.PI/3) baseAimAngle = Math.PI/3; if (baseAimAngle < -Math.PI/3) baseAimAngle = -Math.PI/3;
+            let thrust = 0; let angle = baseAimAngle;
+            if (this.attackState === 'windup') { thrust = -30 * phaseProg; angle = baseAimAngle - (0.2 * phaseProg); }
+            else if (this.attackState === 'active') { thrust = -30 + (110 * Math.sin(phaseProg * Math.PI)); angle = baseAimAngle; } 
+            else if (this.attackState === 'recovery') { thrust = 0; angle = baseAimAngle; }
+            ctx.rotate(angle);
+            if (this.attackState === 'active') { ctx.fillStyle = "rgba(200, 255, 200, 0.5)"; ctx.fillRect(-2, -50 - thrust, 4, thrust + 20); }
+            ctx.fillStyle = "#8B4513"; ctx.fillRect(-3, -50 - thrust, 6, 110); 
+            ctx.fillStyle = "#ddd"; ctx.beginPath(); ctx.moveTo(0, -50 - thrust); ctx.lineTo(-6, -75 - thrust); ctx.lineTo(6, -75 - thrust); ctx.fill(); ctx.restore();
+        }
+        else if (this.heroName === 'Artu') {
+            ctx.save(); ctx.translate(0, 25); let angle = 0; 
+            if (this.attackState === 'idle') { ctx.fillStyle = "#222"; ctx.fillRect(-6, 0, 8, 50); ctx.fillStyle = "#d4af37"; ctx.fillRect(-10, 0, 16, 4); } 
+            else {
+                if (this.attackState === 'windup') angle = -1.0 * phaseProg; else if (this.attackState === 'active') angle = -1.0 + (3.0 * phaseProg); else if (this.attackState === 'recovery') angle = 2.0 - (2.0 * phaseProg);
+                ctx.fillStyle = "#222"; ctx.fillRect(-6, 0, 8, 50); ctx.rotate(angle);
+                if (this.attackState === 'active') { ctx.beginPath(); ctx.arc(0, 0, 60, -1.0, angle); ctx.lineWidth = 10; ctx.strokeStyle = "rgba(255, 200, 100, 0.4)"; ctx.stroke(); }
+                ctx.fillStyle = "#eee"; ctx.fillRect(-2, -60, 4, 60); ctx.fillStyle = "#d4af37"; ctx.fillRect(-6, 0, 12, 4); ctx.fillStyle = "#111"; ctx.fillRect(-3, 4, 6, 15); 
+            } ctx.restore();
+        }
+        else if (this.heroName === 'Willi') {
+            ctx.save(); ctx.translate(hw, 20); let angle = 0;
+            if (this.attackState !== 'idle') {
+                if (this.attackState === 'windup') angle = (-Math.PI/2) * phaseProg; else if (this.attackState === 'active') angle = -Math.PI/2 + (Math.PI * phaseProg); else if (this.attackState === 'recovery') angle = Math.PI/2 - ((Math.PI/2) * phaseProg);
+                ctx.rotate(angle); ctx.fillStyle = "#1a1a1a"; ctx.fillRect(-4, 0, 8, 20);
+                if (this.attackState === 'windup') { ctx.fillStyle = "#ddd"; ctx.beginPath(); ctx.moveTo(0, 20); ctx.lineTo(-4, 30); ctx.lineTo(4, 30); ctx.fill(); }
+            } ctx.restore();
         }
         else if (this.heroName === 'Euclid') {
             if (this.euclidWeapon === 'sword') {
@@ -1641,10 +1723,26 @@ class Fighter extends Entity {
             else if (this.attackState === 'active') angle = -1.0 + (3.0 * phaseProg);
             else if (this.attackState === 'recovery') angle = 2.0 - (2.0 * phaseProg);
 
+            // 挥砍的半月形特效轨迹
+            if (this.attackState === 'active') {
+                ctx.beginPath();
+                ctx.arc(0, 0, 55, -1.0, angle);
+                ctx.lineWidth = 15;
+                ctx.strokeStyle = this.buffs.bloodFrenzy > 0 ? "rgba(220, 20, 20, 0.7)" : "rgba(220, 220, 220, 0.5)";
+                ctx.stroke();
+            }
+
             drawHatchet(angle); // Right hand
 
             if (this.buffs.bloodFrenzy > 0) {
                 ctx.translate(-this.w, 0); 
+                if (this.attackState === 'active') {
+                    ctx.beginPath();
+                    ctx.arc(0, 0, 55, -1.0 + Math.PI/4, angle + Math.PI/4);
+                    ctx.lineWidth = 15;
+                    ctx.strokeStyle = "rgba(255, 50, 50, 0.7)";
+                    ctx.stroke();
+                }
                 drawHatchet(angle + Math.PI/4); // Left hand dual wield offset
             }
             ctx.restore();
