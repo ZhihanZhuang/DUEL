@@ -446,8 +446,13 @@ const HEROES = {
     },
     Volt: {
         name: "Volt", desc: "Flying Energy Marksman",
-        color: "#FFD700", maxHp: 650, speed: 4.0, jump: 15, width: 35, height: 65, superCD: 25000,
+        color: "#FFD700", maxHp: 650, speed: 4.0, jump: 15, width: 35, height: 65, superCD: 18000,
         ui: { hp: "65 WRD", atk: "1.8 WRD (Homing Lasers)", passive: "Hold [Jump]/[Down] to Free Fly. Flight costs 15 Energy/s, Attacks cost 10 Energy. Depleting Energy causes Overload (No attack/flight, take 3 WRD dmg). Below 20 Energy warning.", super: "<span class='skill-tag'>Overdrive Mode</span> Unlimited Energy and +100% Attack Speed for 10 seconds. Forces overload when it ends." }
+    },
+    Gensan: {
+        name: "Gensan", desc: "Phantom Blade Master",
+        color: "#cccccc", maxHp: 800, speed: 5.5, jump: 15, width: 40, height: 70, superCD: 18000,
+        ui: { hp: "80 WRD", atk: "2.2 WRD (Sword)", passive: "Every 4th attack deals 3.5 WRD with +30% range and slows for 1.2s. Moving continuously for 5s leaves a Sword Shadow (Max 2).", super: "<span class='skill-tag'>White Peak Array</span> Creates a large sword array (6 WRD total over 3s) that slows enemies by 40%. Press [Switch] to teleport to furthest shadow (6s CD)." }
     }
 };
 
@@ -478,6 +483,91 @@ class Particle extends Entity {
         ctx.globalAlpha = Math.max(0, this.life / this.maxLife);
         ctx.fillStyle = this.color; ctx.fillRect(this.x, this.y, this.w, this.h);
         ctx.globalAlpha = 1.0;
+    }
+}
+
+class SwordShadow extends Entity {
+    constructor(owner, x, y) {
+        super(x, y, 40, 70);
+        this.owner = owner;
+        this.type = "sword_shadow";
+        this.life = 20000; // 20 seconds
+        this.maxLife = 20000;
+        this.facing = owner.facing;
+    }
+    update(dt) {
+        this.life -= dt;
+        if (this.life <= 0) this.dead = true;
+        if (Math.random() < 0.1) {
+            game.particles.push(new Particle(this.x + Math.random()*this.w, this.y + Math.random()*this.h, "#fff", 0, -2, 400, 2));
+        }
+    }
+    draw(ctx) {
+        ctx.globalAlpha = (this.life / this.maxLife) * 0.5;
+        ctx.save();
+        ctx.translate(this.x + this.w/2, this.y + this.h/2);
+        if (this.facing === -1) ctx.scale(-1, 1);
+        ctx.translate(0, -this.h/2);
+        
+        ctx.fillStyle = "#fff";
+        ctx.fillRect(-this.w/2, 0, this.w, this.h);
+        ctx.fillStyle = "#222";
+        ctx.fillRect(this.w/2 - 12, 10, 8, 8); // eye
+        ctx.fillStyle = "#ddd"; 
+        ctx.fillRect(-this.w/2-2, -50, 4, 50); // sword
+        
+        ctx.restore();
+        ctx.globalAlpha = 1.0;
+    }
+}
+
+class SwordArray extends Entity {
+    constructor(owner, x, y, facing) {
+        super(x, y, 300, 100);
+        this.owner = owner;
+        this.facing = facing;
+        if (facing === -1) this.x -= this.w; 
+        this.life = 3000;
+        this.tickTimer = 0;
+        this.type = "sword_array";
+    }
+    update(dt) {
+        this.life -= dt;
+        if (this.life <= 0) this.dead = true;
+        
+        this.tickTimer += dt;
+        if (this.tickTimer >= 500) {
+            this.tickTimer = 0;
+            let targets = [game.p1, game.p2, ...game.minions].filter(t => t.owner !== this.owner && !t.dead && t.invincible <= 0);
+            for (let t of targets) {
+                if (checkAABB(this, t)) {
+                    t.takeDamage(10, this.owner, true); // 1 WRD
+                    t.buffs.slow = Math.max(t.buffs.slow || 0, 500); // 40% slow applied continuously
+                }
+            }
+        }
+        
+        if (Math.random() < 0.5) {
+            let px = this.x + Math.random() * this.w;
+            game.particles.push(new Particle(px, this.y + this.h, "#fff", 0, -10 - Math.random()*10, 300, 3));
+        }
+    }
+    draw(ctx) {
+        ctx.fillStyle = "rgba(255, 255, 255, 0.3)";
+        ctx.fillRect(this.x, this.y, this.w, this.h);
+        ctx.strokeStyle = "#fff";
+        ctx.lineWidth = 2;
+        ctx.strokeRect(this.x, this.y, this.w, this.h);
+        
+        for(let i=0; i<this.w; i+=30) {
+            let hOffset = Math.sin((Date.now() + i*100) * 0.01) * 20 + 40;
+            ctx.fillStyle = "rgba(255, 255, 255, 0.6)";
+            ctx.beginPath();
+            ctx.moveTo(this.x + i, this.y + this.h);
+            ctx.lineTo(this.x + i + 10, this.y + this.h - hOffset);
+            ctx.lineTo(this.x + i + 20, this.y + this.h);
+            ctx.fill();
+        }
     }
 }
 
@@ -556,7 +646,7 @@ class FireDragon extends Entity {
             
             if (Math.hypot(dx, dy) < 40) {
                 this.dead = true;
-                game.createExplosion(this.x+this.w/2, this.y+this.h/2, 80, 100, this.owner, false, 0); // 10 WRD explosion
+                game.createExplosion(this.x+this.w/2, this.y+this.h/2, 80, 100, this.owner, false, 0); 
             }
         }
     }
@@ -595,7 +685,6 @@ class Projectile extends Entity {
                 }
             }
             if (!target.dead && target.invincible <= 0) {
-                // Weak homing for Volt laser stops after 1.5s
                 if (this.type !== "volt_laser" || this.timer < 1500) {
                     let tx = target.x + target.w/2; let ty = target.y + target.h/2;
                     let angle = Math.atan2(ty - (this.y + this.h/2), tx - (this.x + this.w/2));
@@ -1108,7 +1197,7 @@ class Fighter extends Entity {
         this.currentPlatform = null; this.aiIntent = { left: false, right: false };
         this.attackState = 'idle'; this.stateTimer = 0; this.maxStateTimer = 0; this.hasHit = false;
         
-        this.buffs = { poison: 0, battleCry: 0, shade: 0, dizzy: 0, slow: 0, hurricaneSlow: false, bloodFrenzy: 0, burn: 0 };
+        this.buffs = { poison: 0, battleCry: 0, shade: 0, dizzy: 0, slow: 0, hurricaneSlow: false, bloodFrenzy: 0, burn: 0, msBoost: 0 };
         this.invincible = 0; this.lastJumpTime = 0;
         this.flipActive = 0; this.hasHitFlip = false; this.hasFlipped = false; 
         this.grapplePhase = 0; this.grappleTimer = 0; 
@@ -1136,6 +1225,15 @@ class Fighter extends Entity {
             this.maxEnergy = 200;
             this.isOverloaded = false;
             this.overdriveTimer = 0;
+        }
+        
+        if (this.heroName === 'Gensan') {
+            this.gensanCombo = 0;
+            this.gensanMoveTimer = 0;
+            this.gensanShadows = [];
+            this.gensanSwitchCD = 0;
+            this.lastX = this.x;
+            this.lastY = this.y;
         }
 
         if (this.heroName === 'Duke') {
@@ -1189,7 +1287,7 @@ class Fighter extends Entity {
             for(let i=0; i<30; i++) game.particles.push(new Particle(this.x+this.w/2, this.y+this.h/2, "#000000", (Math.random()-0.5)*15, (Math.random()-0.5)*15, 1000, 8));
         }
 
-        if (this.heroName === 'Euclid' || this.heroName === 'Kae' || this.heroName === 'Ugo' || this.heroName === 'Kila' || this.heroName === 'Volt') {
+        if (this.heroName === 'Euclid' || this.heroName === 'Kae' || this.heroName === 'Ugo' || this.heroName === 'Kila' || this.heroName === 'Volt' || this.heroName === 'Gensan') {
             if (this.attackState === 'windup') {
                 this.attackState = 'idle';
                 this.superWindupTimer = 0;
@@ -1247,6 +1345,7 @@ class Fighter extends Entity {
             this.williHealBuffTimer -= dt;
             if (Math.random() < 0.2) game.particles.push(new Particle(this.x + Math.random()*this.w, this.y + Math.random()*this.h, "#FF0000", 0, -2, 300, 3));
         }
+        if (this.buffs.msBoost > 0) this.buffs.msBoost -= dt;
         
         if (this.flipActive > 0) {
             this.flipActive -= dt;
@@ -1257,6 +1356,30 @@ class Fighter extends Entity {
                     this.hasHitFlip = true;
                 }
             }
+        }
+
+        if (this.heroName === 'Gensan') {
+            if (this.gensanSwitchCD > 0) this.gensanSwitchCD -= dt;
+            let distMoved = Math.hypot(this.x - this.lastX, this.y - this.lastY);
+            if (distMoved > 1) {
+                this.gensanMoveTimer += dt;
+                if (this.gensanMoveTimer >= 5000) {
+                    this.gensanMoveTimer = 0;
+                    let shadow = new SwordShadow(this, this.x, this.y);
+                    this.gensanShadows.push(shadow);
+                    game.minions.push(shadow);
+                    if (this.gensanShadows.length > 2) {
+                        let oldShadow = this.gensanShadows.shift();
+                        oldShadow.dead = true;
+                    }
+                    for(let i=0; i<15; i++) game.particles.push(new Particle(this.x+this.w/2, this.y+this.h/2, "#fff", (Math.random()-0.5)*5, (Math.random()-0.5)*5, 400));
+                }
+            } else {
+                this.gensanMoveTimer = Math.max(0, this.gensanMoveTimer - dt * 2); // decay quickly if standing still
+            }
+            this.lastX = this.x;
+            this.lastY = this.y;
+            this.gensanShadows = this.gensanShadows.filter(s => !s.dead);
         }
 
         if (this.heroName === 'Volt') {
@@ -1335,6 +1458,8 @@ class Fighter extends Entity {
         let currentSpeed = this.baseSpeed;
         let currentJump = this.baseJump;
         
+        if (this.buffs.msBoost > 0) currentSpeed *= 1.2;
+
         if (this.buffs.dizzy > 0) {
             this.buffs.dizzy -= dt;
             if (this.attackState !== 'idle') this.attackState = 'idle';
@@ -1524,7 +1649,7 @@ class Fighter extends Entity {
             if (keys[this.controls.left]) { targetVx = -currentSpeed; this.facing = -1; } 
             else if (keys[this.controls.right]) { targetVx = currentSpeed; this.facing = 1; }
             
-            if (this.attackState === 'windup' && (this.heroName === 'Euclid' || this.heroName === 'Kae' || this.heroName === 'Ugo' || this.heroName === 'Volt')) targetVx = 0;
+            if (this.attackState === 'windup' && (this.heroName === 'Euclid' || this.heroName === 'Kae' || this.heroName === 'Ugo' || this.heroName === 'Volt' || this.heroName === 'Gensan')) targetVx = 0;
 
             if (this.heroName === 'Duke' && this.isMounted) {
                 if ((keys[this.controls.left] || keys[this.controls.right]) && this.attackState === 'idle') this.runTimer += dt;
@@ -1544,7 +1669,7 @@ class Fighter extends Entity {
 
         let friction = 0.25;
         if (this.currentPlatform && this.currentPlatform.type === 'center') friction = 0.03; 
-        if (!canAct || ((this.heroName === 'Euclid' || this.heroName === 'Kae' || this.heroName === 'Ugo' || this.heroName === 'Volt') && this.attackState === 'windup') || hasPuppet) friction = 0.1; 
+        if (!canAct || ((this.heroName === 'Euclid' || this.heroName === 'Kae' || this.heroName === 'Ugo' || this.heroName === 'Volt' || this.heroName === 'Gensan') && this.attackState === 'windup') || hasPuppet) friction = 0.1; 
         
         this.vx += (targetVx - this.vx) * friction;
 
@@ -1569,6 +1694,7 @@ class Fighter extends Entity {
                         if (this.heroName === 'Ugo') activeTime = 100;
                         if (this.heroName === 'Kila') activeTime = 150;
                         if (this.heroName === 'Volt') activeTime = this.overdriveTimer > 0 ? 25 : 50;
+                        if (this.heroName === 'Gensan') activeTime = 150;
                         
                         this.attackState = 'active';
                         this.stateTimer = activeTime; this.maxStateTimer = activeTime;
@@ -1624,6 +1750,17 @@ class Fighter extends Entity {
                             }
                         }
 
+                        if (this.heroName === 'Gensan') {
+                            this.gensanCombo++;
+                            if (this.gensanCombo >= 4) {
+                                this.gensanCombo = 0;
+                                targetsHit.forEach(t => {
+                                    t.takeDamage(13, this); // extra 1.3 WRD
+                                    t.buffs.slow = 1200;
+                                });
+                            }
+                        }
+
                         if (this.heroName === 'Duke' && !this.isMounted) {
                             this.hp = Math.min(this.maxHp, this.hp + 15); 
                             for(let i=0; i<8; i++) game.particles.push(new Particle(this.x + Math.random()*this.w, this.y + Math.random()*this.h, "#32CD32", 0, -Math.random()*4, 500, 5));
@@ -1640,6 +1777,7 @@ class Fighter extends Entity {
                     if (this.heroName === 'Ugo') recTime = 150;
                     if (this.heroName === 'Kila') recTime = 200;
                     if (this.heroName === 'Volt') recTime = this.overdriveTimer > 0 ? 75 : 150;
+                    if (this.heroName === 'Gensan') recTime = 150;
                     
                     this.attackState = 'recovery';
                     this.stateTimer = recTime; 
@@ -1678,6 +1816,23 @@ class Fighter extends Entity {
                         this.attackState = 'idle';
                         let c = this.kilaElement === 'fire' ? "#1E90FF" : (this.kilaElement === 'water' ? "#8B4513" : "#ff4500");
                         for(let i=0; i<30; i++) game.particles.push(new Particle(this.x+this.w/2, this.y+this.h/2, c, (Math.random()-0.5)*15, (Math.random()-0.5)*15, 800, 6));
+                    }
+                } else if (this.heroName === 'Gensan') {
+                    if (this.gensanSwitchCD <= 0 && this.gensanShadows.length > 0) {
+                        let targetShadow = this.gensanShadows[0];
+                        let maxD = 0;
+                        for(let s of this.gensanShadows) {
+                            let d = Math.hypot(this.x - s.x, this.y - s.y);
+                            if (d > maxD) { maxD = d; targetShadow = s; }
+                        }
+                        for(let i=0; i<20; i++) game.particles.push(new Particle(this.x+this.w/2, this.y+this.h/2, "#fff", (Math.random()-0.5)*10, (Math.random()-0.5)*10, 400));
+                        this.x = targetShadow.x;
+                        this.y = targetShadow.y;
+                        targetShadow.dead = true;
+                        this.gensanSwitchCD = 6000;
+                        this.invincible = 200;
+                        this.buffs.msBoost = 500;
+                        for(let i=0; i<20; i++) game.particles.push(new Particle(this.x+this.w/2, this.y+this.h/2, "#fff", (Math.random()-0.5)*10, (Math.random()-0.5)*10, 400));
                     }
                 }
             }
@@ -1754,6 +1909,7 @@ class Fighter extends Entity {
         if (this.heroName === 'Euclid' && this.euclidWeapon === 'sword') range = 50;
         if (this.heroName === 'Lique') range = 55;
         if (this.heroName === 'Kae') range = 45;
+        if (this.heroName === 'Gensan') range = this.gensanCombo === 3 ? 65 : 50;
         
         if (this.heroName === 'Macu') {
             range = 110; 
@@ -1775,6 +1931,7 @@ class Fighter extends Entity {
         if (this.heroName === 'Euclid') return 12; 
         if (this.heroName === 'Lique') return 18; 
         if (this.heroName === 'Kae') return this.kaeAwakened ? 35 : 25; 
+        if (this.heroName === 'Gensan') return this.gensanCombo === 3 ? 35 : 22;
         return 13;
     }
 
@@ -1803,6 +1960,7 @@ class Fighter extends Entity {
         if (this.heroName === 'Ugo') this.stateTimer = 150; 
         if (this.heroName === 'Kila') this.stateTimer = this.kilaElement === 'fire' ? 500 : (this.kilaElement === 'water' ? 250 : 500);
         if (this.heroName === 'Volt') this.stateTimer = this.overdriveTimer > 0 ? 25 : 50;
+        if (this.heroName === 'Gensan') this.stateTimer = 100;
         
         this.maxStateTimer = this.stateTimer;
         this.hasHit = false;
@@ -1918,6 +2076,14 @@ class Fighter extends Entity {
     }
 
     performSuper() {
+        if (this.heroName === 'Gensan') {
+            if (this.superCooldown <= 0) {
+                this.superCooldown = this.superCooldownMax;
+                game.minions.push(new SwordArray(this, this.facing === 1 ? this.x + this.w : this.x, GROUND_Y - 100, this.facing));
+            }
+            return;
+        }
+
         if (this.heroName === 'Volt') {
             if (this.superCooldown <= 0) {
                 this.superCooldown = this.superCooldownMax;
@@ -2183,6 +2349,13 @@ class Fighter extends Entity {
             if (this.isOverloaded && Math.floor(Date.now()/200)%2===0) {
                 ctx.fillStyle = "rgba(255, 0, 0, 0.3)"; ctx.fillRect(-hw, 0, this.w, h); // Overload flash
             }
+        } else if (this.heroName === 'Gensan') {
+            ctx.fillStyle = "#eee"; ctx.fillRect(-hw - 2, -2, this.w + 4, h + 4);
+            ctx.fillStyle = this.color; ctx.fillRect(-hw, 0, this.w, h);
+            ctx.fillStyle = "#333"; ctx.fillRect(-hw, 20, this.w, 6); 
+            if (this.gensanSwitchCD <= 0 && this.gensanShadows.length > 0) {
+                ctx.fillStyle = "rgba(255,255,255,0.8)"; ctx.fillRect(-hw, -10, this.w, 4); // ready indicator
+            }
         } else if (this.heroName === 'Lique') {
             ctx.fillStyle = "#333"; ctx.fillRect(-hw - 2, -2, this.w + 4, h + 4);
             ctx.fillStyle = this.color; ctx.fillRect(-hw, 0, this.w, h);
@@ -2254,9 +2427,6 @@ class Fighter extends Entity {
             ctx.fillStyle = "#1a1a1a"; ctx.fillRect(-hw, 0, this.w, h); ctx.fillStyle = "#ffe0bd"; ctx.fillRect(-hw + 4, 10, this.w - 8, 8);
             ctx.fillStyle = "#800000"; ctx.fillRect(-hw, 20, this.w, 8); ctx.beginPath(); ctx.moveTo(-hw + 5, 25); ctx.lineTo(-hw - 20, 15); ctx.lineTo(-hw - 15, 30); ctx.fill();
             ctx.fillStyle = "#fff"; ctx.fillRect(hw - 10, 12, 6, 4);
-        }
-        else if (this.heroName === 'Volt') {
-            ctx.fillStyle = "#00FFFF"; ctx.fillRect(hw - 14, 10, 10, 6); // glowing visor
         }
         else if (this.heroName === 'Kadaxi') {
             ctx.fillStyle = "#fff"; ctx.fillRect(-hw, 15, this.w, 20); 
@@ -2339,6 +2509,24 @@ class Fighter extends Entity {
                 if (this.attackState === 'windup') { ctx.fillStyle = "#ddd"; ctx.beginPath(); ctx.moveTo(0, 20); ctx.lineTo(-4, 30); ctx.lineTo(4, 30); ctx.fill(); }
             } ctx.restore();
         }
+        else if (this.heroName === 'Gensan') {
+            ctx.save(); ctx.translate(0, 20);
+            let angle = -0.5;
+            let r = this.gensanCombo === 3 ? 85 : 65; 
+            if (this.attackState === 'windup') angle = -0.5 - (1.5 * phaseProg); 
+            else if (this.attackState === 'active') angle = -2.0 + (3.5 * phaseProg); 
+            else if (this.attackState === 'recovery') angle = 1.5 - (2.0 * phaseProg);
+            ctx.rotate(angle);
+            if (this.attackState === 'active') { 
+                ctx.beginPath(); ctx.arc(0, 0, r, -2.0, angle); 
+                ctx.lineWidth = 15; 
+                ctx.strokeStyle = this.gensanCombo === 3 ? "rgba(255, 255, 255, 0.8)" : "rgba(200, 200, 200, 0.4)"; 
+                ctx.stroke(); 
+            }
+            ctx.fillStyle = "#ddd"; ctx.fillRect(-4, -60, 8, 80); // Sword
+            ctx.fillStyle = "#8b4513"; ctx.fillRect(-6, 10, 12, 15); // Hilt
+            ctx.restore();
+        }
         else if (this.heroName === 'Euclid') {
             if (this.euclidWeapon === 'sword') {
                 ctx.save(); ctx.translate(hw, 25); let angle = 0;
@@ -2348,15 +2536,6 @@ class Fighter extends Entity {
                 ctx.rotate(angle);
                 if (this.attackState === 'active') { ctx.beginPath(); ctx.arc(0, 0, 50, -1.0, angle); ctx.lineWidth = 8; ctx.strokeStyle = "rgba(138, 43, 226, 0.4)"; ctx.stroke(); }
                 ctx.fillStyle = "#8A2BE2"; ctx.fillRect(-2, -50, 4, 50); ctx.fillStyle = "#fff"; ctx.fillRect(-6, 0, 12, 4); 
-                ctx.restore();
-            }
-        }
-        else if (this.heroName === 'Kila') {
-            if (this.attackState !== 'idle') {
-                let themeColor = this.kilaElement === 'fire' ? "#ff4500" : (this.kilaElement === 'water' ? "#1E90FF" : "#8B4513");
-                ctx.save(); ctx.translate(hw, 25);
-                ctx.fillStyle = themeColor;
-                ctx.beginPath(); ctx.arc(10 + 10*Math.sin(phaseProg*Math.PI), 0, 10, 0, Math.PI*2); ctx.fill();
                 ctx.restore();
             }
         }
@@ -2415,24 +2594,6 @@ class Fighter extends Entity {
             }
             ctx.restore();
         }
-        else if (this.heroName === 'Kadaxi') {
-            if (this.attackState === 'active') {
-                ctx.fillStyle = "rgba(0, 191, 255, 0.5)";
-                ctx.fillRect(0, 10, 60, 20); 
-            }
-            if (this.grapplePhase === 1 && this.grappleTarget) {
-                ctx.save();
-                let relX = (this.grappleTarget.x + this.grappleTarget.w/2 - (this.x + this.w/2)) * this.facing;
-                let relY = this.grappleTarget.y + this.grappleTarget.h/2 - (this.y + this.h/2);
-                ctx.beginPath();
-                ctx.moveTo(hw, 25);
-                ctx.lineTo(relX, relY);
-                ctx.lineWidth = 3;
-                ctx.strokeStyle = "#1E90FF";
-                ctx.stroke();
-                ctx.restore();
-            }
-        }
 
         ctx.restore();
         
@@ -2459,7 +2620,7 @@ class Game {
         this.lastTime = 0;
         this.state = 'MENU'; 
         
-        this.p1Choice = 'Volt';
+        this.p1Choice = 'Gensan';
         this.p2Choice = 'Ugo'; 
         
         this.setupMenu();
@@ -2634,6 +2795,10 @@ class Game {
             if (this.p1.kilaSwitchTimer > 0) p1Stat += ` (SWITCHING)`;
             else if (this.p1.kilaSwitchCD > 0) p1Stat += ` [CD: ${(this.p1.kilaSwitchCD/1000).toFixed(1)}s]`;
         }
+        if (this.p1.heroName === 'Gensan') {
+            p1Stat += `[Combo: ${this.p1.gensanCombo}/3] [Shadows: ${this.p1.gensanShadows.length}/2]`;
+            if (this.p1.gensanSwitchCD > 0) p1Stat += ` (Teleport CD)`;
+        }
         if (this.p1.heroName === 'Volt') {
             p1Stat += ` [ENERGY: ${Math.floor(this.p1.energy)}/200]`;
             if (this.p1.isOverloaded) p1Stat += " [OVERLOAD!]";
@@ -2643,6 +2808,7 @@ class Game {
         if (this.p1.buffs.burn > 0) p1Stat += " [BURN]";
         if (this.p1.buffs.dizzy > 0) p1Stat += " [DIZZY]";
         if (this.p1.buffs.slow > 0) p1Stat += " [SLOWED]";
+        if (this.p1.buffs.msBoost > 0) p1Stat += " [SPEED+]";
         document.getElementById('p1-status').innerText = p1Stat;
 
         document.getElementById('p2-hp').style.width = `${Math.max(0, (this.p2.hp / this.p2.maxHp) * 100)}%`;
@@ -2693,6 +2859,10 @@ class Game {
             if (this.p2.kilaSwitchTimer > 0) p2Stat += ` (SWITCHING)`;
             else if (this.p2.kilaSwitchCD > 0) p2Stat += ` [CD: ${(this.p2.kilaSwitchCD/1000).toFixed(1)}s]`;
         }
+        if (this.p2.heroName === 'Gensan') {
+            p2Stat += `[Combo: ${this.p2.gensanCombo}/3] [Shadows: ${this.p2.gensanShadows.length}/2]`;
+            if (this.p2.gensanSwitchCD > 0) p2Stat += ` (Teleport CD)`;
+        }
         if (this.p2.heroName === 'Volt') {
             p2Stat += ` [ENERGY: ${Math.floor(this.p2.energy)}/200]`;
             if (this.p2.isOverloaded) p2Stat += " [OVERLOAD!]";
@@ -2702,6 +2872,7 @@ class Game {
         if (this.p2.buffs.burn > 0) p2Stat += " [BURN]";
         if (this.p2.buffs.dizzy > 0) p2Stat += " [DIZZY]";
         if (this.p2.buffs.slow > 0) p2Stat += " [SLOWED]";
+        if (this.p2.buffs.msBoost > 0) p2Stat += " [SPEED+]";
         document.getElementById('p2-status').innerText = p2Stat;
 
         let promptsHTML = '';
@@ -2841,6 +3012,15 @@ class Game {
                 }
             }
 
+            if (p2.heroName === 'Gensan') {
+                if (tacticalState === 'defensive' && p2.gensanSwitchCD <= 0 && p2.gensanShadows.length > 0) {
+                    scores.switch += 200; 
+                }
+                if (dist < 300 && p2.superCooldown <= 0) {
+                    scores.superSkill += 150;
+                }
+            }
+
             if (p2.heroName === 'Ugo') {
                 if (p2Puppet) {
                     scores.moveForward += 100;
@@ -2921,7 +3101,7 @@ class Game {
             let superRange = (p2.heroName === 'Duke' && !p2.isMounted) ? 600 : attackRange + 100;
             if (p2.heroName === 'Kadaxi') superRange = 200; 
             
-            if (skillReady && dist <= superRange && Math.abs(dy) < 60 && p2.heroName !== 'Kae' && p2.heroName !== 'Ugo' && p2.heroName !== 'Kila' && p2.heroName !== 'Volt') {
+            if (skillReady && dist <= superRange && Math.abs(dy) < 60 && p2.heroName !== 'Kae' && p2.heroName !== 'Ugo' && p2.heroName !== 'Kila' && p2.heroName !== 'Volt' && p2.heroName !== 'Gensan') {
                 scores.superSkill += 100;
                 if (tacticalState === 'aggressive') scores.superSkill += 50;
             }
@@ -3059,4 +3239,3 @@ window.dispatchEvent(new Event('resize'));
 </script>
 </body>
 </html>
-
