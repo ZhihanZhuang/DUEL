@@ -227,21 +227,21 @@
 
     <!-- Main Menu Screen -->
     <div id="menu-screen" class="screen">
-        <h1 data-i18n="title">Otokojuku: Legends Duel</h1>
-        <h2 data-i18n="selectHeroes">Select Your Heroes</h2>
+        <h1>Otokojuku: Legends Duel</h1>
+        <h2>Select Your Heroes</h2>
         
         <div class="menu-content">
             <div class="selection-container">
                 <!-- P1 Select -->
                 <div class="player-select">
-                    <h3 data-i18n="player1">Player 1</h3>
+                    <h3>Player 1</h3>
                     <div id="p1-roster"></div>
                     <div class="controls-info" id="p1-controls-display"></div>
                 </div>
                 
                 <!-- P2 Select -->
                 <div class="player-select">
-                    <h3 data-i18n="player2">Player 2</h3>
+                    <h3>Player 2</h3>
                     <div id="p2-roster"></div>
                     <div class="controls-info" id="p2-controls-display"></div>
                 </div>
@@ -256,43 +256,35 @@
         </div>
         
         <div class="btn-row">
-            <button class="btn-start" id="btn-sp" data-i18n="btn1p">1 Player (Vs CPU)</button>
-            <button class="btn-start" id="btn-mp" data-i18n="btn2p">2 Players (Local)</button>
-            <button class="btn-settings" id="btn-open-settings" data-i18n="btnSettings">⚙ Settings</button>
+            <button class="btn-start" id="btn-sp">1 Player (Vs CPU)</button>
+            <button class="btn-start" id="btn-mp">2 Players (Local)</button>
+            <button class="btn-settings" id="btn-open-settings">⚙ Settings</button>
         </div>
     </div>
 
     <!-- Settings Screen -->
     <div id="settings-screen" class="screen hidden">
-        <h1 data-i18n="settingsTitle" style="color: white;">Settings & Key Bindings</h1>
-        <div style="margin-bottom: 20px;">
-            <span data-i18n="language" style="color: #fff; margin-right: 10px; font-weight: bold;">Language:</span>
-            <select id="lang-select" style="padding: 5px 10px; font-size: 1.1rem; background: #333; color: white; border: 1px solid #555; border-radius: 4px; outline: none; cursor: pointer;">
-                <option value="en">English</option>
-                <option value="de">Deutsch</option>
-                <option value="zh_tw">繁體中文</option>
-            </select>
-        </div>
+        <h1 style="color: white;">Settings & Key Bindings</h1>
         <div class="settings-grid">
             <div class="player-select">
-                <h3 data-i18n="player1" style="color: var(--primary);">Player 1</h3>
+                <h3 style="color: var(--primary);">Player 1</h3>
                 <div id="p1-bindings"></div>
             </div>
             <div class="player-select">
-                <h3 data-i18n="player2" style="color: #2196f3;">Player 2</h3>
+                <h3 style="color: #2196f3;">Player 2</h3>
                 <div id="p2-bindings"></div>
             </div>
         </div>
         <div class="btn-row">
-            <button class="btn-settings" id="btn-reset-bindings" data-i18n="resetDefault">Reset Default</button>
-            <button class="btn-start" id="btn-close-settings" data-i18n="saveClose">Save & Close</button>
+            <button class="btn-settings" id="btn-reset-bindings">Reset Default</button>
+            <button class="btn-start" id="btn-close-settings">Save & Close</button>
         </div>
     </div>
 
     <!-- Game Over Screen -->
     <div id="game-over-screen" class="screen hidden">
         <div id="winner-text">Player 1 Wins!</div>
-        <button class="btn-start" id="btn-restart" data-i18n="btnRestart" style="font-size: 1.2rem; padding: 10px 30px; margin-top: 10px;">Main Menu</button>
+        <button class="btn-start" id="btn-restart" style="font-size: 1.2rem; padding: 10px 30px; margin-top: 10px;">Main Menu</button>
     </div>
 </div>
 
@@ -302,78 +294,13 @@
  * A 2D Canvas Platform Fighter
  */
 
-// --- I18N / Localization ---
-const I18N = {
-    en: {
-        title: "Otokojuku: Legends Duel", selectHeroes: "Select Your Heroes", player1: "Player 1", player2: "Player 2",
-        btn1p: "1 Player (Vs CPU)", btn2p: "2 Players (Local)", btnSettings: "⚙ Settings", settingsTitle: "Settings & Key Bindings",
-        resetDefault: "Reset Default", saveClose: "Save & Close", language: "Language:", random: "Random", 
-        randomDesc: "Let fate decide your hero!", btnRestart: "Main Menu", winnerP1: "Player 1", winnerP2: "Player 2", wins: "Wins!",
-        stat_ammo: "Ammo: ", stat_reload: "Ammo: RELOADING...", stat_dynamite: " [DYNAMITE x", stat_dash: " [DASH x", stat_wep: "Wep: ",
-        stat_lance: "LANCE READY", stat_charge: "Charging...", stat_dismount: "DISMOUNTED", stat_dizzy_atk: " [DIZZY ATK]",
-        stat_combo: " [COMBO: ", stat_skulls: " [Skulls: ", stat_switching: " (SWITCHING)", stat_summoning: " (SUMMONING)", stat_casting: " (CASTING)",
-        stat_poisoned: " [POISONED]", stat_dizzy: " [DIZZY]", stat_slowed: " [SLOWED]", stat_lifesteal: " [LIFESTEAL ACTIVE]", stat_rld: "(Rld)",
-        stat_frenzy: " [BLOOD FRENZY]", stat_charge_bolt: " [CHARGE: ", stat_awakened: " [AWAKENED]"
-    },
-    de: {
-        title: "Otokojuku: Legenden Duell", selectHeroes: "Wähle deine Helden", player1: "Spieler 1", player2: "Spieler 2",
-        btn1p: "1 Spieler (Gegen CPU)", btn2p: "2 Spieler (Lokal)", btnSettings: "⚙ Einstellungen", settingsTitle: "Einstellungen & Tastenbelegung",
-        resetDefault: "Standard zurück", saveClose: "Speichern & Schließen", language: "Sprache:", random: "Zufällig", 
-        randomDesc: "Lass das Schicksal entscheiden!", btnRestart: "Hauptmenü", winnerP1: "Spieler 1", winnerP2: "Spieler 2", wins: "Gewinnt!",
-        stat_ammo: "Munition: ", stat_reload: "Munition: NACHLADEN...", stat_dynamite: " [DYNAMIT x", stat_dash: " [SPRINT x", stat_wep: "Waffe: ",
-        stat_lance: "LANZE BEREIT", stat_charge: "Lädt...", stat_dismount: "ABGESESSEN", stat_dizzy_atk: " [BETÄUBUNGSANGRIFF]",
-        stat_combo: " [KOMBO: ", stat_skulls: " [Schädel: ", stat_switching: " (WECHSELN)", stat_summoning: " (BESCHWÖRUNG)", stat_casting: " (ZAUBERN)",
-        stat_poisoned: " [VERGIFTET]", stat_dizzy: " [BETÄUBT]", stat_slowed: " [VERLANGSAMT]", stat_lifesteal: " [LEBENSRAUB AKTIV]", stat_rld: "(Nld)",
-        stat_frenzy: " [BLUTRAUSCH]", stat_charge_bolt: " [LADUNG: ", stat_awakened: " [ERWACHT]"
-    },
-    zh_tw: {
-        title: "男塾：傳奇對決", selectHeroes: "選擇你的英雄", player1: "玩家 1", player2: "玩家 2",
-        btn1p: "單人遊戲 (對戰 CPU)", btn2p: "雙人遊戲 (本地)", btnSettings: "⚙ 設定", settingsTitle: "設定與按鍵綁定",
-        resetDefault: "重置為預設", saveClose: "儲存並關閉", language: "語言:", random: "隨機", 
-        randomDesc: "讓命運決定你的英雄！", btnRestart: "主選單", winnerP1: "玩家 1", winnerP2: "玩家 2", wins: "獲勝！",
-        stat_ammo: "彈藥: ", stat_reload: "彈藥: 裝填中...", stat_dynamite: " [炸藥 x", stat_dash: " [衝刺 x", stat_wep: "武器: ",
-        stat_lance: "騎槍就緒", stat_charge: "衝鋒中...", stat_dismount: "步戰模式", stat_dizzy_atk: " [眩暈打擊]",
-        stat_combo: " [連擊: ", stat_skulls: " [骷髏: ", stat_switching: " (切換中)", stat_summoning: " (召喚中)", stat_casting: " (施法中)",
-        stat_poisoned: " [中毒]", stat_dizzy: " [眩暈]", stat_slowed: " [減速]", stat_lifesteal: " [吸血啟動]", stat_rld: "(冷卻)",
-        stat_frenzy: " [嗜血狂熱]", stat_charge_bolt: " [充能: ", stat_awakened: " [黑影覺醒]"
-    }
-};
-
-let currentLang = localStorage.getItem('otokojuku_lang') || 'en';
-
-const t = (key) => I18N[currentLang][key] || key;
-
-function applyLang() {
-    document.querySelectorAll('[data-i18n]').forEach(el => {
-        let key = el.getAttribute('data-i18n');
-        if (I18N[currentLang][key]) el.innerText = I18N[currentLang][key];
-    });
-    document.getElementById('lang-select').value = currentLang;
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-    document.getElementById('lang-select').addEventListener('change', (e) => {
-        currentLang = e.target.value;
-        localStorage.setItem('otokojuku_lang', currentLang);
-        applyLang();
-        if (window.game) game.setupMenu(); 
-    });
-    applyLang();
-});
-
 // --- Input & KeyBinding Manager ---
 const DEFAULT_BINDS = {
     p1: { left: 'KeyA', right: 'KeyD', jump: 'KeyW', down: 'KeyS', attack: 'Space', super: 'KeyE', switch: 'KeyT' },
     p2: { left: 'ArrowLeft', right: 'ArrowRight', jump: 'ArrowUp', down: 'ArrowDown', attack: 'Numpad9', super: 'NumpadEnter', switch: 'Numpad8' }
 };
 
-let currentBinds = JSON.parse(JSON.stringify(DEFAULT_BINDS));
-let savedBinds = JSON.parse(localStorage.getItem('otokojuku_binds'));
-
-if (savedBinds) {
-    if (savedBinds.p1) currentBinds.p1 = { ...currentBinds.p1, ...savedBinds.p1 };
-    if (savedBinds.p2) currentBinds.p2 = { ...currentBinds.p2, ...savedBinds.p2 };
-}
+let currentBinds = JSON.parse(localStorage.getItem('otokojuku_binds')) || JSON.parse(JSON.stringify(DEFAULT_BINDS));
 
 function saveBinds() {
     localStorage.setItem('otokojuku_binds', JSON.stringify(currentBinds));
@@ -400,7 +327,6 @@ window.addEventListener('keyup', e => {
 });
 
 function formatKey(code) {
-    if (!code) return 'UNBOUND'; 
     return code.replace('Key', '').replace('Arrow', '').replace('Numpad', 'Num ');
 }
 
@@ -458,84 +384,54 @@ let PLATFORMS = [
 
 const HEROES = {
     Hason: {
+        name: "Hason", desc: "Cowboy with Colt Revolver",
         color: "#8B4513", maxHp: 750, speed: 5, jump: 15, width: 40, height: 70, superCD: 10000,
-        i18n: {
-            en: { name: "Hason", desc: "Cowboy with Colt Revolver", hp: "75 WRD", atk: "2.8 WRD (Ranged)", passive: "Empties 6 shots then reloads for 2s. Out of combat for 5s fully restores ammo.", super: "Throws up to 3 Dynamites (15.3 WRD AoE each) in quick succession." },
-            de: { name: "Hason", desc: "Cowboy mit Colt-Revolver", hp: "75 WRD", atk: "2.8 WRD (Fernkampf)", passive: "Verschießt 6 Schüsse, dann 2s Nachladen. 5s außerhalb des Kampfes füllt Munition komplett auf.", super: "Wirft schnell nacheinander bis zu 3 Dynamitstangen (jeweils 15.3 WRD AoE)." },
-            zh_tw: { name: "哈森 (Hason)", desc: "手持柯爾特左輪的牛仔", hp: "75 WRD", atk: "2.8 WRD (遠程)", passive: "打空6發子彈後需2秒裝填。脫離戰鬥5秒自動補滿彈藥。", super: "連續投擲最多3枚炸藥（每個造成 15.3 WRD 範圍傷害）。" }
-        }
+        ui: { hp: "75 WRD", atk: "2.8 WRD (Ranged)", passive: "Empties 6 shots then reloads for 2s. Out of combat for 5s fully restores ammo.", super: "Throws up to 3 Dynamites (15.3 WRD AoE each) in quick succession." }
     },
     Hunter: {
+        name: "Hunter", desc: "Pirate with Musket & Great Sword",
         color: "#008080", maxHp: 750, speed: 4.5, jump: 14, width: 45, height: 70, superCD: 13000,
-        i18n: {
-            en: { name: "Hunter", desc: "Pirate with Musket & Great Sword", hp: "75 WRD", atk: "1.7 WRD (Sword) / 2.0 WRD (Musket Homing)", passive: "Press [Switch] to swap weapons. Switching instantly resets musket cooldown (1s).", super: "Summons a hurricane that damages, stuns (0.5s), and blocks projectiles. Boosts HP & Jump." },
-            de: { name: "Hunter", desc: "Pirat mit Muskete & Großschwert", hp: "75 WRD", atk: "1.7 WRD (Schwert) / 2.0 WRD (Muskete Zielsuchend)", passive: "Drücke [Switch] zum Waffenwechsel. Wechsel setzt Musketen-Cooldown (1s) sofort zurück.", super: "Beschwört einen Hurrikan, der Schaden verursacht, betäubt (0.5s) und Projektile blockt. Erhöht HP & Sprungkraft." },
-            zh_tw: { name: "亨特 (Hunter)", desc: "裝備火槍與大劍的海盜", hp: "75 WRD", atk: "1.7 WRD (劍) / 2.0 WRD (火槍自動瞄準)", passive: "按下 [切換] 鍵更換武器。切換武器會立即重置火槍冷卻時間 (1秒)。", super: "召喚一陣颶風，造成傷害、眩暈 (0.5秒) 並阻擋飛行道具。提升最大生命值與跳躍力。" }
-        }
+        ui: { hp: "75 WRD", atk: "1.7 WRD (Sword) / 2.0 WRD (Musket Homing)", passive: "Press [Switch] to swap weapons. Switching instantly resets musket cooldown (1s).", super: "Summons a hurricane that damages, stuns (0.5s), and blocks projectiles. Boosts HP & Jump." }
     },
     Macu: {
+        name: "Macu", desc: "Ainu Warrior with Long Spear",
         color: "#2E8B57", maxHp: 900, speed: 4, jump: 16, width: 40, height: 75, superCD: 45000,
-        i18n: {
-            en: { name: "Macu", desc: "Ainu Warrior with Long Spear", hp: "90 WRD", atk: "2.2 WRD (Long Range Melee)", passive: "Spear dynamically tracks the closest enemy's height. Extended melee range.", super: "[BattleCry] +40% Speed, +20% Jump, +40% Damage. Grants 3s Poison on hit." },
-            de: { name: "Macu", desc: "Ainu-Krieger mit langem Speer", hp: "90 WRD", atk: "2.2 WRD (Nahkampf große Reichweite)", passive: "Speer verfolgt dynamisch die Höhe des nächsten Feindes. Erweiterte Nahkampfreichweite.", super: "[Kampfschrei] +40% Tempo, +20% Sprung, +40% Schaden. Gewährt 3s Gift bei Treffer." },
-            zh_tw: { name: "馬庫 (Macu)", desc: "手持長矛的阿伊努戰士", hp: "90 WRD", atk: "2.2 WRD (長距離近戰)", passive: "長矛會動態追蹤最近敵人的高度。擁有極長的近戰攻擊距離。", super: "[戰吼] 提升 40% 移速、20% 跳躍力與 40% 傷害。攻擊附加 3 秒中毒效果。" }
-        }
+        ui: { hp: "90 WRD", atk: "2.2 WRD (Long Range Melee)", passive: "Spear dynamically tracks the closest enemy's height. Extended melee range.", super: "[BattleCry] +40% Speed, +20% Jump, +40% Damage. Grants 3s Poison on hit." }
     },
     Willi: {
+        name: "Willi", desc: "Ninja with Throwing Knives",
         color: "#2F4F4F", maxHp: 500, speed: 6.5, jump: 16, width: 35, height: 65, superCD: 12000,
-        i18n: {
-            en: { name: "Willi", desc: "Ninja with Throwing Knives", hp: "50 WRD", atk: "2.3 WRD (Ranged)", passive: "Double Jump. Every 3rd attack knocks back & slows. Below 50% HP for the first time, gains 5s of +1 WRD Lifesteal.", super: "Invincible Dash. Press twice! (1s CD between dashes). Leaves a Giant Knife (5.3 WRD + 5s Slow)." },
-            de: { name: "Willi", desc: "Ninja mit Wurfmessern", hp: "50 WRD", atk: "2.3 WRD (Fernkampf)", passive: "Doppelsprung. Jeder 3. Angriff stößt zurück & verlangsamt. Unter 50% HP zum ersten Mal: erhält 5s lang +1 WRD Lebensraub.", super: "Unbesiegbarer Sprint. Zweimal drücken! (1s CD zwischen Sprints). Hinterlässt ein riesiges Messer (5.3 WRD + 5s Verlangsamung)." },
-            zh_tw: { name: "威利 (Willi)", desc: "使用飛刀的忍者", hp: "50 WRD", atk: "2.3 WRD (遠程)", passive: "可以二段跳。每第 3 次攻擊會擊退並減速敵人。血量首次低於 50% 時，獲得 5 秒的 +1 WRD 吸血效果。", super: "無敵衝刺，可連續施放兩次！(兩次之間有 1 秒冷卻)。會在原地留下一把巨大飛刀 (5.3 WRD 傷害 + 5秒減速)。" }
-        }
+        ui: { hp: "50 WRD", atk: "2.3 WRD (Ranged)", passive: "Double Jump. Every 3rd attack knocks back & slows. Below 50% HP for the first time, gains 5s of +1 WRD Lifesteal.", super: "Invincible Dash. Press twice! (1s CD between dashes). Leaves a Giant Knife (5.3 WRD + 5s Slow)." }
     },
     Artu: {
+        name: "Artu", desc: "Daimyo with Great Armor & Ashigaru",
         color: "#8B0000", maxHp: 1000, speed: 3.5, jump: 13, width: 50, height: 75, superCD: 65000,
-        i18n: {
-            en: { name: "Artu", desc: "Daimyo with Great Armor & Ashigaru", hp: "100 WRD", atk: "7.3 WRD (Heavy Melee)", passive: "Takes 10% less damage. Attacking has a 50% chance to block/deflect projectiles.", super: "Summons 5 Ashigaru soldiers (3 WRD HP) that auto-fire 1.3 WRD bullets every 1.5s." },
-            de: { name: "Artu", desc: "Daimyo mit großer Rüstung & Ashigaru", hp: "100 WRD", atk: "7.3 WRD (Schwerer Nahkampf)", passive: "Nimmt 10% weniger Schaden. Angriffe haben eine 50% Chance, Projektile zu blocken/abzuwehren.", super: "Beschwört 5 Ashigaru-Soldaten (3 WRD HP), die alle 1.5s 1.3 WRD Kugeln abfeuern." },
-            zh_tw: { name: "阿圖 (Artu)", desc: "身穿重甲並統帥足輕的大名", hp: "100 WRD", atk: "7.3 WRD (重型近戰)", passive: "受到的傷害減少 10%。揮刀攻擊時有 50% 的機率格擋/彈開飛行道具。", super: "召喚 5 名足輕士兵 (生命值 3 WRD)，他們每 1.5 秒會自動發射造成 1.3 WRD 傷害的子彈。" }
-        }
+        ui: { hp: "100 WRD", atk: "7.3 WRD (Heavy Melee)", passive: "Takes 10% less damage. Attacking has a 50% chance to block/deflect projectiles.", super: "Summons 5 Ashigaru soldiers (3 WRD HP) that auto-fire 1.3 WRD bullets every 1.5s." }
     },
     Duke: {
+        name: "Duke", desc: "Cavalry Rider with Lance & Handgun",
         color: "#4682B4", maxHp: 750, speed: 6.5, jump: 12, width: 45, height: 70, superCD: 20000,
-        i18n: {
-            en: { name: "Duke", desc: "Cavalry Rider with Lance & Handgun", hp: "Horse 50 WRD / Duke 75 WRD", atk: "3.3 WRD (Lance) / 1.5 WRD (Sabre)", passive: "Run continuously for 3s to charge Lance (3s Stun). Dismounts when horse dies (Sabre blocks 50% projectiles and heals 2 WRD on hit).", super: "Fires a deadly precise Handgun bullet (10.3 WRD) with no knockback." },
-            de: { name: "Duke", desc: "Kavalleriereiter mit Lanze & Pistole", hp: "Pferd 50 WRD / Duke 75 WRD", atk: "3.3 WRD (Lanze) / 1.5 WRD (Säbel)", passive: "Laufe 3s ununterbrochen, um die Lanze aufzuladen (3s Stun). Steigt ab, wenn das Pferd stirbt (Säbel blockt 50% Projektile und heilt 2 WRD bei Treffer).", super: "Feuert eine tödlich präzise Pistolenkugel (10.3 WRD) ohne Rückstoß." },
-            zh_tw: { name: "杜克 (Duke)", desc: "裝備騎槍與手槍的騎兵", hp: "戰馬 50 WRD / 杜克 75 WRD", atk: "3.3 WRD (騎槍) / 1.5 WRD (軍刀)", passive: "連續奔跑 3 秒可讓騎槍充能 (命中眩暈 3 秒)。戰馬陣亡後改為步戰 (軍刀可格擋 50% 飛行道具，且命中恢復 2 WRD)。", super: "發射一顆致命且精準的手槍子彈 (10.3 WRD)，無擊退效果。" }
-        }
+        ui: { hp: "Horse 50 WRD / Duke 75 WRD", atk: "3.3 WRD (Lance) / 1.5 WRD (Sabre)", passive: "Run continuously for 3s to charge Lance (3s Stun). Dismounts when horse dies (Sabre blocks 50% projectiles and heals 2 WRD on hit).", super: "Fires a deadly precise Handgun bullet (10.3 WRD) with no knockback." }
     },
     Kadaxi: {
+        name: "Kadaxi", desc: "Judo Master (Control & Combos)",
         color: "#1E90FF", maxHp: 850, speed: 5.5, jump: 15, width: 40, height: 75, superCD: 25000,
-        i18n: {
-            en: { name: "Kadaxi", desc: "Judo Master (Control & Combos)", hp: "85 WRD", atk: "3.3 WRD (Melee Combo)", passive: "<span class='skill-tag'>Karate Combo</span> Every 3rd attack fires a Blue Ki Blast (5.3 WRD, Huge Knockback, 0.75s Stun).<br><span class='skill-tag'>Flip Attack</span> Double Jump quickly to backflip (6.3 WRD, 3s CD).", super: "<span class='skill-tag'>2-Phase Grapple</span><br>1) Vacuum pull nearby enemies.<br>2) Press Super again within 5s to Judo Throw (13.3 WRD + 5s Stun)." },
-            de: { name: "Kadaxi", desc: "Judo-Meister (Kontrolle & Kombos)", hp: "85 WRD", atk: "3.3 WRD (Nahkampf-Kombo)", passive: "<span class='skill-tag'>Karate-Kombo</span> Jeder 3. Angriff feuert eine blaue Ki-Explosion (5.3 WRD, enormer Rückstoß, 0.75s Stun).<br><span class='skill-tag'>Flip-Angriff</span> Schneller Doppelsprung für Rückwärtssalto (6.3 WRD, 3s CD).", super: "<span class='skill-tag'>2-Phasen-Griff</span><br>1) Zieht nahe Feinde an.<br>2) Drücke Super erneut innerhalb von 5s für Judo-Wurf (13.3 WRD + 5s Stun)." },
-            zh_tw: { name: "卡達西 (Kadaxi)", desc: "柔道大師 (控制與連擊)", hp: "85 WRD", atk: "3.3 WRD (近戰連擊)", passive: "<span class='skill-tag'>空手道連擊</span> 每第 3 次攻擊會發射藍色氣功波 (5.3 WRD，巨大擊退，0.75秒眩暈)。<br><span class='skill-tag'>空翻攻擊</span> 快速二段跳觸發後空翻攻擊 (6.3 WRD，3秒冷卻)。", super: "<span class='skill-tag'>二段式抓取</span><br>1) 產生吸力將附近敵人拉近。<br>2) 5 秒內再次按下大招鍵使出過肩摔 (13.3 WRD + 5秒眩暈)。" }
-        }
+        ui: { hp: "85 WRD", atk: "3.3 WRD (Melee Combo)", passive: "<span class='skill-tag'>Karate Combo</span> Every 3rd attack fires a Blue Ki Blast (5.3 WRD, Huge Knockback, 0.75s Stun).<br><span class='skill-tag'>Flip Attack</span> Double Jump quickly to backflip (6.3 WRD, 3s CD).", super: "<span class='skill-tag'>2-Phase Grapple</span><br>1) Vacuum pull nearby enemies.<br>2) Press Super again within 5s to Judo Throw (13.3 WRD + 5s Stun)." }
     },
     Euclid: {
+        name: "Euclid", desc: "Necromantic Geometric Mage",
         color: "#8A2BE2", maxHp: 700, speed: 4.5, jump: 14, width: 40, height: 70, superCD: 10000,
-        i18n: {
-            en: { name: "Euclid", desc: "Necromantic Geometric Mage", hp: "70 WRD", atk: "1.2 WRD (Sword) / 10.3 WRD (Homing Burst)", passive: "Press [Switch] for Melee/Ranged (2s Invincible Channel). Magic takes 1s to cast, homes in, or heals skeletons if out of range.", super: "<span class='skill-tag'>Necromantic Summoning</span> 3s cast to summon 8 ultra-fast melee skeletons. Skeletons deal 3 WRD damage and explode on death (2.3 WRD)." },
-            de: { name: "Euclid", desc: "Nekromantischer Geometrie-Magier", hp: "70 WRD", atk: "1.2 WRD (Schwert) / 10.3 WRD (Zielsuchende Explosion)", passive: "Drücke [Switch] für Nah-/Fernkampf (2s unbesiegbares Kanalisieren). Magie braucht 1s zum Wirken, sucht Ziele oder heilt Skelette, falls außer Reichweite.", super: "<span class='skill-tag'>Nekromantische Beschwörung</span> 3s Zauberzeit, um 8 ultraschnelle Nahkampf-Skelette zu beschwören. Skelette verursachen 3 WRD Schaden und explodieren beim Tod (2.3 WRD)." },
-            zh_tw: { name: "歐幾里得 (Euclid)", desc: "亡靈幾何法師", hp: "70 WRD", atk: "1.2 WRD (劍) / 10.3 WRD (追蹤法球)", passive: "按下 [切換] 鍵切換近戰/遠程模式 (需引導 2 秒且無敵)。魔法需要 1 秒施法，會自動追蹤敵人，若射程內無敵人則轉為治療骷髏。", super: "<span class='skill-tag'>亡靈召喚</span> 施法 3 秒，召喚 8 隻極速近戰骷髏。骷髏每次攻擊造成 3 WRD 傷害，死亡時會爆炸 (2.3 WRD)。" }
-        }
+        ui: { hp: "70 WRD", atk: "1.2 WRD (Sword) / 10.3 WRD (Homing Burst)", passive: "Press [Switch] for Melee/Ranged (2s Invincible Channel). Magic takes 1s to cast, homes in, or heals skeletons if out of range.", super: "<span class='skill-tag'>Necromantic Summoning</span> 3s cast to summon 8 ultra-fast melee skeletons. Skeletons deal 3 WRD damage and explode on death (2.3 WRD)." }
     },
     Lique: {
+        name: "Lique", desc: "Berserker with Hatchets",
         color: "#B22222", maxHp: 950, speed: 5.5, jump: 13, width: 40, height: 70, superCD: 25000,
-        i18n: {
-            en: { name: "Lique", desc: "Berserker with Hatchets", hp: "95 WRD", atk: "1.8 WRD (Fast Melee)", passive: "Pure relentless melee pressure with virtually no attack windup.", super: "<span class='skill-tag'>Blood Frenzy</span> Dual-wields for 10s. Attack speed x2, movement speed slightly reduced. Heals 0.5 WRD per hit on heroes. Throws a 10.3 WRD axe when it ends." },
-            de: { name: "Lique", desc: "Berserker mit Beilen", hp: "95 WRD", atk: "1.8 WRD (Schneller Nahkampf)", passive: "Reiner unerbittlicher Nahkampfdruck mit fast keiner Angriffsverzögerung.", super: "<span class='skill-tag'>Blutrausch</span> Führt 10s lang zwei Waffen. Angriffsgeschwindigkeit x2, Bewegung leicht reduziert. Heilt 0.5 WRD pro Treffer bei Helden. Wirft am Ende eine Axt (10.3 WRD)." },
-            zh_tw: { name: "利克 (Lique)", desc: "狂戰士 (雙斧)", hp: "95 WRD", atk: "1.8 WRD (極速近戰)", passive: "毫無前搖的無情近戰壓制，擅長死斗貼臉。", super: "<span class='skill-tag'>嗜血狂熱</span> 雙持戰斧 10 秒。期間攻速翻倍，移動速度小幅降低。每次砍中英雄恢復 0.5 WRD。大招結束瞬間會投擲一把飛斧 (10.3 WRD)。" }
-        }
+        ui: { hp: "95 WRD", atk: "1.8 WRD (Fast Melee)", passive: "Pure relentless melee pressure with virtually no attack windup.", super: "<span class='skill-tag'>Blood Frenzy</span> Dual-wields for 10s. Attack speed x2, movement speed slightly reduced. Heals 0.5 WRD per hit on heroes. Throws a 10.3 WRD axe when it ends." }
     },
     Kae: {
+        name: "Kae", desc: "Assassin of Thunder",
         color: "#00CED1", maxHp: 650, speed: 6.0, jump: 16, width: 35, height: 65, superCD: 12000,
-        i18n: {
-            en: { name: "Kae", desc: "Assassin of Thunder", hp: "65 WRD", atk: "2.0 WRD (Thunder Fist)", passive: "Fast melee. Every 4th hit deals +1 WRD & slows target. Below 50% HP, turns into a shadow, doubling ATK & move speed.", super: "<span class='skill-tag'>Shadow Thunder Step</span> Teleports behind an enemy within 400px and stuns them for 1s. 0.3s cast time." },
-            de: { name: "Kae", desc: "Assassine des Donners", hp: "65 WRD", atk: "2.0 WRD (Donnerfaust)", passive: "Schneller Nahkampf. Jeder 4. Treffer macht +1 WRD & verlangsamt. Unter 50% HP wird sie zum Schatten, ATK & Tempo verdoppelt.", super: "<span class='skill-tag'>Schatten-Donner-Schritt</span> Teleportiert sich hinter einen Feind innerhalb von 400px und betäubt ihn für 1s. 0.3s Zauberzeit." },
-            zh_tw: { name: "凱 (Kae)", desc: "雷電刺客", hp: "65 WRD", atk: "2.0 WRD (雷電拳)", passive: "極快近戰。每第4次攻擊+1 WRD並減速。血量低於50%後化身黑影，攻速與移速翻倍。", super: "<span class='skill-tag'>影雷步</span> 0.3 秒施法後，瞬間移動到 400px 內的敵人背後，並造成 1 秒眩暈。" }
-        }
+        ui: { hp: "65 WRD", atk: "2.0 WRD (Thunder Fist)", passive: "Fast melee. Every 4th hit deals +1 WRD & slows target. Below 50% HP, turns into a shadow, doubling ATK & move speed.", super: "<span class='skill-tag'>Shadow Thunder Step</span> Teleports behind an enemy within 400px and stuns them for 1s. 0.3s cast time." }
     }
 };
 
@@ -1752,13 +1648,17 @@ class Fighter extends Entity {
                 ctx.strokeStyle = "rgba(255, 0, 0, 0.5)"; ctx.lineWidth = 4; ctx.strokeRect(-hw-4, -4, this.w+8, h+8);
             }
         } else if (this.heroName === 'Kae') {
-            ctx.fillStyle = "#1a1a2e"; ctx.fillRect(-hw - 2, -2, this.w + 4, h + 4); // Dark Ninja Suit
-            ctx.fillStyle = this.color; ctx.fillRect(-hw, 0, this.w, h);
+            let suitColor = this.kaeAwakened ? "#000000" : "#1a1a2e";
+            let bodyColor = this.kaeAwakened ? "#222222" : this.color;
+            let visorColor = this.kaeAwakened ? "#ff0000" : "#fff";
+
+            ctx.fillStyle = suitColor; ctx.fillRect(-hw - 2, -2, this.w + 4, h + 4); 
+            ctx.fillStyle = bodyColor; ctx.fillRect(-hw, 0, this.w, h);
             ctx.fillStyle = "#000"; ctx.fillRect(-hw, 20, this.w, 6); // belt
-            ctx.fillStyle = "#fff"; ctx.fillRect(hw - 12, 10, 8, 4); // Visor slit
+            ctx.fillStyle = visorColor; ctx.fillRect(hw - 12, 10, 8, 4); // Visor slit
             
             if (this.kaeComboCount > 0) {
-                ctx.fillStyle = "#00FFFF";
+                ctx.fillStyle = this.kaeAwakened ? "#ff0000" : "#00FFFF";
                 for(let i=0; i<this.kaeComboCount; i++) {
                     ctx.beginPath(); ctx.arc(-hw + 8 + i*8, -10, 3, 0, Math.PI*2); ctx.fill();
                 }
@@ -1799,22 +1699,149 @@ class Fighter extends Entity {
             ctx.fillStyle = "#800000"; ctx.fillRect(-hw, 20, this.w, 8); ctx.beginPath(); ctx.moveTo(-hw + 5, 25); ctx.lineTo(-hw - 20, 15); ctx.lineTo(-hw - 15, 30); ctx.fill();
             ctx.fillStyle = "#fff"; ctx.fillRect(hw - 10, 12, 6, 4);
         }
-        else if (this.heroName === 'Kae') {
-            let suitColor = this.kaeAwakened ? "#000000" : "#1a1a2e";
-            let bodyColor = this.kaeAwakened ? "#222222" : this.color;
-            let visorColor = this.kaeAwakened ? "#ff0000" : "#fff";
+        else if (this.heroName === 'Kadaxi') {
+            ctx.fillStyle = "#fff"; ctx.fillRect(-hw, 15, this.w, 20); 
+            ctx.fillStyle = "#000"; ctx.fillRect(-hw, 30, this.w, 8); 
+            ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.moveTo(-hw, 15); ctx.lineTo(hw, 15); ctx.lineTo(0, 30); ctx.fill();
+            if (this.comboCount > 0) {
+                ctx.fillStyle = "#0ff";
+                for(let i=0; i<this.comboCount; i++) ctx.fillRect(-hw + i*10, -10, 6, 4);
+            }
+        }
 
-            ctx.fillStyle = suitColor; ctx.fillRect(-hw - 2, -2, this.w + 4, h + 4); 
-            ctx.fillStyle = bodyColor; ctx.fillRect(-hw, 0, this.w, h);
-            ctx.fillStyle = "#000"; ctx.fillRect(-hw, 20, this.w, 6); // belt
-            ctx.fillStyle = visorColor; ctx.fillRect(hw - 12, 10, 8, 4); // Visor slit
+        // Weapons / Active animations
+        if (this.heroName === 'Hason') {
+            ctx.save(); ctx.translate(hw, 25);
+            let recoil = this.attackState === 'active' ? -0.5 * Math.sin(phaseProg * Math.PI) : 0;
+            ctx.rotate(recoil); ctx.fillStyle = "#aaa"; ctx.fillRect(0, 0, 22, 6); ctx.fillRect(0, 0, 6, 14); ctx.restore();
+        }
+        else if (this.heroName === 'Duke') {
+            ctx.save(); ctx.translate(hw, 25);
+            if (this.isMounted) {
+                let thrust = this.attackState === 'active' ? 40 * Math.sin(phaseProg * Math.PI) : 0;
+                ctx.fillStyle = "#654321"; ctx.fillRect(0, 5, 80 + thrust, 4); ctx.fillStyle = "#eee"; ctx.beginPath(); ctx.moveTo(80+thrust, 3); ctx.lineTo(100+thrust, 7); ctx.lineTo(80+thrust, 11); ctx.fill();
+            } else {
+                let angle = 0;
+                if (this.attackState === 'windup') angle = -1.0 * phaseProg; else if (this.attackState === 'active') angle = -1.0 + (3.0 * phaseProg); else if (this.attackState === 'recovery') angle = 2.0 - (2.0 * phaseProg);
+                ctx.rotate(angle);
+                if (this.attackState === 'active') { ctx.beginPath(); ctx.arc(0, 0, 60, -1.0, angle); ctx.lineWidth = 10; ctx.strokeStyle = "rgba(255, 255, 255, 0.4)"; ctx.stroke(); }
+                ctx.fillStyle = "#eee"; ctx.fillRect(-2, -60, 4, 60); ctx.fillStyle = "#d4af37"; ctx.fillRect(-6, 0, 12, 4); 
+            }
+            ctx.restore();
+        }
+        else if (this.heroName === 'Hunter') {
+            if (this.hunterWeapon === 'musket') {
+                ctx.save(); ctx.translate(hw - 15, 25);
+                let recoil = this.attackState === 'active' ? -0.2 * Math.sin(phaseProg * Math.PI) : 0;
+                ctx.rotate(recoil); ctx.fillStyle = "#5c2e0e"; ctx.fillRect(-15, 0, 50, 8); ctx.fillStyle = "#222"; ctx.fillRect(20, -2, 35, 5); ctx.restore();
+            } else {
+                ctx.save(); ctx.translate(0, 20);
+                let angle = -0.5;
+                if (this.attackState === 'windup') angle = -0.5 - (1.5 * phaseProg); else if (this.attackState === 'active') angle = -2.0 + (3.5 * phaseProg); else if (this.attackState === 'recovery') angle = 1.5 - (2.0 * phaseProg);
+                ctx.rotate(angle);
+                if (this.attackState === 'active') { ctx.beginPath(); ctx.arc(0, 0, 75, -2.0, angle); ctx.lineWidth = 15; ctx.strokeStyle = "rgba(100, 200, 255, 0.4)"; ctx.stroke(); }
+                ctx.fillStyle = "#d3d3d3"; ctx.fillRect(-8, -75, 16, 80); ctx.fillStyle = "#8b4513"; ctx.fillRect(-6, 5, 12, 20); ctx.fillStyle = "#ffd700"; ctx.fillRect(-12, 1, 24, 4); ctx.restore();
+            }
+        }
+        else if (this.heroName === 'Macu') {
+            ctx.save(); ctx.translate(0, 20);
+            let enemy = game.getEnemyOf(this); let mx = this.x + this.w/2; let my = this.y + 20; let ex = enemy.x + enemy.w/2; let ey = enemy.y + enemy.h/2;
+            let rDx = (ex - mx) * this.facing; let rDy = ey - my; let baseAimAngle = Math.atan2(rDy, rDx);
+            if (baseAimAngle > Math.PI/3) baseAimAngle = Math.PI/3; if (baseAimAngle < -Math.PI/3) baseAimAngle = -Math.PI/3;
+            let thrust = 0; let angle = baseAimAngle;
+            if (this.attackState === 'windup') { thrust = -30 * phaseProg; angle = baseAimAngle - (0.2 * phaseProg); }
+            else if (this.attackState === 'active') { thrust = -30 + (110 * Math.sin(phaseProg * Math.PI)); angle = baseAimAngle; } 
+            else if (this.attackState === 'recovery') { thrust = 0; angle = baseAimAngle; }
+            ctx.rotate(angle);
+            if (this.attackState === 'active') { ctx.fillStyle = "rgba(200, 255, 200, 0.5)"; ctx.fillRect(-2, -50 - thrust, 4, thrust + 20); }
+            ctx.fillStyle = "#8B4513"; ctx.fillRect(-3, -50 - thrust, 6, 110); 
+            ctx.fillStyle = "#ddd"; ctx.beginPath(); ctx.moveTo(0, -50 - thrust); ctx.lineTo(-6, -75 - thrust); ctx.lineTo(6, -75 - thrust); ctx.fill(); ctx.restore();
+        }
+        else if (this.heroName === 'Artu') {
+            ctx.save(); ctx.translate(0, 25); let angle = 0; 
+            if (this.attackState === 'idle') { ctx.fillStyle = "#222"; ctx.fillRect(-6, 0, 8, 50); ctx.fillStyle = "#d4af37"; ctx.fillRect(-10, 0, 16, 4); } 
+            else {
+                if (this.attackState === 'windup') angle = -1.0 * phaseProg; else if (this.attackState === 'active') angle = -1.0 + (3.0 * phaseProg); else if (this.attackState === 'recovery') angle = 2.0 - (2.0 * phaseProg);
+                ctx.fillStyle = "#222"; ctx.fillRect(-6, 0, 8, 50); ctx.rotate(angle);
+                if (this.attackState === 'active') { ctx.beginPath(); ctx.arc(0, 0, 60, -1.0, angle); ctx.lineWidth = 10; ctx.strokeStyle = "rgba(255, 200, 100, 0.4)"; ctx.stroke(); }
+                ctx.fillStyle = "#eee"; ctx.fillRect(-2, -60, 4, 60); ctx.fillStyle = "#d4af37"; ctx.fillRect(-6, 0, 12, 4); ctx.fillStyle = "#111"; ctx.fillRect(-3, 4, 6, 15); 
+            } ctx.restore();
+        }
+        else if (this.heroName === 'Willi') {
+            ctx.save(); ctx.translate(hw, 20); let angle = 0;
+            if (this.attackState !== 'idle') {
+                if (this.attackState === 'windup') angle = (-Math.PI/2) * phaseProg; else if (this.attackState === 'active') angle = -Math.PI/2 + (Math.PI * phaseProg); else if (this.attackState === 'recovery') angle = Math.PI/2 - ((Math.PI/2) * phaseProg);
+                ctx.rotate(angle); ctx.fillStyle = "#1a1a1a"; ctx.fillRect(-4, 0, 8, 20);
+                if (this.attackState === 'windup') { ctx.fillStyle = "#ddd"; ctx.beginPath(); ctx.moveTo(0, 20); ctx.lineTo(-4, 30); ctx.lineTo(4, 30); ctx.fill(); }
+            } ctx.restore();
+        }
+        else if (this.heroName === 'Euclid') {
+            if (this.euclidWeapon === 'sword') {
+                ctx.save(); ctx.translate(hw, 25); let angle = 0;
+                if (this.attackState === 'windup') angle = -1.0 * phaseProg; 
+                else if (this.attackState === 'active') angle = -1.0 + (3.0 * phaseProg); 
+                else if (this.attackState === 'recovery') angle = 2.0 - (2.0 * phaseProg);
+                ctx.rotate(angle);
+                if (this.attackState === 'active') { ctx.beginPath(); ctx.arc(0, 0, 50, -1.0, angle); ctx.lineWidth = 8; ctx.strokeStyle = "rgba(138, 43, 226, 0.4)"; ctx.stroke(); }
+                ctx.fillStyle = "#8A2BE2"; ctx.fillRect(-2, -50, 4, 50); ctx.fillStyle = "#fff"; ctx.fillRect(-6, 0, 12, 4); 
+                ctx.restore();
+            }
+        }
+        else if (this.heroName === 'Kae') {
+            ctx.save(); ctx.translate(hw, 25);
+            let thrust = 0;
+            if (this.attackState === 'windup') thrust = 10 * phaseProg;
+            else if (this.attackState === 'active') thrust = 35 * Math.sin(phaseProg * Math.PI);
             
-            if (this.kaeComboCount > 0) {
-                ctx.fillStyle = this.kaeAwakened ? "#ff0000" : "#00FFFF";
-                for(let i=0; i<this.kaeComboCount; i++) {
-                    ctx.beginPath(); ctx.arc(-hw + 8 + i*8, -10, 3, 0, Math.PI*2); ctx.fill();
+            if (this.attackState !== 'idle') {
+                ctx.fillStyle = this.kaeAwakened ? "rgba(255, 0, 0, 0.8)" : "rgba(0, 255, 255, 0.8)";
+                ctx.fillRect(0, -5, thrust, 10); 
+                
+                if (this.attackState === 'active') {
+                    ctx.strokeStyle = "#fff"; ctx.lineWidth = 1;
+                    ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(thrust/2, (Math.random()-0.5)*15); ctx.lineTo(thrust, 0); ctx.stroke();
                 }
             }
+            ctx.restore();
+        }
+        else if (this.heroName === 'Lique') {
+            let drawHatchet = (angleOffset) => {
+                ctx.save();
+                ctx.rotate(angleOffset);
+                ctx.fillStyle = "#5c2e0b"; ctx.fillRect(-3, -5, 6, 35); // Handle
+                ctx.fillStyle = "#eee"; ctx.beginPath(); ctx.moveTo(-3, -5); ctx.lineTo(15, -15); ctx.lineTo(18, 5); ctx.lineTo(-3, 10); ctx.fill(); // Axe head
+                ctx.restore();
+            };
+
+            ctx.save(); ctx.translate(hw, 20);
+            let angle = 0;
+            if (this.attackState === 'windup') angle = -1.0 * phaseProg;
+            else if (this.attackState === 'active') angle = -1.0 + (3.0 * phaseProg);
+            else if (this.attackState === 'recovery') angle = 2.0 - (2.0 * phaseProg);
+
+            // 挥砍的半月形特效轨迹
+            if (this.attackState === 'active') {
+                ctx.beginPath();
+                ctx.arc(0, 0, 55, -1.0, angle);
+                ctx.lineWidth = 15;
+                ctx.strokeStyle = this.buffs.bloodFrenzy > 0 ? "rgba(220, 20, 20, 0.7)" : "rgba(220, 220, 220, 0.5)";
+                ctx.stroke();
+            }
+
+            drawHatchet(angle); // Right hand
+
+            if (this.buffs.bloodFrenzy > 0) {
+                ctx.translate(-this.w, 0); 
+                if (this.attackState === 'active') {
+                    ctx.beginPath();
+                    ctx.arc(0, 0, 55, -1.0 + Math.PI/4, angle + Math.PI/4);
+                    ctx.lineWidth = 15;
+                    ctx.strokeStyle = "rgba(255, 50, 50, 0.7)";
+                    ctx.stroke();
+                }
+                drawHatchet(angle + Math.PI/4); // Left hand dual wield offset
+            }
+            ctx.restore();
         }
         else if (this.heroName === 'Kadaxi') {
             if (this.attackState === 'active') {
@@ -1874,56 +1901,24 @@ class Game {
         p1Roster.innerHTML = '';
         p2Roster.innerHTML = '';
         
-        const attachHover = (btn, key, isRandom = false) => {
+        const attachHover = (btn, key) => {
             btn.onmouseover = () => {
-                if (isRandom) {
-                    document.getElementById('info-name').innerText = t('random');
-                    document.getElementById('info-desc').innerText = t('randomDesc');
-                    document.getElementById('info-details').innerHTML = `
-                        <div style="font-size:3rem; text-align:center; color:#555; margin-top:30px;">?</div>
-                    `;
-                } else {
-                    const info = HEROES[key].i18n[currentLang];
-                    document.getElementById('info-name').innerText = info.name;
-                    document.getElementById('info-desc').innerText = info.desc;
-                    document.getElementById('info-details').innerHTML = `
-                        <div class="info-stat">HP: <span style="color:#4caf50">${info.hp}</span></div>
-                        <div class="info-stat">ATK: <span style="color:#ff5252">${info.atk}</span></div><br>
-                        <div class="info-stat">Passive:</div> <div class="info-desc">${info.passive}</div>
-                        <div class="info-stat">Super Skill:</div> <div class="info-desc">${info.super}</div>
-                    `;
-                }
+                const info = HEROES[key];
+                document.getElementById('info-name').innerText = info.name;
+                document.getElementById('info-desc').innerText = info.desc;
+                document.getElementById('info-details').innerHTML = `
+                    <div class="info-stat">HP: <span style="color:#4caf50">${info.ui.hp}</span></div>
+                    <div class="info-stat">ATK: <span style="color:#ff5252">${info.ui.atk}</span></div><br>
+                    <div class="info-stat">Passive:</div> <div class="info-desc">${info.ui.passive}</div>
+                    <div class="info-stat">Super Skill:</div> <div class="info-desc">${info.ui.super}</div>
+                `;
             };
         };
-
-        // Inject Random Button for P1
-        let b1Rand = document.createElement('button');
-        b1Rand.className = `hero-btn ${this.p1Choice === 'Random' ? 'selected' : ''}`;
-        b1Rand.innerText = `🎲 ${t('random')}`;
-        b1Rand.onclick = () => {
-            this.p1Choice = 'Random';
-            Array.from(p1Roster.children).forEach(c => c.classList.remove('selected'));
-            b1Rand.classList.add('selected');
-        };
-        attachHover(b1Rand, 'Random', true);
-        p1Roster.appendChild(b1Rand);
-
-        // Inject Random Button for P2
-        let b2Rand = document.createElement('button');
-        b2Rand.className = `hero-btn ${this.p2Choice === 'Random' ? 'selected' : ''}`;
-        b2Rand.innerText = `🎲 ${t('random')}`;
-        b2Rand.onclick = () => {
-            this.p2Choice = 'Random';
-            Array.from(p2Roster.children).forEach(c => c.classList.remove('selected'));
-            b2Rand.classList.add('selected');
-        };
-        attachHover(b2Rand, 'Random', true);
-        p2Roster.appendChild(b2Rand);
 
         Object.keys(HEROES).forEach(key => {
             let b1 = document.createElement('button');
             b1.className = `hero-btn ${key === this.p1Choice ? 'selected' : ''}`;
-            b1.innerText = `${HEROES[key].i18n[currentLang].name}`;
+            b1.innerText = `${HEROES[key].name}`;
             b1.onclick = () => {
                 this.p1Choice = key;
                 Array.from(p1Roster.children).forEach(c => c.classList.remove('selected'));
@@ -1934,7 +1929,7 @@ class Game {
 
             let b2 = document.createElement('button');
             b2.className = `hero-btn ${key === this.p2Choice ? 'selected' : ''}`;
-            b2.innerText = `${HEROES[key].i18n[currentLang].name}`;
+            b2.innerText = `${HEROES[key].name}`;
             b2.onclick = () => {
                 this.p2Choice = key;
                 Array.from(p2Roster.children).forEach(c => c.classList.remove('selected'));
@@ -1944,8 +1939,7 @@ class Game {
             p2Roster.appendChild(b2);
         });
 
-        if (this.p1Choice === 'Random') b1Rand.onmouseover();
-        else p1Roster.children[Object.keys(HEROES).indexOf(this.p1Choice) + 1].onmouseover();
+        p1Roster.children[Object.keys(HEROES).indexOf(this.p1Choice)].onmouseover();
 
         document.getElementById('btn-sp').onclick = () => this.startGame(true);
         document.getElementById('btn-mp').onclick = () => this.startGame(false);
@@ -1978,26 +1972,18 @@ class Game {
 
         let p2StartX = CANVAS_W - 150; 
         
-        let heroKeys = Object.keys(HEROES);
-        
-        this.p1ActualHero = this.p1Choice === 'Random' ? heroKeys[Math.floor(Math.random() * heroKeys.length)] : this.p1Choice;
-        this.p2ActualHero = this.p2Choice === 'Random' ? heroKeys[Math.floor(Math.random() * heroKeys.length)] : this.p2Choice;
-
-        this.p1 = new Fighter('p1', this.p1ActualHero, 100, currentBinds.p1, true);
-        this.p2 = new Fighter('p2', this.p2ActualHero, p2StartX, currentBinds.p2, false);
+        this.p1 = new Fighter('p1', this.p1Choice, 100, currentBinds.p1, true);
+        this.p2 = new Fighter('p2', this.p2Choice, p2StartX, currentBinds.p2, false);
         this.p2.facing = -1;
 
         this.projectiles = []; this.particles = []; this.minions = [];
         this.hurricane = null; this.hitstop = 0; this.aiTimer = 0;
 
-        let p1Label = t('player1');
-        let p2Label = t('player2');
-
-        document.getElementById('p1-name').innerText = `${p1Label}: ${HEROES[this.p1ActualHero].i18n[currentLang].name}`;
-        document.getElementById('p2-name').innerText = `${p2Label}: ${HEROES[this.p2ActualHero].i18n[currentLang].name}${isSinglePlayer ? ' [CPU]' : ''}`;
+        document.getElementById('p1-name').innerText = `Player 1: ${HEROES[this.p1Choice].name}`;
+        document.getElementById('p2-name').innerText = `Player 2: ${HEROES[this.p2Choice].name}${isSinglePlayer ? ' [CPU]' : ''}`;
         
-        document.getElementById('p1-horse-container').classList.toggle('hidden', this.p1ActualHero !== 'Duke');
-        document.getElementById('p2-horse-container').classList.toggle('hidden', this.p2ActualHero !== 'Duke');
+        document.getElementById('p1-horse-container').classList.toggle('hidden', this.p1Choice !== 'Duke');
+        document.getElementById('p2-horse-container').classList.toggle('hidden', this.p2Choice !== 'Duke');
 
         this.state = 'PLAYING';
         this.lastTime = performance.now();
@@ -2024,31 +2010,31 @@ class Game {
 
         let p1Stat = "";
         if (this.p1.heroName === 'Hason') { 
-            p1Stat = this.p1.hasonAmmo <= 0 ? t('stat_reload') : `${t('stat_ammo')}${this.p1.hasonAmmo}/6`; 
-            if (this.p1.hasonSuperCharges > 0) p1Stat += `${t('stat_dynamite')}${this.p1.hasonSuperCharges}]`; 
+            p1Stat = this.p1.hasonAmmo <= 0 ? `Ammo: RELOADING...` : `Ammo: ${this.p1.hasonAmmo}/6`; 
+            if (this.p1.hasonSuperCharges > 0) p1Stat += ` [DYNAMITE x${this.p1.hasonSuperCharges}]`; 
         }
         if (this.p1.heroName === 'Willi') {
-            if (this.p1.williSuperCharges > 0) p1Stat += `${t('stat_dash')}${this.p1.williSuperCharges}]`;
-            if (this.p1.williHealBuffTimer > 0) p1Stat += t('stat_lifesteal');
+            if (this.p1.williSuperCharges > 0) p1Stat += ` [DASH x${this.p1.williSuperCharges}]`;
+            if (this.p1.williHealBuffTimer > 0) p1Stat += ` [LIFESTEAL ACTIVE]`;
         }
-        if (this.p1.heroName === 'Hunter') p1Stat = `${t('stat_wep')}${this.p1.hunterWeapon.toUpperCase()} ${this.p1.hunterMusketCD>0 ? t('stat_rld') : ''}`;
-        if (this.p1.heroName === 'Duke') p1Stat = this.p1.isMounted ? (this.p1.runTimer >= 3000 ? t('stat_lance') : t('stat_charge')) : t('stat_dismount');
-        if (this.p1.heroName === 'Kadaxi' && this.p1.comboCount > 0) p1Stat += `${t('stat_combo')}${this.p1.comboCount}/2]`;
+        if (this.p1.heroName === 'Hunter') p1Stat = `Wep: ${this.p1.hunterWeapon.toUpperCase()} ${this.p1.hunterMusketCD>0 ? '(Rld)' : ''}`;
+        if (this.p1.heroName === 'Duke') p1Stat = this.p1.isMounted ? (this.p1.runTimer >= 3000 ? "LANCE READY" : "Charging...") : "DISMOUNTED";
+        if (this.p1.heroName === 'Kadaxi' && this.p1.comboCount > 0) p1Stat += ` [COMBO: ${this.p1.comboCount}/2]`;
         if (this.p1.heroName === 'Kae') {
-            if (this.p1.kaeComboCount > 0) p1Stat += `${t('stat_charge_bolt')}${this.p1.kaeComboCount}/3]`;
-            if (this.p1.kaeAwakened) p1Stat += t('stat_awakened');
+            if (this.p1.kaeComboCount > 0) p1Stat += ` [CHARGE: ${this.p1.kaeComboCount}/3]`;
+            if (this.p1.kaeAwakened) p1Stat += " [AWAKENED]";
         }
-        if (this.p1.heroName === 'Lique' && this.p1.buffs.bloodFrenzy > 0) p1Stat += t('stat_frenzy');
+        if (this.p1.heroName === 'Lique' && this.p1.buffs.bloodFrenzy > 0) p1Stat += " [BLOOD FRENZY]";
         if (this.p1.heroName === 'Euclid') {
             let skelCount = this.minions.filter(m => m.type === 'skeleton' && m.owner === this.p1).length;
-            p1Stat += `${t('stat_wep')}${this.p1.euclidWeapon.toUpperCase()} [Skulls: ${skelCount}/8]`;
-            if (this.p1.euclidSwitchTimer > 0) p1Stat += t('stat_switching');
-            else if (this.p1.superWindupTimer > 0) p1Stat += t('stat_summoning');
-            else if (this.p1.attackState === 'windup' && this.p1.euclidWeapon === 'magic') p1Stat += t('stat_casting');
+            p1Stat += `Wep: ${this.p1.euclidWeapon.toUpperCase()} [Skulls: ${skelCount}/8]`;
+            if (this.p1.euclidSwitchTimer > 0) p1Stat += ` (SWITCHING)`;
+            else if (this.p1.superWindupTimer > 0) p1Stat += ` (SUMMONING)`;
+            else if (this.p1.attackState === 'windup' && this.p1.euclidWeapon === 'magic') p1Stat += ` (CASTING)`;
         }
-        if (this.p1.buffs.poison > 0) p1Stat += t('stat_poisoned');
-        if (this.p1.buffs.dizzy > 0) p1Stat += t('stat_dizzy');
-        if (this.p1.buffs.slow > 0) p1Stat += t('stat_slowed');
+        if (this.p1.buffs.poison > 0) p1Stat += " [POISONED]";
+        if (this.p1.buffs.dizzy > 0) p1Stat += " [DIZZY]";
+        if (this.p1.buffs.slow > 0) p1Stat += " [SLOWED]";
         document.getElementById('p1-status').innerText = p1Stat;
 
         document.getElementById('p2-hp').style.width = `${Math.max(0, (this.p2.hp / this.p2.maxHp) * 100)}%`;
@@ -2059,31 +2045,31 @@ class Game {
 
         let p2Stat = "";
         if (this.p2.heroName === 'Hason') { 
-            p2Stat = this.p2.hasonAmmo <= 0 ? t('stat_reload') : `${t('stat_ammo')}${this.p2.hasonAmmo}/6`; 
-            if (this.p2.hasonSuperCharges > 0) p2Stat += `${t('stat_dynamite')}${this.p2.hasonSuperCharges}]`; 
+            p2Stat = this.p2.hasonAmmo <= 0 ? `Ammo: RELOADING...` : `Ammo: ${this.p2.hasonAmmo}/6`; 
+            if (this.p2.hasonSuperCharges > 0) p2Stat += ` [DYNAMITE x${this.p2.hasonSuperCharges}]`; 
         }
         if (this.p2.heroName === 'Willi') {
-            if (this.p2.williSuperCharges > 0) p2Stat += `${t('stat_dash')}${this.p2.williSuperCharges}]`;
-            if (this.p2.williHealBuffTimer > 0) p2Stat += t('stat_lifesteal');
+            if (this.p2.williSuperCharges > 0) p2Stat += ` [DASH x${this.p2.williSuperCharges}]`;
+            if (this.p2.williHealBuffTimer > 0) p2Stat += ` [LIFESTEAL ACTIVE]`;
         }
-        if (this.p2.heroName === 'Hunter') p2Stat = `${t('stat_wep')}${this.p2.hunterWeapon.toUpperCase()} ${this.p2.hunterMusketCD>0 ? t('stat_rld') : ''}`;
-        if (this.p2.heroName === 'Duke') p2Stat = this.p2.isMounted ? (this.p2.runTimer >= 3000 ? t('stat_lance') : t('stat_charge')) : t('stat_dismount');
-        if (this.p2.heroName === 'Kadaxi' && this.p2.comboCount > 0) p2Stat += `${t('stat_combo')}${this.p2.comboCount}/2]`;
+        if (this.p2.heroName === 'Hunter') p2Stat = `Wep: ${this.p2.hunterWeapon.toUpperCase()} ${this.p2.hunterMusketCD>0 ? '(Rld)' : ''}`;
+        if (this.p2.heroName === 'Duke') p2Stat = this.p2.isMounted ? (this.p2.runTimer >= 3000 ? "LANCE READY" : "Charging...") : "DISMOUNTED";
+        if (this.p2.heroName === 'Kadaxi' && this.p2.comboCount > 0) p2Stat += ` [COMBO: ${this.p2.comboCount}/2]`;
         if (this.p2.heroName === 'Kae') {
-            if (this.p2.kaeComboCount > 0) p2Stat += `${t('stat_charge_bolt')}${this.p2.kaeComboCount}/3]`;
-            if (this.p2.kaeAwakened) p2Stat += t('stat_awakened');
+            if (this.p2.kaeComboCount > 0) p2Stat += ` [CHARGE: ${this.p2.kaeComboCount}/3]`;
+            if (this.p2.kaeAwakened) p2Stat += " [AWAKENED]";
         }
-        if (this.p2.heroName === 'Lique' && this.p2.buffs.bloodFrenzy > 0) p2Stat += t('stat_frenzy');
+        if (this.p2.heroName === 'Lique' && this.p2.buffs.bloodFrenzy > 0) p2Stat += " [BLOOD FRENZY]";
         if (this.p2.heroName === 'Euclid') {
             let skelCount = this.minions.filter(m => m.type === 'skeleton' && m.owner === this.p2).length;
-            p2Stat += `${t('stat_wep')}${this.p2.euclidWeapon.toUpperCase()} [Skulls: ${skelCount}/8]`;
-            if (this.p2.euclidSwitchTimer > 0) p2Stat += t('stat_switching');
-            else if (this.p2.superWindupTimer > 0) p2Stat += t('stat_summoning');
-            else if (this.p2.attackState === 'windup' && this.p2.euclidWeapon === 'magic') p2Stat += t('stat_casting');
+            p2Stat += `Wep: ${this.p2.euclidWeapon.toUpperCase()} [Skulls: ${skelCount}/8]`;
+            if (this.p2.euclidSwitchTimer > 0) p2Stat += ` (SWITCHING)`;
+            else if (this.p2.superWindupTimer > 0) p2Stat += ` (SUMMONING)`;
+            else if (this.p2.attackState === 'windup' && this.p2.euclidWeapon === 'magic') p2Stat += ` (CASTING)`;
         }
-        if (this.p2.buffs.poison > 0) p2Stat += t('stat_poisoned');
-        if (this.p2.buffs.dizzy > 0) p2Stat += t('stat_dizzy');
-        if (this.p2.buffs.slow > 0) p2Stat += t('stat_slowed');
+        if (this.p2.buffs.poison > 0) p2Stat += " [POISONED]";
+        if (this.p2.buffs.dizzy > 0) p2Stat += " [DIZZY]";
+        if (this.p2.buffs.slow > 0) p2Stat += " [SLOWED]";
         document.getElementById('p2-status').innerText = p2Stat;
 
         let promptsHTML = '';
@@ -2095,14 +2081,10 @@ class Game {
     endGame(winnerText) {
         if (this.state === 'GAMEOVER') return;
         this.state = 'GAMEOVER';
-        
-        let winTextLoc = winnerText === "Player 1" ? t('winnerP1') : (winnerText === "Player 2" ? t('winnerP2') : winnerText);
-        let fullWinStr = `${winTextLoc} ${t('wins')}`;
-
         setTimeout(() => {
             document.getElementById('game-ui').classList.add('hidden');
             document.getElementById('game-over-screen').classList.remove('hidden');
-            document.getElementById('winner-text').innerText = fullWinStr;
+            document.getElementById('winner-text').innerText = `${winnerText} Wins!`;
         }, 1500); 
     }
 
