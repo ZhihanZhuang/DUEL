@@ -430,7 +430,7 @@ const HEROES = {
     },
     Duke: {
         name: "Duke", desc: "Cavalry Rider with Lance & Handgun",
-        color: "#4682B4", maxHp: 750, speed: 6.5, jump: 12, width: 45, height: 70, superCD: 20000,
+        color: "#4682B4", maxHp: 900, speed: 6.5, jump: 12, width: 45, height: 70, superCD: 20000,
         ui: {
             hp: "Horse 50 WRD / Duke 75 WRD", atk: "3.3 WRD (Lance) / 1.5 WRD (Sabre)",
             passive: "Run continuously for 3s to charge Lance (3s Stun). Dismounts when horse dies (Sabre blocks 50% projectiles and heals 2 WRD on hit).",
@@ -453,6 +453,15 @@ const HEROES = {
             hp: "70 WRD", atk: "1.2 WRD (Sword) / 10.3 WRD (Homing Burst)",
             passive: "Press [Switch] for Melee/Ranged (2s Invincible Channel). Magic takes 1s to cast, homes in, or heals skeletons if out of range.",
             super: "<span class='skill-tag'>Necromantic Summoning</span> 3s cast to summon 8 ultra-fast melee skeletons. Skeletons deal 3 WRD damage and explode on death (2.3 WRD)."
+        }
+    },
+    Lique: {
+        name: "Lique", desc: "Berserker with Hatchets",
+        color: "#B22222", maxHp: 780, speed: 5.5, jump: 13, width: 40, height: 70, superCD: 35000,
+        ui: {
+            hp: "95 WRD", atk: "1.8 WRD (Fast Melee)",
+            passive: "Pure relentless melee pressure with virtually no attack windup.",
+            super: "<span class='skill-tag'>Blood Frenzy</span> Dual-wields for 10s. Attack speed x2, movement speed slightly reduced. Heals 0.5 WRD per hit on heroes. Throws a 10.3 WRD axe when it ends."
         }
     }
 };
@@ -521,8 +530,8 @@ class Projectile extends Entity {
                 this.vx += (Math.cos(angle) * speed - this.vx) * turnSpeed;
                 this.vy += (Math.sin(angle) * speed - this.vy) * turnSpeed;
             }
-        } else if (this.type === "knife" || this.type === "large_knife" || this.type === "enhanced_knife" || this.type === "ki_blast") {
-            if (this.type !== "ki_blast") this.vy += GRAVITY * 0.1;
+        } else if (this.type === "knife" || this.type === "large_knife" || this.type === "enhanced_knife" || this.type === "ki_blast" || this.type === "thrown_axe") {
+            if (this.type !== "ki_blast" && this.type !== "thrown_axe") this.vy += GRAVITY * 0.1;
         }
 
         if (this.x < -100 || this.x > CANVAS_W + 100 || this.y > CANVAS_H || this.y < -100) this.dead = true;
@@ -603,6 +612,15 @@ class Projectile extends Entity {
             ctx.strokeRect(-this.w/2, -this.h/2, this.w, this.h);
             ctx.restore();
             game.particles.push(new Particle(this.x + this.w/2, this.y + this.h/2, this.color, 0, 0, 150, 4));
+            this.timer += 16;
+        } else if (this.type === "thrown_axe") {
+            ctx.save(); ctx.translate(this.x + this.w/2, this.y + this.h/2);
+            ctx.rotate(this.timer * 0.05 * (this.vx > 0 ? 1 : -1));
+            ctx.fillStyle = "#8B4513"; ctx.fillRect(-3, -15, 6, 30); 
+            ctx.fillStyle = "#ccc";
+            ctx.beginPath(); ctx.moveTo(0, -10); ctx.lineTo(15, -20); ctx.lineTo(20, 0); ctx.lineTo(0, 5); ctx.fill();
+            ctx.beginPath(); ctx.moveTo(0, -10); ctx.lineTo(-15, -20); ctx.lineTo(-20, 0); ctx.lineTo(0, 5); ctx.fill(); 
+            ctx.restore();
             this.timer += 16;
         } else if (this.type === "bullet" || this.type === "homing_bullet") {
             ctx.fillStyle = this.type === "homing_bullet" ? "#ff5500" : "#fff"; 
@@ -824,7 +842,7 @@ class Fighter extends Entity {
         this.currentPlatform = null; this.aiIntent = { left: false, right: false };
         this.attackState = 'idle'; this.stateTimer = 0; this.maxStateTimer = 0; this.hasHit = false;
         
-        this.buffs = { poison: 0, battleCry: 0, shade: 0, dizzy: 0, slow: 0, hurricaneSlow: false };
+        this.buffs = { poison: 0, battleCry: 0, shade: 0, dizzy: 0, slow: 0, hurricaneSlow: false, bloodFrenzy: 0 };
         this.invincible = 0; this.lastJumpTime = 0;
         this.flipActive = 0; this.hasHitFlip = false; this.hasFlipped = false; 
         this.grapplePhase = 0; this.grappleTimer = 0; 
@@ -967,6 +985,19 @@ class Fighter extends Entity {
             }
         }
 
+        // Lique Super Loop
+        if (this.buffs.bloodFrenzy > 0) {
+            this.buffs.bloodFrenzy -= dt;
+            if (Math.random() < 0.3) game.particles.push(new Particle(this.x + Math.random()*this.w, this.y + Math.random()*this.h, "#B22222", 0, -3, 300, 4));
+
+            if (this.buffs.bloodFrenzy <= 0) {
+                // Throws axe at end
+                let px = this.facing === 1 ? this.x + this.w : this.x - 10;
+                let py = this.y + 25;
+                game.projectiles.push(new Projectile(px, py, 25, 25, this.facing * 20, 0, 103, this, "#B22222", "thrown_axe"));
+            }
+        }
+
         let currentSpeed = this.baseSpeed;
         let currentJump = this.baseJump;
         
@@ -991,6 +1022,10 @@ class Fighter extends Entity {
             if(Math.random()<0.1) game.particles.push(new Particle(this.x+this.w/2, this.y+this.h, "#ff4500", 0, -3, 300));
         }
         if (this.buffs.shade > 0) this.buffs.shade -= dt;
+
+        if (this.buffs.bloodFrenzy > 0) {
+            currentSpeed *= 0.9; // 10% speed penalty during frenzy
+        }
         
         this.buffs.hurricaneSlow = false;
         if (game.hurricane && !game.hurricane.dead && game.hurricane.owner !== this) {
@@ -1093,8 +1128,11 @@ class Fighter extends Entity {
             if (this.attackState === 'windup') {
                 this.stateTimer -= dt;
                 if (this.stateTimer <= 0) {
+                    let activeTime = 150;
+                    if (this.heroName === 'Lique') activeTime = this.buffs.bloodFrenzy > 0 ? 50 : 100;
+
                     this.attackState = 'active';
-                    this.stateTimer = 150; this.maxStateTimer = 150;
+                    this.stateTimer = activeTime; this.maxStateTimer = activeTime;
                     this.executeActiveAttack();
                 }
             } else if (this.attackState === 'active') {
@@ -1109,6 +1147,13 @@ class Fighter extends Entity {
                         enemy.takeDamage(this.getMeleeDamage(), this);
                         if (this.heroName === 'Macu' && this.buffs.battleCry > 0) enemy.buffs.poison = 3000;
                         if (this.heroName === 'Duke' && this.isMounted) enemy.buffs.dizzy = 3000; 
+
+                        // Lique Blood Frenzy Lifesteal (Only works on Enemy Hero, avoids minion abuse)
+                        if (this.heroName === 'Lique' && this.buffs.bloodFrenzy > 0 && enemy.heroName) {
+                            this.hp = Math.min(this.maxHp, this.hp + 5); // 0.5 WRD = 5 HP
+                            for(let i=0; i<5; i++) game.particles.push(new Particle(this.x + Math.random()*this.w, this.y + Math.random()*this.h, "#ff0000", 0, -2, 300, 3));
+                        }
+
                         hitAnything = true;
                     }
                     
@@ -1129,8 +1174,13 @@ class Fighter extends Entity {
                 }
                 
                 if (this.stateTimer <= 0) {
+                    let recTime = 250;
+                    if (this.heroName === 'Hason') recTime = 100;
+                    if (this.heroName === 'Kadaxi') recTime = 200;
+                    if (this.heroName === 'Lique') recTime = this.buffs.bloodFrenzy > 0 ? 90 : 180;
+
                     this.attackState = 'recovery';
-                    this.stateTimer = (this.heroName === 'Hason') ? 100 : (this.heroName === 'Kadaxi' ? 200 : 250); 
+                    this.stateTimer = recTime; 
                     this.maxStateTimer = this.stateTimer;
                 }
             } else if (this.attackState === 'recovery') {
@@ -1215,6 +1265,7 @@ class Fighter extends Entity {
         if (this.heroName === 'Artu' || (this.heroName === 'Duke' && !this.isMounted) || this.heroName === 'Kadaxi') range = 65;
         if (this.heroName === 'Duke' && this.isMounted) range = 90; 
         if (this.heroName === 'Euclid' && this.euclidWeapon === 'sword') range = 50;
+        if (this.heroName === 'Lique') range = 55;
         
         if (this.heroName === 'Macu') {
             range = 110; 
@@ -1233,7 +1284,8 @@ class Fighter extends Entity {
         if (this.heroName === 'Hunter') return 17; 
         if (this.heroName === 'Duke' && !this.isMounted) return 15; 
         if (this.heroName === 'Kadaxi') return 33; 
-        if (this.heroName === 'Euclid') return 12; // Sword damage 1.2 WRD
+        if (this.heroName === 'Euclid') return 12; 
+        if (this.heroName === 'Lique') return 18; 
         return 13;
     }
 
@@ -1249,7 +1301,8 @@ class Fighter extends Entity {
         if (this.heroName === 'Duke' && this.isMounted) this.stateTimer = 50; 
         if (this.heroName === 'Hason') this.stateTimer = 50; 
         if (this.heroName === 'Kadaxi') this.stateTimer = 100; 
-        if (this.heroName === 'Euclid') this.stateTimer = (this.euclidWeapon === 'sword') ? 50 : 1000; // Euclid 魔法1秒前摇，剑极快
+        if (this.heroName === 'Euclid') this.stateTimer = (this.euclidWeapon === 'sword') ? 50 : 1000; 
+        if (this.heroName === 'Lique') this.stateTimer = this.buffs.bloodFrenzy > 0 ? 10 : 20;
         
         this.maxStateTimer = this.stateTimer;
         this.hasHit = false;
@@ -1287,7 +1340,6 @@ class Fighter extends Entity {
             game.particles.push(new Particle(px, py, "#FFA500", Math.cos(aimAngle)*2, Math.sin(aimAngle)*2, 100));
         } 
         else if (this.heroName === 'Willi') {
-            // 吸血 Buff 触发
             if (this.williHealBuffTimer > 0) {
                 this.hp = Math.min(this.maxHp, this.hp + 10); // 1 WRD Heal
                 for(let i=0; i<5; i++) game.particles.push(new Particle(this.x + Math.random()*this.w, this.y + Math.random()*this.h, "#32CD32", 0, -2, 300, 4));
@@ -1296,7 +1348,7 @@ class Fighter extends Entity {
             this.williComboCount++;
             let speed = 18;
             if (this.williComboCount >= 3) {
-                this.williComboCount = 0; // 强化飞刀
+                this.williComboCount = 0; 
                 game.projectiles.push(new Projectile(px, py, 25, 6, Math.cos(aimAngle)*speed, Math.sin(aimAngle)*speed, 30, this, "#0ff", "enhanced_knife")); 
             } else {
                 game.projectiles.push(new Projectile(px, py, 20, 4, Math.cos(aimAngle)*speed, Math.sin(aimAngle)*speed, 23, this, "#ccc", "knife")); 
@@ -1320,16 +1372,15 @@ class Fighter extends Entity {
         else if (this.heroName === 'Euclid') {
             if (this.euclidWeapon === 'magic') {
                 let dist = Math.hypot(tx - px, ty - py);
-                let inRange = dist < 600 && Math.abs(ty - py) < 300; // 追踪弹需要较大的锁定范围
+                let inRange = dist < 600 && Math.abs(ty - py) < 300; 
 
                 if (inRange) {
                     let speed = 15;
                     game.projectiles.push(new Projectile(px, py, 25, 25, Math.cos(aimAngle)*speed, Math.sin(aimAngle)*speed, 103, this, "#8A2BE2", "magic_burst"));
                 } else {
-                    // 没有目标时转化为骷髅回血
                     let skeletons = game.minions.filter(m => m.type === 'skeleton' && m.owner === this);
                     if (skeletons.length > 0) {
-                        let healAmt = 100 / skeletons.length; // 10 WRD 均分
+                        let healAmt = 100 / skeletons.length; 
                         skeletons.forEach(s => {
                             s.hp = Math.min(s.maxHp, s.hp + healAmt);
                             for(let i=0; i<8; i++) game.particles.push(new Particle(s.x + Math.random()*s.w, s.y + Math.random()*s.h, "#00ff00", 0, -3, 400, 5));
@@ -1337,13 +1388,19 @@ class Fighter extends Entity {
                     }
                 }
             } else {
-                // Sword mode VFX (Hitbox takes care of damage)
                 game.particles.push(new Particle(px, py, "#8A2BE2", this.facing*5, 0, 150, 5));
             }
         }
     }
 
     performSuper() {
+        if (this.heroName === 'Lique') {
+            this.superCooldown = this.superCooldownMax;
+            this.buffs.bloodFrenzy = 10000; // 10秒大招
+            for(let i=0; i<30; i++) game.particles.push(new Particle(this.x+this.w/2, this.y+this.h/2, "#B22222", (Math.random()-0.5)*15, (Math.random()-0.5)*15, 600, 6));
+            return;
+        }
+
         if (this.heroName === 'Euclid') {
             if (this.superCooldown <= 0 && this.superWindupTimer <= 0) {
                 this.superWindupTimer = 3000; 
@@ -1433,7 +1490,7 @@ class Fighter extends Entity {
             game.hurricane = new Hurricane(this, hx, GROUND_Y - 300); 
         }
         else if (this.heroName === 'Macu') {
-            this.buffs.battleCry = 30000;
+            this.buffs.battleCry = 30000; 
         }
         else if (this.heroName === 'Artu') {
             for (let i = 0; i < 5; i++) game.minions.push(new Minion(this, this.x + (Math.random() * 100 - 50), this.y - 50));
@@ -1462,7 +1519,6 @@ class Fighter extends Entity {
         ctx.save();
         ctx.translate(this.x + this.w / 2, this.y + this.h/2); 
         
-        // Euclid Switch Channeling & Shield
         if (this.euclidSwitchTimer > 0) {
             ctx.save();
             ctx.rotate(-Date.now() * 0.005);
@@ -1474,6 +1530,12 @@ class Fighter extends Entity {
             ctx.restore();
         }
         
+        let phaseProg = 0;
+        if (this.attackState !== 'idle' && this.maxStateTimer > 0) {
+            phaseProg = 1 - (this.stateTimer / this.maxStateTimer);
+            phaseProg = phaseProg * phaseProg * (3 - 2 * phaseProg);
+        }
+
         if (this.superWindupTimer > 0 || (this.attackState === 'windup' && this.heroName === 'Euclid' && this.euclidWeapon === 'magic')) {
             let prog = this.superWindupTimer > 0 ? this.superWindupTimer / 3000 : 1 - (this.stateTimer / 1000);
             ctx.save();
@@ -1511,6 +1573,14 @@ class Fighter extends Entity {
             ctx.fillStyle = "#2E0854"; ctx.fillRect(-hw, 10, this.w, h-10);
             ctx.fillStyle = "#8A2BE2"; ctx.fillRect(-hw+5, 10, this.w-10, h-10);
             ctx.fillStyle = "#000"; ctx.beginPath(); ctx.moveTo(-hw, 10); ctx.lineTo(hw, 10); ctx.lineTo(0, 30); ctx.fill();
+        } else if (this.heroName === 'Lique') {
+            ctx.fillStyle = "#333"; ctx.fillRect(-hw - 2, -2, this.w + 4, h + 4);
+            ctx.fillStyle = this.color; ctx.fillRect(-hw, 0, this.w, h);
+            ctx.fillStyle = "#222"; ctx.fillRect(-hw, h/2 - 5, this.w, 10); // belt
+            // Frenzy aura
+            if (this.buffs.bloodFrenzy > 0) {
+                ctx.strokeStyle = "rgba(255, 0, 0, 0.5)"; ctx.lineWidth = 4; ctx.strokeRect(-hw-4, -4, this.w+8, h+8);
+            }
         } else {
             ctx.fillStyle = "rgba(0,0,0,0.4)"; ctx.fillRect(-hw - 2, -2, this.w + 4, h + 4);
             ctx.fillStyle = this.color; ctx.fillRect(-hw, 0, this.w, h);
@@ -1544,88 +1614,6 @@ class Fighter extends Entity {
             ctx.fillStyle = "#800000"; ctx.fillRect(-hw, 20, this.w, 8); ctx.beginPath(); ctx.moveTo(-hw + 5, 25); ctx.lineTo(-hw - 20, 15); ctx.lineTo(-hw - 15, 30); ctx.fill();
             ctx.fillStyle = "#fff"; ctx.fillRect(hw - 10, 12, 6, 4);
         }
-        else if (this.heroName === 'Kadaxi') {
-            ctx.fillStyle = "#fff"; ctx.fillRect(-hw, 15, this.w, 20); 
-            ctx.fillStyle = "#000"; ctx.fillRect(-hw, 30, this.w, 8); 
-            ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.moveTo(-hw, 15); ctx.lineTo(hw, 15); ctx.lineTo(0, 30); ctx.fill();
-            if (this.comboCount > 0) {
-                ctx.fillStyle = "#0ff";
-                for(let i=0; i<this.comboCount; i++) ctx.fillRect(-hw + i*10, -10, 6, 4);
-            }
-        }
-
-        let phaseProg = 0;
-        if (this.attackState !== 'idle' && this.maxStateTimer > 0) {
-            phaseProg = 1 - (this.stateTimer / this.maxStateTimer);
-            phaseProg = phaseProg * phaseProg * (3 - 2 * phaseProg);
-        }
-
-        // Weapons / Active animations
-        if (this.heroName === 'Hason') {
-            ctx.save(); ctx.translate(hw, 25);
-            let recoil = this.attackState === 'active' ? -0.5 * Math.sin(phaseProg * Math.PI) : 0;
-            ctx.rotate(recoil); ctx.fillStyle = "#aaa"; ctx.fillRect(0, 0, 22, 6); ctx.fillRect(0, 0, 6, 14); ctx.restore();
-        }
-        else if (this.heroName === 'Duke') {
-            ctx.save(); ctx.translate(hw, 25);
-            if (this.isMounted) {
-                let thrust = this.attackState === 'active' ? 40 * Math.sin(phaseProg * Math.PI) : 0;
-                ctx.fillStyle = "#654321"; ctx.fillRect(0, 5, 80 + thrust, 4); ctx.fillStyle = "#eee"; ctx.beginPath(); ctx.moveTo(80+thrust, 3); ctx.lineTo(100+thrust, 7); ctx.lineTo(80+thrust, 11); ctx.fill();
-            } else {
-                let angle = 0;
-                if (this.attackState === 'windup') angle = -1.0 * phaseProg; else if (this.attackState === 'active') angle = -1.0 + (3.0 * phaseProg); else if (this.attackState === 'recovery') angle = 2.0 - (2.0 * phaseProg);
-                ctx.rotate(angle);
-                if (this.attackState === 'active') { ctx.beginPath(); ctx.arc(0, 0, 60, -1.0, angle); ctx.lineWidth = 10; ctx.strokeStyle = "rgba(255, 255, 255, 0.4)"; ctx.stroke(); }
-                ctx.fillStyle = "#eee"; ctx.fillRect(-2, -60, 4, 60); ctx.fillStyle = "#d4af37"; ctx.fillRect(-6, 0, 12, 4); 
-            }
-            ctx.restore();
-        }
-        else if (this.heroName === 'Hunter') {
-            if (this.hunterWeapon === 'musket') {
-                ctx.save(); ctx.translate(hw - 15, 25);
-                let recoil = this.attackState === 'active' ? -0.2 * Math.sin(phaseProg * Math.PI) : 0;
-                ctx.rotate(recoil); ctx.fillStyle = "#5c2e0e"; ctx.fillRect(-15, 0, 50, 8); ctx.fillStyle = "#222"; ctx.fillRect(20, -2, 35, 5); ctx.restore();
-            } else {
-                ctx.save(); ctx.translate(0, 20);
-                let angle = -0.5;
-                if (this.attackState === 'windup') angle = -0.5 - (1.5 * phaseProg); else if (this.attackState === 'active') angle = -2.0 + (3.5 * phaseProg); else if (this.attackState === 'recovery') angle = 1.5 - (2.0 * phaseProg);
-                ctx.rotate(angle);
-                if (this.attackState === 'active') { ctx.beginPath(); ctx.arc(0, 0, 75, -2.0, angle); ctx.lineWidth = 15; ctx.strokeStyle = "rgba(100, 200, 255, 0.4)"; ctx.stroke(); }
-                ctx.fillStyle = "#d3d3d3"; ctx.fillRect(-8, -75, 16, 80); ctx.fillStyle = "#8b4513"; ctx.fillRect(-6, 5, 12, 20); ctx.fillStyle = "#ffd700"; ctx.fillRect(-12, 1, 24, 4); ctx.restore();
-            }
-        }
-        else if (this.heroName === 'Macu') {
-            ctx.save(); ctx.translate(0, 20);
-            let enemy = game.getEnemyOf(this); let mx = this.x + this.w/2; let my = this.y + 20; let ex = enemy.x + enemy.w/2; let ey = enemy.y + enemy.h/2;
-            let rDx = (ex - mx) * this.facing; let rDy = ey - my; let baseAimAngle = Math.atan2(rDy, rDx);
-            if (baseAimAngle > Math.PI/3) baseAimAngle = Math.PI/3; if (baseAimAngle < -Math.PI/3) baseAimAngle = -Math.PI/3;
-            let thrust = 0; let angle = baseAimAngle;
-            if (this.attackState === 'windup') { thrust = -30 * phaseProg; angle = baseAimAngle - (0.2 * phaseProg); }
-            else if (this.attackState === 'active') { thrust = -30 + (110 * Math.sin(phaseProg * Math.PI)); angle = baseAimAngle; } 
-            else if (this.attackState === 'recovery') { thrust = 0; angle = baseAimAngle; }
-            ctx.rotate(angle);
-            if (this.attackState === 'active') { ctx.fillStyle = "rgba(200, 255, 200, 0.5)"; ctx.fillRect(-2, -50 - thrust, 4, thrust + 20); }
-            ctx.fillStyle = "#8B4513"; ctx.fillRect(-3, -50 - thrust, 6, 110); 
-            ctx.fillStyle = "#ddd"; ctx.beginPath(); ctx.moveTo(0, -50 - thrust); ctx.lineTo(-6, -75 - thrust); ctx.lineTo(6, -75 - thrust); ctx.fill(); ctx.restore();
-        }
-        else if (this.heroName === 'Artu') {
-            ctx.save(); ctx.translate(0, 25); let angle = 0; 
-            if (this.attackState === 'idle') { ctx.fillStyle = "#222"; ctx.fillRect(-6, 0, 8, 50); ctx.fillStyle = "#d4af37"; ctx.fillRect(-10, 0, 16, 4); } 
-            else {
-                if (this.attackState === 'windup') angle = -1.0 * phaseProg; else if (this.attackState === 'active') angle = -1.0 + (3.0 * phaseProg); else if (this.attackState === 'recovery') angle = 2.0 - (2.0 * phaseProg);
-                ctx.fillStyle = "#222"; ctx.fillRect(-6, 0, 8, 50); ctx.rotate(angle);
-                if (this.attackState === 'active') { ctx.beginPath(); ctx.arc(0, 0, 60, -1.0, angle); ctx.lineWidth = 10; ctx.strokeStyle = "rgba(255, 200, 100, 0.4)"; ctx.stroke(); }
-                ctx.fillStyle = "#eee"; ctx.fillRect(-2, -60, 4, 60); ctx.fillStyle = "#d4af37"; ctx.fillRect(-6, 0, 12, 4); ctx.fillStyle = "#111"; ctx.fillRect(-3, 4, 6, 15); 
-            } ctx.restore();
-        }
-        else if (this.heroName === 'Willi') {
-            ctx.save(); ctx.translate(hw, 20); let angle = 0;
-            if (this.attackState !== 'idle') {
-                if (this.attackState === 'windup') angle = (-Math.PI/2) * phaseProg; else if (this.attackState === 'active') angle = -Math.PI/2 + (Math.PI * phaseProg); else if (this.attackState === 'recovery') angle = Math.PI/2 - ((Math.PI/2) * phaseProg);
-                ctx.rotate(angle); ctx.fillStyle = "#1a1a1a"; ctx.fillRect(-4, 0, 8, 20);
-                if (this.attackState === 'windup') { ctx.fillStyle = "#ddd"; ctx.beginPath(); ctx.moveTo(0, 20); ctx.lineTo(-4, 30); ctx.lineTo(4, 30); ctx.fill(); }
-            } ctx.restore();
-        }
         else if (this.heroName === 'Euclid') {
             if (this.euclidWeapon === 'sword') {
                 ctx.save(); ctx.translate(hw, 25); let angle = 0;
@@ -1637,6 +1625,29 @@ class Fighter extends Entity {
                 ctx.fillStyle = "#8A2BE2"; ctx.fillRect(-2, -50, 4, 50); ctx.fillStyle = "#fff"; ctx.fillRect(-6, 0, 12, 4); 
                 ctx.restore();
             }
+        }
+        else if (this.heroName === 'Lique') {
+            let drawHatchet = (angleOffset) => {
+                ctx.save();
+                ctx.rotate(angleOffset);
+                ctx.fillStyle = "#5c2e0b"; ctx.fillRect(-3, -5, 6, 35); // Handle
+                ctx.fillStyle = "#eee"; ctx.beginPath(); ctx.moveTo(-3, -5); ctx.lineTo(15, -15); ctx.lineTo(18, 5); ctx.lineTo(-3, 10); ctx.fill(); // Axe head
+                ctx.restore();
+            };
+
+            ctx.save(); ctx.translate(hw, 20);
+            let angle = 0;
+            if (this.attackState === 'windup') angle = -1.0 * phaseProg;
+            else if (this.attackState === 'active') angle = -1.0 + (3.0 * phaseProg);
+            else if (this.attackState === 'recovery') angle = 2.0 - (2.0 * phaseProg);
+
+            drawHatchet(angle); // Right hand
+
+            if (this.buffs.bloodFrenzy > 0) {
+                ctx.translate(-this.w, 0); 
+                drawHatchet(angle + Math.PI/4); // Left hand dual wield offset
+            }
+            ctx.restore();
         }
         else if (this.heroName === 'Kadaxi') {
             if (this.attackState === 'active') {
@@ -1682,7 +1693,7 @@ class Game {
         this.lastTime = 0;
         this.state = 'MENU'; 
         
-        this.p1Choice = 'Euclid';
+        this.p1Choice = 'Lique';
         this.p2Choice = 'Kadaxi'; 
         
         this.setupMenu();
@@ -1811,6 +1822,7 @@ class Game {
         if (this.p1.heroName === 'Hunter') p1Stat = `Wep: ${this.p1.hunterWeapon.toUpperCase()} ${this.p1.hunterMusketCD>0 ? '(Rld)' : ''}`;
         if (this.p1.heroName === 'Duke') p1Stat = this.p1.isMounted ? (this.p1.runTimer >= 3000 ? "LANCE READY" : "Charging...") : "DISMOUNTED";
         if (this.p1.heroName === 'Kadaxi' && this.p1.comboCount > 0) p1Stat += ` [COMBO: ${this.p1.comboCount}/2]`;
+        if (this.p1.heroName === 'Lique' && this.p1.buffs.bloodFrenzy > 0) p1Stat += " [BLOOD FRENZY]";
         if (this.p1.heroName === 'Euclid') {
             let skelCount = this.minions.filter(m => m.type === 'skeleton' && m.owner === this.p1).length;
             p1Stat += `Wep: ${this.p1.euclidWeapon.toUpperCase()} [Skulls: ${skelCount}/8]`;
@@ -1841,6 +1853,7 @@ class Game {
         if (this.p2.heroName === 'Hunter') p2Stat = `Wep: ${this.p2.hunterWeapon.toUpperCase()} ${this.p2.hunterMusketCD>0 ? '(Rld)' : ''}`;
         if (this.p2.heroName === 'Duke') p2Stat = this.p2.isMounted ? (this.p2.runTimer >= 3000 ? "LANCE READY" : "Charging...") : "DISMOUNTED";
         if (this.p2.heroName === 'Kadaxi' && this.p2.comboCount > 0) p2Stat += ` [COMBO: ${this.p2.comboCount}/2]`;
+        if (this.p2.heroName === 'Lique' && this.p2.buffs.bloodFrenzy > 0) p2Stat += " [BLOOD FRENZY]";
         if (this.p2.heroName === 'Euclid') {
             let skelCount = this.minions.filter(m => m.type === 'skeleton' && m.owner === this.p2).length;
             p2Stat += `Wep: ${this.p2.euclidWeapon.toUpperCase()} [Skulls: ${skelCount}/8]`;
@@ -1926,6 +1939,7 @@ class Game {
             if (p2.heroName === 'Kadaxi') attackRange = 100;
             if (p2.heroName === 'Duke' && p2.isMounted) attackRange = 120;
             if (p2.heroName === 'Macu') attackRange = 160;
+            if (p2.heroName === 'Lique') attackRange = 65;
             if (p2.heroName === 'Euclid' && p2.euclidWeapon === 'magic') attackRange = 400; 
 
             if (p2.heroName === 'Kadaxi') {
@@ -1952,6 +1966,16 @@ class Game {
             if (tacticalState === 'aggressive') scores.moveForward += 30;
             if (nearEdge && tacticalState !== 'defensive') scores.moveForward += 20; 
             if (p2.heroName === 'Duke' && p2.isMounted && p2.runTimer < 3000) scores.moveForward += 40; 
+
+            // Lique AI Blood Frenzy override
+            if (p2.heroName === 'Lique') {
+                if (dist < 100 && hpRatioP2 < 0.7 && p2.superCooldown <= 0) scores.superSkill += 500;
+                if (p2.buffs.bloodFrenzy > 0) {
+                    scores.moveForward += 200; // Unstoppable aggression
+                    scores.moveBackward = -100;
+                    scores.attack += 100;
+                }
+            }
 
             if (dist < attackRange - 30 && !isMelee) scores.moveBackward += 60; 
             if (tacticalState === 'defensive') scores.moveBackward += 40;
