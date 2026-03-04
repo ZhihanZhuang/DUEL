@@ -3,20 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Otokojuku: Legends Duel</title>
+    <title>Otokojuku: Legends Duel - Twin Spire Arena</title>
     <style>
         :root {
-            --primary: #c92a2a;
-            --bg-dark: #1a1a1a;
+            --primary: #00e5ff;
+            --bg-dark: #0a0a0f;
             --ui-bg: rgba(10, 10, 15, 0.9);
             --text-main: #f1f3f5;
-            --accent: #ffeb3b;
+            --accent: #ff0055;
         }
         body {
             margin: 0;
             padding: 0;
-            background-color: #050505;
-            background-image: radial-gradient(circle at center, #1a1a2e 0%, #000 100%);
+            background-color: var(--bg-dark);
             color: var(--text-main);
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             overflow: hidden;
@@ -30,8 +29,8 @@
             position: relative;
             width: 100vw;
             height: 100vh;
-            box-shadow: 0 0 20px rgba(201, 42, 42, 0.3);
-            background: linear-gradient(to bottom, #1c2331 0%, #0b0f19 100%);
+            box-shadow: 0 0 30px rgba(0, 229, 255, 0.2) inset;
+            background: linear-gradient(to bottom, #0d1117 0%, #05070a 100%);
         }
         canvas {
             display: block;
@@ -50,155 +49,95 @@
             justify-content: center;
             align-items: center;
             z-index: 10;
-            backdrop-filter: blur(5px);
+            backdrop-filter: blur(8px);
         }
         .hidden { display: none !important; }
         
         h1 {
             color: var(--primary);
-            font-size: 3rem;
+            font-size: 3.5rem;
             text-transform: uppercase;
-            letter-spacing: 5px;
-            margin-bottom: 10px;
-            text-shadow: 2px 2px 0px #000;
+            letter-spacing: 6px;
+            margin-bottom: 5px;
+            text-shadow: 0 0 15px rgba(0, 229, 255, 0.6);
         }
-        h2 { margin-bottom: 20px; font-weight: 300; }
+        h2 { margin-bottom: 30px; font-weight: 300; color: #aaa; letter-spacing: 2px;}
         
-        /* Layout for Menu + Hero Info */
-        .menu-content {
-            display: flex;
-            gap: 40px;
-            align-items: flex-start;
-        }
-
-        .selection-container {
-            display: flex;
-            gap: 20px;
-        }
+        .menu-content { display: flex; gap: 40px; align-items: flex-start; }
+        .selection-container { display: flex; gap: 20px; }
+        
         .player-select {
-            background: rgba(255, 255, 255, 0.05);
+            background: rgba(255, 255, 255, 0.03);
             padding: 20px;
-            border-radius: 10px;
-            border: 2px solid #333;
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.1);
             width: 280px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
         }
         .player-select h3 { margin-top: 0; text-align: center; color: var(--accent); }
         
         .hero-btn {
-            display: block;
-            width: 100%;
-            padding: 10px;
-            margin: 5px 0;
-            background: #333;
-            color: white;
-            border: 1px solid #555;
-            cursor: pointer;
-            transition: all 0.2s;
-            text-align: left;
-            border-radius: 4px;
+            display: block; width: 100%; padding: 12px; margin: 6px 0;
+            background: #1a1a24; color: white; border: 1px solid #333;
+            cursor: pointer; transition: all 0.2s; text-align: left; border-radius: 6px;
+            font-weight: 600;
         }
-        .hero-btn:hover { background: #444; }
+        .hero-btn:hover { background: #2a2a35; transform: translateX(5px); }
         .hero-btn.selected {
-            background: linear-gradient(90deg, var(--primary) 0%, #8e0000 100%);
-            border-color: #ff5252;
-            font-weight: bold;
+            background: linear-gradient(90deg, #005566 0%, #002233 100%);
+            border-color: var(--primary);
+            box-shadow: 0 0 10px rgba(0, 229, 255, 0.3);
         }
         
-        /* Info Panel */
         .hero-info-panel {
-            background: linear-gradient(135deg, rgba(20,20,30,0.9), rgba(0,0,0,0.8));
-            padding: 20px;
-            border-radius: 10px;
-            border: 1px solid var(--primary);
-            width: 350px;
-            height: 400px;
-            box-shadow: 0 0 15px rgba(229,57,53,0.2);
-            color: #ddd;
-            overflow-y: auto;
+            background: linear-gradient(135deg, rgba(20,20,30,0.9), rgba(10,10,15,0.95));
+            padding: 25px; border-radius: 12px; border: 1px solid var(--primary);
+            width: 350px; height: 420px; box-shadow: 0 0 20px rgba(0, 229, 255, 0.15);
+            color: #eee; overflow-y: auto;
         }
-        .hero-info-panel h3 { color: var(--accent); border-bottom: 1px solid #444; padding-bottom: 5px; margin-top: 0;}
-        .info-stat { font-weight: bold; color: #fff; }
-        .info-desc { font-size: 0.9rem; line-height: 1.4; margin-bottom: 15px; color: #bbb;}
-        .skill-tag { background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 3px; font-size: 0.8rem; color: #0ff;}
+        .hero-info-panel h3 { color: var(--primary); border-bottom: 1px solid #333; padding-bottom: 8px; margin-top: 0; font-size: 1.5rem;}
+        .info-stat { font-weight: bold; color: #fff; margin-top: 10px;}
+        .info-desc { font-size: 0.95rem; line-height: 1.5; margin-bottom: 15px; color: #bbb;}
+        .skill-tag { background: rgba(0, 229, 255, 0.15); padding: 3px 8px; border-radius: 4px; font-size: 0.8rem; color: #0ff; border: 1px solid #0ff;}
 
-        .controls-info {
-            font-size: 0.85rem;
-            color: #aaa;
-            margin-top: 15px;
-            background: rgba(0,0,0,0.5);
-            padding: 10px;
-            border-radius: 5px;
-        }
-        .controls-info span { color: #fff; font-weight: bold; }
+        .controls-info { font-size: 0.85rem; color: #888; margin-top: 15px; background: rgba(0,0,0,0.5); padding: 12px; border-radius: 6px; }
+        .controls-info span { color: #ddd; font-weight: bold; }
 
-        .btn-row {
-            display: flex;
-            gap: 20px;
-            margin-top: 25px;
-        }
+        .btn-row { display: flex; gap: 20px; margin-top: 30px; }
         .btn-start, .btn-settings {
-            padding: 15px 30px;
-            font-size: 1.2rem;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            text-transform: uppercase;
-            font-weight: bold;
-            transition: transform 0.1s, filter 0.2s;
+            padding: 15px 35px; font-size: 1.1rem; color: white; border: none; border-radius: 6px;
+            cursor: pointer; text-transform: uppercase; font-weight: bold; transition: all 0.2s;
         }
-        .btn-start { background: var(--primary); }
-        .btn-settings { background: #555; }
-        .btn-start:hover, .btn-settings:hover { filter: brightness(1.2); transform: scale(1.05); }
-        .btn-start:active, .btn-settings:active { transform: scale(0.95); }
+        .btn-start { background: linear-gradient(45deg, var(--accent), #cc0044); box-shadow: 0 4px 15px rgba(255,0,85,0.4); }
+        .btn-settings { background: #333; }
+        .btn-start:hover { filter: brightness(1.2); transform: translateY(-2px); box-shadow: 0 6px 20px rgba(255,0,85,0.6); }
+        .btn-settings:hover { background: #444; }
 
-        /* Settings Modal */
-        #settings-screen {
-            background: rgba(0,0,0,0.95);
-        }
-        .settings-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 30px;
-            width: 800px;
-        }
-        .keybind-row {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 10px;
-            align-items: center;
-        }
-        .key-btn {
-            background: #222; border: 1px solid #555; color: #fff; padding: 5px 15px; border-radius: 3px; cursor: pointer; min-width: 100px; text-align: center;
-        }
-        .key-btn.listening { background: var(--primary); animation: pulse 1s infinite; }
+        #settings-screen { background: rgba(0,0,0,0.95); }
+        .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; width: 800px; }
+        .keybind-row { display: flex; justify-content: space-between; margin-bottom: 10px; align-items: center; }
+        .key-btn { background: #222; border: 1px solid #555; color: #fff; padding: 6px 15px; border-radius: 4px; cursor: pointer; min-width: 100px; text-align: center; }
+        .key-btn.listening { background: var(--primary); color: #000; font-weight: bold; animation: pulse 1s infinite; }
 
-        /* In-Game UI Overlay */
-        #game-ui {
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 5;
-        }
-        .hud-player {
-            position: absolute; top: 20px; width: 350px; background: rgba(0,0,0,0.6);
-            padding: 10px; border-radius: 5px; border: 1px solid #444;
-        }
-        #hud-p1 { left: 20px; border-left: 3px solid var(--primary); }
-        #hud-p2 { right: 20px; text-align: right; border-right: 3px solid #2196f3; }
+        #game-ui { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 5; }
+        .hud-player { position: absolute; top: 20px; width: 350px; background: rgba(10,10,15,0.8); padding: 12px; border-radius: 8px; border: 1px solid #333; backdrop-filter: blur(4px); box-shadow: 0 4px 15px rgba(0,0,0,0.5);}
+        #hud-p1 { left: 20px; border-left: 4px solid var(--primary); }
+        #hud-p2 { right: 20px; text-align: right; border-right: 4px solid var(--accent); }
         
-        .hud-name { font-weight: bold; font-size: 1.2rem; margin-bottom: 5px; text-transform: uppercase; }
-        .bar-container { width: 100%; height: 20px; background: #333; margin-bottom: 5px; border-radius: 3px; overflow: hidden; border: 1px solid #111; }
-        .health-bar { height: 100%; background: #4caf50; transition: width 0.1s; }
+        .hud-name { font-weight: 800; font-size: 1.3rem; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px;}
+        .bar-container { width: 100%; height: 22px; background: #1a1a24; margin-bottom: 6px; border-radius: 4px; overflow: hidden; border: 1px solid #000; box-shadow: inset 0 2px 5px rgba(0,0,0,0.5);}
+        .health-bar { height: 100%; background: linear-gradient(90deg, #2e7d32, #4caf50); transition: width 0.1s; }
         .horse-bar { height: 100%; background: #8B4513; transition: width 0.1s; }
         .super-bar { height: 100%; background: #2196f3; transition: width 0.1s; }
         .super-bar.ready { background: #ffeb3b; animation: pulse 0.8s infinite alternate; }
         
-        @keyframes pulse { from { opacity: 0.8; filter: brightness(1); } to { opacity: 1; filter: brightness(1.5); box-shadow: 0 0 10px #ffeb3b; } }
+        @keyframes pulse { from { opacity: 0.8; filter: brightness(1); } to { opacity: 1; filter: brightness(1.5); box-shadow: 0 0 10px currentColor; } }
         
-        .status-text { font-size: 0.85rem; color: #ffd54f; min-height: 16px; font-weight: bold; }
+        .status-text { font-size: 0.9rem; color: #ffd54f; min-height: 18px; font-weight: bold; margin-top: 5px;}
         .prompt-text { position: absolute; color: #fff; font-weight: bold; text-shadow: 2px 2px 0 #000, -1px -1px 0 #000; font-size: 14px; text-align: center; width: 200px; transform: translateX(-50%); z-index: 6;}
 
         #game-over { text-align: center; }
-        #winner-text { font-size: 4rem; color: #ffeb3b; margin-bottom: 20px; text-shadow: 0 0 20px rgba(255,235,59,0.5); font-style: italic; }
+        #winner-text { font-size: 4.5rem; color: var(--primary); margin-bottom: 20px; text-shadow: 0 0 30px rgba(0,229,255,0.6); font-style: italic; font-weight: 900;}
     </style>
 </head>
 <body>
@@ -206,40 +145,35 @@
 <div id="game-container">
     <canvas id="gameCanvas"></canvas>
     
-    <!-- Game UI Overlay -->
     <div id="game-ui" class="hidden">
         <div id="hud-p1" class="hud-player">
             <div class="hud-name" id="p1-name">P1 Name</div>
             <div class="bar-container"><div id="p1-hp" class="health-bar" style="width: 100%"></div></div>
             <div class="bar-container hidden" id="p1-horse-container"><div id="p1-horse-hp" class="horse-bar" style="width: 100%"></div></div>
-            <div class="bar-container" style="height:10px;"><div id="p1-super" class="super-bar" style="width: 0%"></div></div>
+            <div class="bar-container" style="height:12px;"><div id="p1-super" class="super-bar" style="width: 0%"></div></div>
             <div class="status-text" id="p1-status"></div>
         </div>
         <div id="hud-p2" class="hud-player">
             <div class="hud-name" id="p2-name">P2 Name</div>
             <div class="bar-container"><div id="p2-hp" class="health-bar" style="width: 100%; float: right;"></div></div>
             <div class="bar-container hidden" id="p2-horse-container"><div id="p2-horse-hp" class="horse-bar" style="width: 100%; float: right;"></div></div>
-            <div class="bar-container" style="height:10px;"><div id="p2-super" class="super-bar" style="width: 0%; float: right;"></div></div>
+            <div class="bar-container" style="height:12px;"><div id="p2-super" class="super-bar" style="width: 0%; float: right;"></div></div>
             <div class="status-text" id="p2-status"></div>
         </div>
         <div id="dynamic-prompts"></div>
     </div>
 
-    <!-- Main Menu Screen -->
     <div id="menu-screen" class="screen">
         <h1>Otokojuku: Legends Duel</h1>
-        <h2>Select Your Heroes</h2>
+        <h2>Twin Spire Arena</h2>
         
         <div class="menu-content">
             <div class="selection-container">
-                <!-- P1 Select -->
                 <div class="player-select">
                     <h3>Player 1</h3>
                     <div id="p1-roster"></div>
                     <div class="controls-info" id="p1-controls-display"></div>
                 </div>
-                
-                <!-- P2 Select -->
                 <div class="player-select">
                     <h3>Player 2</h3>
                     <div id="p2-roster"></div>
@@ -247,7 +181,6 @@
                 </div>
             </div>
 
-            <!-- Interactive Hero Info Panel -->
             <div class="hero-info-panel" id="hero-info-panel">
                 <h3 id="info-name">Hover a Hero</h3>
                 <div class="info-desc" id="info-desc">Select a hero to see their abilities.</div>
@@ -262,7 +195,6 @@
         </div>
     </div>
 
-    <!-- Settings Screen -->
     <div id="settings-screen" class="screen hidden">
         <h1 style="color: white;">Key Bindings</h1>
         <div class="settings-grid">
@@ -271,7 +203,7 @@
                 <div id="p1-bindings"></div>
             </div>
             <div class="player-select">
-                <h3 style="color: #2196f3;">Player 2</h3>
+                <h3 style="color: var(--accent);">Player 2</h3>
                 <div id="p2-bindings"></div>
             </div>
         </div>
@@ -281,7 +213,6 @@
         </div>
     </div>
 
-    <!-- Game Over Screen -->
     <div id="game-over-screen" class="screen hidden">
         <div id="winner-text">Player 1 Wins!</div>
         <button class="btn-start" id="btn-restart" style="font-size: 1.2rem; padding: 10px 30px; margin-top: 10px;">Main Menu</button>
@@ -290,11 +221,9 @@
 
 <script>
 /**
- * Otokojuku: Legends Duel
- * A 2D Canvas Platform Fighter
+ * Otokojuku: Legends Duel - Twin Spire Arena Edition
  */
 
-// --- Input & KeyBinding Manager ---
 const DEFAULT_BINDS = {
     p1: { left: 'KeyA', right: 'KeyD', jump: 'KeyW', down: 'KeyS', attack: 'Space', super: 'KeyE', switch: 'KeyT' },
     p2: { left: 'ArrowLeft', right: 'ArrowRight', jump: 'ArrowUp', down: 'ArrowDown', attack: 'Numpad9', super: 'NumpadEnter', switch: 'Numpad8' }
@@ -375,24 +304,30 @@ function buildSettingsUI() {
 let CANVAS_W = window.innerWidth;
 let CANVAS_H = window.innerHeight;
 const GRAVITY = 0.6;
-let BOTTOM_Y = CANVAS_H - 20;
 
+// Twin Spire Arena Maps Structure
+let BOTTOM_Y = CANVAS_H - 40;
+let MAIN_Y = BOTTOM_Y - 160;
 let PLATFORMS = [];
 
 function updatePlatforms() {
     let cx = CANVAS_W / 2;
-    BOTTOM_Y = CANVAS_H - 20;
+    BOTTOM_Y = CANVAS_H - 40;
+    MAIN_Y = BOTTOM_Y - 160;
+    let SIDE_HIGH_Y = MAIN_Y - 150;
+    let CENTER_HIGH_Y = MAIN_Y - 250;
+
     PLATFORMS = [
-        // Absolute Floor
-        { x: -100, y: BOTTOM_Y, w: CANVAS_W + 200, h: 40, type: 'floor' },
-        // Main Ground (Center)
-        { x: cx - 400, y: BOTTOM_Y - 150, w: 800, h: 20, type: 'main' },
-        // Left High
-        { x: cx - 450, y: BOTTOM_Y - 300, w: 150, h: 20, type: 'high' },
-        // Right High
-        { x: cx + 300, y: BOTTOM_Y - 300, w: 150, h: 20, type: 'high' },
-        // Center High
-        { x: cx - 100, y: BOTTOM_Y - 450, w: 200, h: 20, type: 'center_high' }
+        // Tactical Floor (Bottom)
+        { x: -200, y: BOTTOM_Y, w: CANVAS_W + 400, h: 40, type: 'floor' },
+        // Main Combat Zone
+        { x: cx - 450, y: MAIN_Y, w: 900, h: 20, type: 'main' },
+        // Left Sniper High
+        { x: cx - 550, y: SIDE_HIGH_Y, w: 150, h: 15, type: 'high' },
+        // Right Sniper High
+        { x: cx + 400, y: SIDE_HIGH_Y, w: 150, h: 15, type: 'high' },
+        // Center Spire High
+        { x: cx - 100, y: CENTER_HIGH_Y, w: 200, h: 15, type: 'center_high' }
     ];
 }
 
@@ -469,14 +404,6 @@ const HEROES = {
     }
 };
 
-const keys = {};
-const keysPressed = {};
-
-function checkAABB(r1, r2) {
-    return r1.x < r2.x + r2.w && r1.x + r1.w > r2.x && r1.y < r2.y + r2.h && r1.y + r1.h > r2.y;
-}
-
-// --- Game Engine Classes ---
 class Entity {
     constructor(x, y, w, h) { this.x = x; this.y = y; this.w = w; this.h = h; this.vx = 0; this.vy = 0; this.dead = false; }
     update(dt) {} draw(ctx) {}
@@ -551,12 +478,12 @@ class SwordArray extends Entity {
         this.tickTimer += dt;
         if (this.tickTimer >= 500) {
             this.tickTimer = 0;
-            // FIXED: Ensure array doesn't hit its owner
-            let targets = [game.p1, game.p2, ...game.minions].filter(t => t !== this.owner && t.owner !== this.owner && !t.dead && t.invincible <= 0);
+            // Prevent array from hurting its own caster
+            let targets = [game.p1, game.p2, ...game.minions, ...game.npcs].filter(t => t.id !== this.owner.id && t.owner !== this.owner && !t.dead && t.invincible <= 0);
             for (let t of targets) {
                 if (checkAABB(this, t)) {
                     t.takeDamage(10, this.owner, true); // 1 WRD
-                    t.buffs.slow = Math.max(t.buffs.slow || 0, 500); 
+                    if (t.type !== 'npc') t.buffs.slow = Math.max(t.buffs.slow || 0, 500); 
                 }
             }
         }
@@ -605,7 +532,7 @@ class Hazard extends Entity {
             this.dead = true; 
             return; 
         }
-        let targets = [game.p1, game.p2, ...game.minions].filter(t => t !== this.owner && t.owner !== this.owner && !t.dead && t.invincible <= 0);
+        let targets = [game.p1, game.p2, ...game.minions, ...game.npcs].filter(t => t.id !== this.owner.id && t.owner !== this.owner && !t.dead && t.invincible <= 0);
         for (let t of targets) {
             if (checkAABB(this, t) && !this.hitTargets.has(t)) {
                 t.takeDamage(this.damage, this.owner);
@@ -672,10 +599,12 @@ class FireDragon extends Entity {
 }
 
 class EnergyCoreGuard extends Entity {
-    constructor(x, y) {
-        super(x, y, 60, 60);
+    constructor() {
+        let cx = CANVAS_W / 2;
+        let my = CANVAS_H - 40 - 160; // MAIN_Y
+        super(cx - 30, my - 60, 60, 60);
         this.type = 'npc';
-        this.hp = 400; 
+        this.hp = 400; // 40 WRD
         this.maxHp = 400;
         this.shockTimer = 0;
         this.respawnTimer = 0;
@@ -686,9 +615,10 @@ class EnergyCoreGuard extends Entity {
         if (this.hp <= 0) {
             this.dead = true;
             this.respawnTimer = 15000;
+            if (attacker && attacker.owner) attacker = attacker.owner; // If hit by minion/proj
             if (attacker && attacker.heroName) {
-                attacker.hp = Math.min(attacker.maxHp, attacker.hp + 200); 
-                attacker.buffs.battleCry = 5000; 
+                attacker.hp = Math.min(attacker.maxHp, attacker.hp + 200); // Heal 20 WRD
+                attacker.buffs.battleCry = 5000; // 5s dmg boost
                 if (attacker.heroName === 'Volt') attacker.energy = Math.min(attacker.maxEnergy, attacker.energy + 50);
             }
             for(let i=0; i<30; i++) game.particles.push(new Particle(this.x+30, this.y+30, "#00ff00", (Math.random()-0.5)*15, (Math.random()-0.5)*15, 800, 5));
@@ -700,14 +630,15 @@ class EnergyCoreGuard extends Entity {
             if (this.respawnTimer <= 0) {
                 this.dead = false;
                 this.hp = this.maxHp;
+                for(let i=0; i<20; i++) game.particles.push(new Particle(this.x+30, this.y+30, "#ff5500", (Math.random()-0.5)*10, (Math.random()-0.5)*10, 500, 4));
             }
             return;
         }
         this.shockTimer += dt;
         if (this.shockTimer >= 3000) {
             this.shockTimer = 0;
-            game.createExplosion(this.x+30, this.y+30, 150, 10, this, true, 0); 
-            for(let i=0; i<20; i++) game.particles.push(new Particle(this.x+30, this.y+30, "rgba(255,0,0,0.5)", (Math.random()-0.5)*15, (Math.random()-0.5)*15, 300, 8));
+            game.createExplosion(this.x+30, this.y+30, 150, 10, this, true, 0); // 1 WRD shockwave
+            for(let i=0; i<20; i++) game.particles.push(new Particle(this.x+30, this.y+30, "rgba(255,100,0,0.5)", (Math.random()-0.5)*15, (Math.random()-0.5)*15, 300, 8));
         }
     }
     draw(ctx) {
@@ -716,16 +647,19 @@ class EnergyCoreGuard extends Entity {
             ctx.fillRect(this.x, this.y, this.w, this.h);
             return;
         }
+        // Body
         ctx.fillStyle = "#ff5500";
         ctx.fillRect(this.x, this.y, this.w, this.h);
         ctx.fillStyle = "#fff";
         ctx.fillRect(this.x + 10, this.y + 10, 40, 40);
         
-        ctx.fillStyle = "red"; ctx.fillRect(this.x, this.y - 10, this.w, 5);
-        ctx.fillStyle = "#00ff00"; ctx.fillRect(this.x, this.y - 10, this.w * (this.hp/this.maxHp), 5);
+        // HP Bar
+        ctx.fillStyle = "red"; ctx.fillRect(this.x, this.y - 15, this.w, 6);
+        ctx.fillStyle = "#00ff00"; ctx.fillRect(this.x, this.y - 15, this.w * (this.hp/this.maxHp), 6);
         
-        ctx.strokeStyle = "rgba(255, 0, 0, 0.5)";
-        ctx.lineWidth = 2;
+        // Shockwave Indicator
+        ctx.strokeStyle = "rgba(255, 100, 0, 0.5)";
+        ctx.lineWidth = 3;
         ctx.beginPath();
         ctx.arc(this.x+30, this.y+30, 150 * (this.shockTimer / 3000), 0, Math.PI*2);
         ctx.stroke();
@@ -733,8 +667,10 @@ class EnergyCoreGuard extends Entity {
 }
 
 class MerchantBot extends Entity {
-    constructor(x, y) {
-        super(x, y, 40, 40);
+    constructor() {
+        let cx = CANVAS_W / 2;
+        let fy = CANVAS_H - 40;
+        super(cx - 20, fy - 40, 40, 40);
         this.type = 'npc';
         this.cooldown = 0;
         this.capP1 = 0;
@@ -750,9 +686,12 @@ class MerchantBot extends Entity {
         let d1 = Math.hypot((game.p1.x+game.p1.w/2) - (this.x+20), (game.p1.y+game.p1.h/2) - (this.y+20));
         let d2 = Math.hypot((game.p2.x+game.p2.w/2) - (this.x+20), (game.p2.y+game.p2.h/2) - (this.y+20));
         
-        if (d1 < 100 && !game.p1.dead) this.capP1 += dt; else this.capP1 = 0;
-        if (d2 < 100 && !game.p2.dead) this.capP2 += dt; else this.capP2 = 0;
+        if (d1 < 100 && !game.p1.dead) this.capP1 += dt; else this.capP1 -= dt;
+        if (d2 < 100 && !game.p2.dead) this.capP2 += dt; else this.capP2 -= dt;
         
+        this.capP1 = Math.max(0, this.capP1);
+        this.capP2 = Math.max(0, this.capP2);
+
         let winner = null;
         if (this.capP1 >= 2000) winner = game.p1;
         if (this.capP2 >= 2000) winner = game.p2;
@@ -762,27 +701,32 @@ class MerchantBot extends Entity {
             let r = Math.random();
             if (r < 0.33) winner.buffs.msBoost = 5000;
             else if (r < 0.66) winner.buffs.asBoost = 5000;
-            else winner.shield += 50; 
-            for(let i=0; i<20; i++) game.particles.push(new Particle(winner.x+winner.w/2, winner.y+winner.h/2, "#00FFFF", (Math.random()-0.5)*10, (Math.random()-0.5)*10, 600, 4));
+            else winner.shield += 50; // 5 WRD shield
+            for(let i=0; i<30; i++) game.particles.push(new Particle(winner.x+winner.w/2, winner.y+winner.h/2, "#00e5ff", (Math.random()-0.5)*10, (Math.random()-0.5)*10, 600, 5));
         }
     }
     draw(ctx) {
-        ctx.fillStyle = this.cooldown > 0 ? "#555" : "#00FFFF";
+        ctx.fillStyle = this.cooldown > 0 ? "#555" : "#00e5ff";
         ctx.beginPath(); ctx.arc(this.x+20, this.y+20, 20, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = "#fff"; ctx.fillRect(this.x+10, this.y+10, 20, 10); // eye display
         
         if (this.cooldown <= 0) {
-            ctx.strokeStyle = "rgba(0, 255, 255, 0.3)";
+            ctx.strokeStyle = "rgba(0, 229, 255, 0.2)";
             ctx.lineWidth = 2;
             ctx.beginPath(); ctx.arc(this.x+20, this.y+20, 100, 0, Math.PI*2); ctx.stroke();
             
             if (this.capP1 > 0) {
-                ctx.strokeStyle = game.p1.color; ctx.lineWidth = 4;
+                ctx.strokeStyle = game.p1.color; ctx.lineWidth = 6;
                 ctx.beginPath(); ctx.arc(this.x+20, this.y+20, 100, -Math.PI/2, -Math.PI/2 + (this.capP1/2000)*Math.PI*2); ctx.stroke();
             }
             if (this.capP2 > 0) {
-                ctx.strokeStyle = game.p2.color; ctx.lineWidth = 4;
+                ctx.strokeStyle = game.p2.color; ctx.lineWidth = 6;
                 ctx.beginPath(); ctx.arc(this.x+20, this.y+20, 90, -Math.PI/2, -Math.PI/2 + (this.capP2/2000)*Math.PI*2); ctx.stroke();
             }
+        } else {
+            ctx.fillStyle = "#aaa";
+            ctx.font = "12px sans-serif";
+            ctx.fillText(Math.ceil(this.cooldown/1000) + "s", this.x + 10, this.y - 10);
         }
     }
 }
@@ -840,7 +784,7 @@ class Projectile extends Entity {
         }
 
         if (!this.dead && this.type !== "dynamite") {
-            let targets = [game.getEnemyOf(this.owner), ...game.minions.filter(m => m.owner !== this.owner)];
+            let targets = [game.getEnemyOf(this.owner), ...game.minions.filter(m => m.owner !== this.owner), ...game.npcs];
             for (let t of targets) {
                 if (!t.dead && t.invincible <= 0 && checkAABB(this, t) && !this.hitTargets.has(t)) {
                     let isBlocked = false;
@@ -854,32 +798,34 @@ class Projectile extends Entity {
                     } else {
                         let noKnockback = (this.type === "bullet" || this.type === "ki_blast" || this.type === "magic_burst" || this.type === "paper_plane" || this.type === "blue_paper_plane" || this.type === "fire_bolt" || this.type === "water_bolt" || this.type === "tidal_wave" || this.type === "volt_laser"); 
                         t.takeDamage(this.damage, this.owner, false, noKnockback);
-                        if (this.type === "large_knife" || this.type === "enhanced_knife") t.buffs.slow = 5000;
-                        if (this.type === "enhanced_knife") {
-                            let dir = this.vx > 0 ? 1 : -1;
-                            t.vx = dir * 30; // Knockback
-                            t.vy = -5;
-                        }
-                        if (this.type === "ki_blast") {
-                            t.buffs.dizzy = 750; 
-                            let dir = this.vx > 0 ? 1 : -1;
-                            t.vx = dir * 45; 
-                            t.vy = -8;
-                        }
-                        if (this.type === "fire_bolt") {
-                            t.buffs.burn = 3000;
-                            t.buffs.slow = 1000;
-                        }
-                        if (this.type === "water_bolt") {
-                            if (t.waterStunImmunity <= 0) {
-                                t.buffs.dizzy = 500;
-                                t.waterStunImmunity = 1000;
+                        if (t.type !== 'npc') {
+                            if (this.type === "large_knife" || this.type === "enhanced_knife") t.buffs.slow = 5000;
+                            if (this.type === "enhanced_knife") {
+                                let dir = this.vx > 0 ? 1 : -1;
+                                t.vx = dir * 30; // Knockback
+                                t.vy = -5;
                             }
-                        }
-                        if (this.type === "tidal_wave") {
-                            t.buffs.slow = 4500;
-                            t.buffs.dizzy = 1000;
-                            t.vx += (this.vx > 0 ? 1 : -1) * 15; 
+                            if (this.type === "ki_blast") {
+                                t.buffs.dizzy = 750; 
+                                let dir = this.vx > 0 ? 1 : -1;
+                                t.vx = dir * 45; 
+                                t.vy = -8;
+                            }
+                            if (this.type === "fire_bolt") {
+                                t.buffs.burn = 3000;
+                                t.buffs.slow = 1000;
+                            }
+                            if (this.type === "water_bolt") {
+                                if (t.waterStunImmunity <= 0) {
+                                    t.buffs.dizzy = 500;
+                                    t.waterStunImmunity = 1000;
+                                }
+                            }
+                            if (this.type === "tidal_wave") {
+                                t.buffs.slow = 4500;
+                                t.buffs.dizzy = 1000;
+                                t.vx += (this.vx > 0 ? 1 : -1) * 15; 
+                            }
                         }
 
                         if (this.type === "bullet" && this.owner.heroName === 'Duke') {
@@ -978,10 +924,349 @@ class Projectile extends Entity {
     }
 }
 
+class Minion extends Entity {
+    constructor(owner, x, y) {
+        super(x, y, 35, 65);
+        this.owner = owner; this.type = "minion"; this.hp = 30; this.maxHp = this.hp;
+        this.shootTimer = Math.random() * 1000; this.color = "#f4f4f4";
+        this.buffs = { dizzy: 0 }; this.invincible = 0;
+    }
+    takeDamage(amt, attacker) {
+        if (this.grappledBy) return; 
+        this.hp -= amt;
+        if (this.hp <= 0) {
+            this.dead = true;
+            if (attacker && attacker.heroName === 'Euclid') {
+                game.minions.push(new Skeleton(attacker, this.x, this.y));
+                for(let i=0; i<15; i++) game.particles.push(new Particle(this.x+this.w/2, this.y+this.h/2, "#8A2BE2", (Math.random()-0.5)*10, -Math.random()*10, 500, 6));
+            } else {
+                for(let i=0; i<10; i++) game.particles.push(new Particle(this.x+this.w/2, this.y+this.h/2, "#ff0000", (Math.random()-0.5)*10, Math.random()*-10, 500));
+            }
+        }
+    }
+    update(dt) {
+        if (this.buffs.dizzy > 0) { this.buffs.dizzy -= dt; return; }
+
+        this.vy += GRAVITY; this.y += this.vy;
+        if (this.y + this.h >= BOTTOM_Y) { this.y = BOTTOM_Y - this.h; this.vy = 0; }
+        if (this.vy > 0) {
+            for (let plat of PLATFORMS) {
+                if (this.y + this.h - this.vy <= plat.y && this.y + this.h >= plat.y && this.x + this.w > plat.x && this.x < plat.x + plat.w) {
+                    this.y = plat.y - this.h; this.vy = 0;
+                }
+            }
+        }
+
+        let enemy = game.getEnemyOf(this.owner);
+        if (enemy && !enemy.dead) {
+            this.shootTimer += dt;
+            if (this.shootTimer >= 1500) {
+                this.shootTimer = 0;
+                let cx = this.x + this.w/2; let cy = this.y + 25;
+                let ex = enemy.x + enemy.w/2; let ey = enemy.y + enemy.h/2;
+                let angle = Math.atan2(ey - cy, ex - cx);
+                game.projectiles.push(new Projectile(cx, cy, 6, 6, Math.cos(angle)*12, Math.sin(angle)*12, 13, this.owner, "#FFFF00")); 
+                game.particles.push(new Particle(cx + Math.cos(angle)*15, cy + Math.sin(angle)*15, "#FFA500", 0, 0, 100));
+            }
+        }
+    }
+    draw(ctx) {
+        if (this.buffs.dizzy > 0) {
+            ctx.save(); ctx.translate(this.x + this.w/2, this.y - 15);
+            let timeAngle = Date.now() * 0.005;
+            for(let s=0; s<3; s++) {
+                let offset = timeAngle + (s * (Math.PI*2/3));
+                ctx.fillStyle = "#FFD700"; ctx.fillRect(Math.cos(offset)*15, Math.sin(offset)*4, 3, 3);
+            }
+            ctx.restore();
+        }
+        ctx.fillStyle = this.color; ctx.fillRect(this.x, this.y, this.w, this.h);
+        ctx.fillStyle = "#333"; ctx.fillRect(this.x, this.y + 35, this.w, 6);
+        let enemy = game.getEnemyOf(this.owner);
+        let dir = (enemy && enemy.x < this.x) ? -1 : 1;
+        ctx.fillStyle = "#111"; ctx.fillRect(this.x + (dir > 0 ? 22 : 8), this.y + 15, 5, 4);
+        ctx.fillStyle = "#dcb274"; ctx.beginPath(); ctx.moveTo(this.x + this.w / 2, this.y - 12); ctx.lineTo(this.x - 12, this.y + 8); ctx.lineTo(this.x + this.w + 12, this.y + 8); ctx.fill();
+        ctx.strokeStyle = "#b58b4c"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(this.x - 12, this.y + 8); ctx.lineTo(this.x + this.w + 12, this.y + 8); ctx.stroke();
+        ctx.fillStyle = "#4a2e15"; ctx.fillRect(this.x + (dir>0?10:-20), this.y + 25, 45, 5);
+        ctx.fillStyle = "#222"; ctx.fillRect(this.x + (dir>0?25:-20), this.y + 23, 30, 3);
+        ctx.fillStyle = "red"; ctx.fillRect(this.x, this.y - 20, this.w, 4);
+        ctx.fillStyle = "green"; ctx.fillRect(this.x, this.y - 20, this.w * (this.hp/this.maxHp), 4);
+    }
+}
+
+class Skeleton extends Entity {
+    constructor(owner, x, y) {
+        super(x, y, 35, 60);
+        this.owner = owner;
+        this.type = "skeleton";
+        this.hp = 20; 
+        this.maxHp = 100; 
+        this.color = "#e0e0e0";
+        this.speed = 7; 
+        this.jumpPower = 20; 
+        this.attackCooldown = 0;
+        this.buffs = { dizzy: 0 };
+        this.invincible = 0;
+    }
+    takeDamage(amt, attacker) {
+        if (this.grappledBy) return;
+        this.hp -= amt;
+        if (this.hp <= 0) {
+            this.dead = true;
+            game.createExplosion(this.x + this.w/2, this.y + this.h/2, 60, 23, this.owner, false); 
+            for(let i=0; i<15; i++) game.particles.push(new Particle(this.x+this.w/2, this.y+this.h/2, "#aaa", (Math.random()-0.5)*10, Math.random()*-15, 500, 6));
+        }
+    }
+    update(dt) {
+        if (this.buffs.dizzy > 0) { this.buffs.dizzy -= dt; return; }
+
+        this.vy += GRAVITY;
+        this.y += this.vy;
+        if (this.y + this.h >= BOTTOM_Y) { this.y = BOTTOM_Y - this.h; this.vy = 0; }
+        
+        if (this.vy >= 0) {
+            for (let plat of PLATFORMS) {
+                if (this.y + this.h - this.vy <= plat.y && this.y + this.h >= plat.y && this.x + this.w > plat.x && this.x < plat.x + plat.w) {
+                    this.y = plat.y - this.h; this.vy = 0;
+                }
+            }
+        }
+
+        let enemy = game.getEnemyOf(this.owner);
+        if (enemy && !enemy.dead) {
+            let dx = enemy.x + enemy.w/2 - (this.x + this.w/2);
+            let dy = enemy.y + enemy.h/2 - (this.y + this.h/2);
+            let dist = Math.abs(dx);
+
+            if (dist > 30) {
+                this.vx = (dx > 0 ? 1 : -1) * this.speed;
+                this.x += this.vx;
+            }
+
+            if (dy < -40 && this.vy === 0 && dist < 150) {
+                this.vy = -this.jumpPower;
+            }
+
+            if (this.attackCooldown > 0) this.attackCooldown -= dt;
+            if (dist < 50 && Math.abs(dy) < 60 && this.attackCooldown <= 0) {
+                enemy.takeDamage(30, this.owner); 
+                this.attackCooldown = 1000;
+                game.particles.push(new Particle(this.x + this.w/2, this.y, "#8A2BE2", dx>0?5:-5, 0, 200, 8));
+            }
+        }
+        
+        if (this.x < 0) this.x = 0;
+        if (this.x > CANVAS_W - this.w) this.x = CANVAS_W - this.w;
+    }
+    draw(ctx) {
+        if (this.buffs.dizzy > 0) {
+            ctx.save(); ctx.translate(this.x + this.w/2, this.y - 15);
+            let timeAngle = Date.now() * 0.005;
+            for(let s=0; s<3; s++) {
+                let offset = timeAngle + (s * (Math.PI*2/3));
+                ctx.fillStyle = "#FFD700"; ctx.fillRect(Math.cos(offset)*10, Math.sin(offset)*3, 3, 3);
+            }
+            ctx.restore();
+        }
+        
+        ctx.fillStyle = this.color;
+        ctx.fillRect(this.x + 5, this.y + 18, this.w - 10, this.h - 18); 
+        ctx.fillStyle = "#111"; 
+        ctx.fillRect(this.x + 5, this.y + 25, this.w - 10, 4);
+        ctx.fillRect(this.x + 5, this.y + 35, this.w - 10, 4);
+        ctx.fillRect(this.x + 5, this.y + 45, this.w - 10, 4);
+        
+        ctx.fillStyle = "#fff";
+        ctx.fillRect(this.x + 2, this.y, this.w - 4, 18); 
+        ctx.fillStyle = "#8A2BE2"; 
+        let enemy = game.getEnemyOf(this.owner);
+        let dir = (enemy && enemy.x > this.x) ? 1 : -1;
+        ctx.fillRect(this.x + (dir>0?20:10), this.y + 4, 6, 6);
+        
+        ctx.fillStyle = "red"; ctx.fillRect(this.x, this.y - 12, this.w, 4);
+        ctx.fillStyle = "#8A2BE2"; ctx.fillRect(this.x, this.y - 12, this.w * (this.hp/this.maxHp), 4);
+    }
+}
+
+class Puppet extends Entity {
+    constructor(owner, x, y) {
+        super(x, y, 35, 65);
+        this.owner = owner;
+        this.type = "puppet";
+        this.hp = 250; 
+        this.maxHp = 250;
+        this.color = "#aaaaaa";
+        this.speed = 4.5; 
+        this.jumpPower = 15;
+        this.attackCooldown = 0;
+        this.buffs = { dizzy: 0 };
+        this.invincible = 0;
+        this.targetVx = 0;
+        this.facing = owner.facing;
+        this.attackState = 'idle';
+        this.stateTimer = 0;
+        this.hasHit = false;
+        this.isGrounded = false;
+    }
+    takeDamage(amt, attacker) {
+        if (this.grappledBy) return;
+        this.hp -= amt;
+        if (this.hp <= 0) {
+            this.dead = true;
+            for(let i=0; i<15; i++) game.particles.push(new Particle(this.x+this.w/2, this.y+this.h/2, "#fff", (Math.random()-0.5)*10, Math.random()*-15, 500, 4));
+            if (this.owner && !this.owner.dead) {
+                this.owner.buffs.dizzy = 3000;
+                this.owner.attackState = 'idle';
+            }
+        }
+    }
+    doJump() {
+        if (this.isGrounded && this.attackState === 'idle') {
+            this.vy = -this.jumpPower;
+            this.isGrounded = false;
+        }
+    }
+    doAttack() {
+        if (this.attackState === 'idle') {
+            this.attackState = 'windup';
+            this.stateTimer = 100;
+            this.hasHit = false;
+        }
+    }
+    update(dt) {
+        if (this.buffs.dizzy > 0) { this.buffs.dizzy -= dt; return; }
+
+        this.vy += GRAVITY;
+        
+        if (this.attackState !== 'idle') this.targetVx = 0;
+        this.vx += (this.targetVx - this.vx) * 0.25;
+        
+        this.x += this.vx;
+        this.y += this.vy;
+        
+        if (this.y + this.h >= BOTTOM_Y) { this.y = BOTTOM_Y - this.h; this.vy = 0; this.isGrounded = true; }
+        else this.isGrounded = false;
+        
+        if (this.vy > 0) {
+            for (let plat of PLATFORMS) {
+                if (this.y + this.h - this.vy <= plat.y && this.y + this.h >= plat.y && this.x + this.w > plat.x && this.x < plat.x + plat.w) {
+                    this.y = plat.y - this.h; this.vy = 0; this.isGrounded = true;
+                }
+            }
+        }
+        
+        if (this.x < 0) this.x = 0;
+        if (this.x > CANVAS_W - this.w) this.x = CANVAS_W - this.w;
+
+        if (this.attackState === 'windup') {
+            this.stateTimer -= dt;
+            if (this.stateTimer <= 0) {
+                this.attackState = 'active';
+                this.stateTimer = 100;
+                
+                let px = this.facing === 1 ? this.x + this.w : this.x - 40;
+                let hitBox = { x: px, y: this.y + 10, w: 40, h: 40 };
+                let enemy = game.getEnemyOf(this.owner);
+                let targetsHit = [];
+                if (!enemy.dead && checkAABB(hitBox, enemy)) targetsHit.push(enemy);
+                for (let m of game.minions) {
+                    if (m.owner !== this.owner && !m.dead && checkAABB(hitBox, m)) targetsHit.push(m);
+                }
+                for (let n of game.npcs) {
+                    if (!n.dead && checkAABB(hitBox, n)) targetsHit.push(n);
+                }
+
+                if (targetsHit.length > 0) {
+                    this.hasHit = true;
+                    targetsHit.forEach(t => t.takeDamage(20, this.owner)); 
+                }
+            }
+        } else if (this.attackState === 'active') {
+            this.stateTimer -= dt;
+            if (this.stateTimer <= 0) {
+                this.attackState = 'recovery';
+                this.stateTimer = 150;
+            }
+        } else if (this.attackState === 'recovery') {
+            this.stateTimer -= dt;
+            if (this.stateTimer <= 0) this.attackState = 'idle';
+        }
+    }
+    draw(ctx) {
+        if (this.buffs.dizzy > 0) {
+            ctx.save(); ctx.translate(this.x + this.w/2, this.y - 15);
+            let timeAngle = Date.now() * 0.005;
+            for(let s=0; s<3; s++) {
+                let offset = timeAngle + (s * (Math.PI*2/3));
+                ctx.fillStyle = "#FFD700"; ctx.fillRect(Math.cos(offset)*10, Math.sin(offset)*3, 3, 3);
+            }
+            ctx.restore();
+        }
+        
+        ctx.save();
+        ctx.translate(this.x + this.w/2, this.y + this.h/2);
+        if (this.facing === -1) ctx.scale(-1, 1);
+        
+        ctx.fillStyle = this.color;
+        ctx.fillRect(-this.w/2, -this.h/2, this.w, this.h);
+        
+        ctx.strokeStyle = "#333"; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(-this.w/2, -this.h/2 + 20); ctx.lineTo(this.w/2, -this.h/2 + 20); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(-this.w/2, -this.h/2 + 40); ctx.lineTo(this.w/2, -this.h/2 + 40); ctx.stroke();
+        
+        ctx.fillStyle = "#fff";
+        ctx.beginPath(); ctx.arc(10, -this.h/2 + 10, 4, 0, Math.PI*2); ctx.fill();
+
+        if (this.attackState !== 'idle') {
+            ctx.fillStyle = "rgba(255, 255, 255, 0.5)";
+            let ext = this.attackState === 'active' ? 30 : (this.attackState === 'windup' ? 0 : 10);
+            ctx.fillRect(this.w/2, -10, ext, 10); 
+        }
+        
+        ctx.restore();
+
+        ctx.fillStyle = "red"; ctx.fillRect(this.x, this.y - 12, this.w, 4);
+        ctx.fillStyle = "#fff"; ctx.fillRect(this.x, this.y - 12, this.w * (this.hp/this.maxHp), 4);
+    }
+}
+
+class Hurricane extends Entity {
+    constructor(owner, x, y) {
+        super(x, y, 100, 300);
+        this.owner = owner; this.timer = 15000; this.tickTimer = 0; this.stunTickTimer = 0;
+    }
+    update(dt) {
+        this.timer -= dt; if (this.timer <= 0) this.dead = true;
+        this.tickTimer += dt;
+        if (this.tickTimer >= 200) {
+            this.tickTimer = 0;
+            let enemy = game.getEnemyOf(this.owner);
+            if (checkAABB(this, enemy)) enemy.takeDamage(0.6, this.owner, true);
+            for (let m of game.minions) {
+                if (m.owner !== this.owner && !m.dead && checkAABB(this, m)) m.takeDamage(0.6, this.owner, true);
+            }
+        }
+        this.stunTickTimer += dt;
+        if (this.stunTickTimer >= 1000) {
+            this.stunTickTimer = 0;
+            let targets = [game.getEnemyOf(this.owner), ...game.minions.filter(m => m.owner !== this.owner)];
+            for (let t of targets) {
+                if (!t.dead && checkAABB(this, t)) { t.buffs = t.buffs || {}; t.buffs.dizzy = 500; }
+            }
+        }
+        if(Math.random() < 0.3) game.particles.push(new Particle(this.x + Math.random()*this.w, this.y + Math.random()*this.h, "#aaddff", (Math.random()-0.5)*4, -Math.random()*5, 400));
+    }
+    draw(ctx) {
+        ctx.globalAlpha = 0.5; ctx.fillStyle = "#88ccff";
+        ctx.beginPath(); ctx.moveTo(this.x, this.y); ctx.lineTo(this.x + this.w, this.y); ctx.lineTo(this.x + this.w/2 + 20, this.y + this.h); ctx.lineTo(this.x + this.w/2 - 20, this.y + this.h); ctx.fill();
+        ctx.globalAlpha = 1.0;
+    }
+}
+
 class Fighter extends Entity {
     constructor(id, heroName, x, controls, isP1) {
         let stats = HEROES[heroName];
-        super(x, BOTTOM_Y - 150 - stats.height, stats.width, stats.height);
+        super(x, MAIN_Y - stats.height, stats.width, stats.height);
         this.id = id; this.heroName = heroName; this.controls = controls; this.isP1 = isP1; this.facing = isP1 ? 1 : -1;
         
         this.baseMaxHp = stats.maxHp; this.maxHp = stats.maxHp; this.hp = this.maxHp;
@@ -993,7 +1278,8 @@ class Fighter extends Entity {
         this.attackState = 'idle'; this.stateTimer = 0; this.maxStateTimer = 0; this.hasHit = false;
         
         this.buffs = { poison: 0, battleCry: 0, shade: 0, dizzy: 0, slow: 0, hurricaneSlow: false, bloodFrenzy: 0, burn: 0, msBoost: 0, asBoost: 0 };
-        this.invincible = 0; this.lastJumpTime = 0;
+        this.invincible = 2000; // Spawn invincibility
+        this.lastJumpTime = 0;
         this.flipActive = 0; this.hasHitFlip = false; this.hasFlipped = false; 
         this.grapplePhase = 0; this.grappleTimer = 0; 
         this.grappledBy = null; 
@@ -1035,6 +1321,7 @@ class Fighter extends Entity {
         if (this.heroName === 'Duke') {
             this.isMounted = true; this.maxHorseHp = 500; this.horseHp = 500; this.runTimer = 0;
             this.w = 70; this.h = 80;
+            this.y = MAIN_Y - this.h;
         }
 
         if (this.heroName === 'Kadaxi') {
@@ -1266,7 +1553,7 @@ class Fighter extends Entity {
         let currentSpeed = this.baseSpeed;
         let currentJump = this.baseJump;
         
-        if (this.buffs.msBoost > 0) currentSpeed *= 1.2;
+        if (this.buffs.msBoost > 0) currentSpeed *= 1.15;
 
         if (this.buffs.dizzy > 0) {
             this.buffs.dizzy -= dt;
@@ -1475,9 +1762,8 @@ class Fighter extends Entity {
             activePuppet.targetVx = 0;
         }
 
-        let friction = 0.25;
-        if (this.currentPlatform && this.currentPlatform.type === 'main') friction = 0.03; 
-        if (!canAct || ((this.heroName === 'Euclid' || this.heroName === 'Kae' || this.heroName === 'Ugo' || this.heroName === 'Volt' || this.heroName === 'Gensan') && this.attackState === 'windup') || hasPuppet) friction = 0.1; 
+        let friction = this.isGrounded ? 0.3 : 0.1;
+        if (!canAct || ((this.heroName === 'Euclid' || this.heroName === 'Kae' || this.heroName === 'Ugo' || this.heroName === 'Volt' || this.heroName === 'Gensan') && this.attackState === 'windup') || hasPuppet) friction = 0.05; 
         
         this.vx += (targetVx - this.vx) * friction;
 
@@ -1529,13 +1815,19 @@ class Fighter extends Entity {
                             targetsHit.push(m);
                         }
                     }
+                    for (let n of game.npcs) {
+                        if (!n.dead && checkAABB(hitBox, n)) {
+                            n.takeDamage(this.getMeleeDamage(), this);
+                            targetsHit.push(n);
+                        }
+                    }
 
                     if (targetsHit.length > 0) {
                         this.hasHit = true;
 
                         targetsHit.forEach(t => {
-                            if (this.heroName === 'Macu' && this.buffs.battleCry > 0) t.buffs.poison = 3000;
-                            if (this.heroName === 'Duke' && this.isMounted) t.buffs.dizzy = 3000; 
+                            if (this.heroName === 'Macu' && this.buffs.battleCry > 0 && t.buffs) t.buffs.poison = 3000;
+                            if (this.heroName === 'Duke' && this.isMounted && t.buffs) t.buffs.dizzy = 3000; 
 
                             if (this.heroName === 'Lique' && this.buffs.bloodFrenzy > 0 && t.heroName) {
                                 this.hp = Math.min(this.maxHp, this.hp + 5); 
@@ -1550,7 +1842,7 @@ class Fighter extends Entity {
                                 targetsHit.forEach(t => {
                                     let extraDmg = this.kaeAwakened ? 14 : 10;
                                     t.takeDamage(extraDmg, this);
-                                    t.buffs.dizzy = 1000; 
+                                    if (t.buffs) t.buffs.dizzy = 1000; 
                                     for(let i=0; i<10; i++) game.particles.push(new Particle(t.x + t.w/2, t.y + t.h/2, "#00FFFF", (Math.random()-0.5)*10, (Math.random()-0.5)*10, 300, 5));
                                 });
                             } else {
@@ -1565,8 +1857,8 @@ class Fighter extends Entity {
                             if (this.gensanCombo >= 4) {
                                 this.gensanCombo = 0;
                                 targetsHit.forEach(t => {
-                                    t.takeDamage(13, this); // extra 1.3 WRD
-                                    t.buffs.slow = 1200;
+                                    t.takeDamage(13, this); 
+                                    if (t.buffs) t.buffs.slow = 1200;
                                 });
                             }
                         }
@@ -1642,7 +1934,7 @@ class Fighter extends Entity {
                         this.y = targetShadow.y;
                         targetShadow.dead = true;
                         this.gensanSwitchCD = 6000;
-                        this.invincible = 200;
+                        this.invincible = 500;
                         this.buffs.msBoost = 500;
                         for(let i=0; i<20; i++) game.particles.push(new Particle(this.x+this.w/2, this.y+this.h/2, "#fff", (Math.random()-0.5)*10, (Math.random()-0.5)*10, 400));
                     }
@@ -2064,8 +2356,19 @@ class Fighter extends Entity {
     }
 
     draw(ctx) {
-        if (this.buffs.shade > 0) ctx.globalAlpha = 0.15;
-        if (this.invincible > 0) ctx.globalAlpha = 0.5; 
+        if (this.invincible > 0) {
+            ctx.save();
+            ctx.translate(this.x + this.w/2, this.y + this.h/2);
+            ctx.strokeStyle = "rgba(0, 229, 255, 0.8)";
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.arc(0, 0, Math.max(this.w, this.h) * 0.8, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.restore();
+            ctx.globalAlpha = 0.6;
+        } else if (this.buffs.shade > 0) {
+            ctx.globalAlpha = 0.15;
+        }
 
         if (this.buffs.dizzy > 0) {
             ctx.save(); ctx.translate(this.x + this.w/2, this.y - 15);
@@ -2408,6 +2711,24 @@ class Fighter extends Entity {
             }
             ctx.restore();
         }
+        else if (this.heroName === 'Kadaxi') {
+            if (this.attackState === 'active') {
+                ctx.fillStyle = "rgba(0, 191, 255, 0.5)";
+                ctx.fillRect(0, 10, 60, 20); 
+            }
+            if (this.grapplePhase === 1 && this.grappleTarget) {
+                ctx.save();
+                let relX = (this.grappleTarget.x + this.grappleTarget.w/2 - (this.x + this.w/2)) * this.facing;
+                let relY = this.grappleTarget.y + this.grappleTarget.h/2 - (this.y + this.h/2);
+                ctx.beginPath();
+                ctx.moveTo(hw, 25);
+                ctx.lineTo(relX, relY);
+                ctx.lineWidth = 3;
+                ctx.strokeStyle = "#1E90FF";
+                ctx.stroke();
+                ctx.restore();
+            }
+        }
 
         ctx.restore();
         
@@ -2426,12 +2747,12 @@ class Fighter extends Entity {
             ctx.fillRect(this.x, this.y - 18, this.w * Math.min(1, this.shield/50), 4);
         }
 
+        ctx.globalAlpha = 1.0;
         ctx.fillStyle = "red"; ctx.fillRect(this.x, this.y - 12, this.w, 5);
         ctx.fillStyle = "#4caf50"; ctx.fillRect(this.x, this.y - 12, this.w * (this.hp / this.maxHp), 5);
     }
 }
 
-// --- Main Game Engine ---
 class Game {
     constructor() {
         this.canvas = document.getElementById('gameCanvas');
@@ -2527,12 +2848,9 @@ class Game {
         this.isSinglePlayer = isSinglePlayer;
 
         let cx = CANVAS_W / 2;
-        this.p1 = new Fighter('p1', this.p1Choice, cx - 300, currentBinds.p1, true);
-        this.p2 = new Fighter('p2', this.p2Choice, cx + 300 - 40, currentBinds.p2, false);
+        this.p1 = new Fighter('p1', this.p1Choice, cx - 250, currentBinds.p1, true);
+        this.p2 = new Fighter('p2', this.p2Choice, cx + 250 - 40, currentBinds.p2, false);
         this.p2.facing = -1;
-
-        this.p1.invincible = 2000;
-        this.p2.invincible = 2000;
 
         this.projectiles = []; 
         this.particles = []; 
@@ -2891,7 +3209,6 @@ class Game {
                 }
             }
 
-            // Volt AI Logic
             if (p2.heroName === 'Volt') {
                 if (p2.energy < 50 && p2.superCooldown <= 0) scores.superSkill += 500;
                 if (p2.isOverloaded) {
@@ -2903,7 +3220,7 @@ class Game {
                         scores.attack += 100;
                         scores.moveBackward += 50; 
                     } else {
-                        scores.moveBackward += 150; // Try to land safely
+                        scores.moveBackward += 150; 
                     }
                 }
             }
@@ -2939,7 +3256,6 @@ class Game {
                 scores.superSkill += 500; 
             }
 
-            // Jump logic updated for vertical map
             if (dy < -40 && p2.heroName !== 'Volt') {
                 if (sourceEntity.isGrounded) {
                     scores.jump += 100;
@@ -3035,17 +3351,30 @@ class Game {
 
         for (let plat of PLATFORMS) {
             if (plat.type === 'main') {
-                this.ctx.fillStyle = "#2c3e50"; this.ctx.fillRect(plat.x, plat.y, plat.w, plat.h);
-                this.ctx.fillStyle = "#1a252f"; this.ctx.fillRect(plat.x, plat.y + plat.h, plat.w, 10);
-                this.ctx.fillStyle = "#0f171e";
+                this.ctx.fillStyle = "#1e293b"; this.ctx.fillRect(plat.x, plat.y, plat.w, plat.h);
+                this.ctx.fillStyle = "#0f172a"; this.ctx.fillRect(plat.x, plat.y + plat.h, plat.w, 10);
+                // Glowing border
+                this.ctx.strokeStyle = "#00e5ff"; this.ctx.lineWidth = 2; this.ctx.strokeRect(plat.x, plat.y, plat.w, plat.h);
+                // Pillars
+                this.ctx.fillStyle = "#05070a";
                 this.ctx.fillRect(plat.x + 50, plat.y + plat.h + 10, 30, CANVAS_H);
                 this.ctx.fillRect(plat.x + plat.w - 80, plat.y + plat.h + 10, 30, CANVAS_H);
+                // Pillar neon lines
+                this.ctx.fillStyle = "#00e5ff";
+                this.ctx.fillRect(plat.x + 64, plat.y + plat.h + 10, 2, CANVAS_H);
+                this.ctx.fillRect(plat.x + plat.w - 66, plat.y + plat.h + 10, 2, CANVAS_H);
+
             } else if (plat.type === 'high' || plat.type === 'center_high') {
-                this.ctx.fillStyle = "#607d8b"; this.ctx.fillRect(plat.x, plat.y, plat.w, plat.h);
-                this.ctx.fillStyle = "#455a64"; this.ctx.fillRect(plat.x, plat.y + plat.h, plat.w, 5);
-            } else if (plat.type === 'side' || plat.type === 'floor') {
-                this.ctx.fillStyle = "#3e2723"; this.ctx.fillRect(plat.x, plat.y, plat.w, plat.h);
-                this.ctx.fillStyle = "#261a16"; this.ctx.fillRect(plat.x, plat.y + plat.h, plat.w, 10);
+                this.ctx.fillStyle = "#334155"; this.ctx.fillRect(plat.x, plat.y, plat.w, plat.h);
+                this.ctx.fillStyle = "#1e293b"; this.ctx.fillRect(plat.x, plat.y + plat.h, plat.w, 5);
+                this.ctx.strokeStyle = "#ff0055"; this.ctx.lineWidth = 2; this.ctx.strokeRect(plat.x, plat.y, plat.w, plat.h);
+                // Mini pillars
+                this.ctx.fillStyle = "#0a0f14";
+                this.ctx.fillRect(plat.x + plat.w/2 - 10, plat.y + plat.h + 5, 20, CANVAS_H);
+            } else if (plat.type === 'floor') {
+                this.ctx.fillStyle = "#111"; this.ctx.fillRect(plat.x, plat.y, plat.w, plat.h);
+                this.ctx.strokeStyle = "#333"; this.ctx.lineWidth = 4;
+                this.ctx.beginPath(); this.ctx.moveTo(plat.x, plat.y); this.ctx.lineTo(plat.x + plat.w, plat.y); this.ctx.stroke();
             }
         }
 
