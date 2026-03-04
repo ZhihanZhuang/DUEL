@@ -441,8 +441,13 @@ const HEROES = {
     },
     Kila: {
         name: "Kila", desc: "Elemental Stance Mage",
-        color: "#555555", maxHp: 690, speed: 4.8, jump: 14, width: 40, height: 70, superCD: 18000,
-        ui: { hp: "69 WRD", atk: "3~5 WRD (Multi)", passive: "Press [Switch] to rotate Elements (Fire->Water->Earth). 2s Invincibility while switching, but heavily slowed and cannot attack. 8s CD.", super: "Fire: Homing explosive Dragon. Water: Massive CC Wave. Earth: Spawns spikes on all platforms." }
+        color: "#555555", maxHp: 750, speed: 4.8, jump: 14, width: 40, height: 70, superCD: 18000,
+        ui: { hp: "75 WRD", atk: "3~5 WRD (Multi)", passive: "Press [Switch] to rotate Elements (Fire->Water->Earth). 2s Invincibility while switching, but heavily slowed and cannot attack. 8s CD.", super: "Fire: Homing explosive Dragon. Water: Massive CC Wave. Earth: Spawns spikes on all platforms." }
+    },
+    Volt: {
+        name: "Volt", desc: "Flying Energy Marksman",
+        color: "#FFD700", maxHp: 650, speed: 4.0, jump: 15, width: 35, height: 65, superCD: 18000,
+        ui: { hp: "65 WRD", atk: "1.8 WRD (Homing Lasers)", passive: "Hold [Jump]/[Down] to Free Fly. Flight costs 15 Energy/s, Attacks cost 10 Energy. Depleting Energy causes Overload (No attack/flight, take 3 WRD dmg). Below 20 Energy warning.", super: "<span class='skill-tag'>Overdrive Mode</span> Unlimited Energy and +100% Attack Speed for 10 seconds. Forces overload when it ends." }
     }
 };
 
@@ -580,7 +585,7 @@ class Projectile extends Entity {
                 this.dead = true;
                 game.createExplosion(this.x + this.w/2, this.y + this.h/2, 120, 153, this.owner); 
             }
-        } else if (this.type === "homing_bullet" || this.type === "magic_burst") {
+        } else if (this.type === "homing_bullet" || this.type === "magic_burst" || this.type === "volt_laser") {
             let target = game.getEnemyOf(this.owner);
             let minDist = Math.hypot(target.x - this.x, target.y - this.y);
             for (let m of game.minions) {
@@ -590,13 +595,17 @@ class Projectile extends Entity {
                 }
             }
             if (!target.dead && target.invincible <= 0) {
-                let tx = target.x + target.w/2; let ty = target.y + target.h/2;
-                let angle = Math.atan2(ty - (this.y + this.h/2), tx - (this.x + this.w/2));
-                let speed = this.type === "magic_burst" ? 18 : 25; 
-                let turnSpeed = this.type === "magic_burst" ? 0.08 : 0.15;
-                this.vx += (Math.cos(angle) * speed - this.vx) * turnSpeed;
-                this.vy += (Math.sin(angle) * speed - this.vy) * turnSpeed;
+                // Weak homing for Volt laser stops after 1.5s
+                if (this.type !== "volt_laser" || this.timer < 1500) {
+                    let tx = target.x + target.w/2; let ty = target.y + target.h/2;
+                    let angle = Math.atan2(ty - (this.y + this.h/2), tx - (this.x + this.w/2));
+                    let speed = this.type === "magic_burst" ? 18 : (this.type === "volt_laser" ? 15 : 25); 
+                    let turnSpeed = this.type === "magic_burst" ? 0.08 : (this.type === "volt_laser" ? 0.05 : 0.15);
+                    this.vx += (Math.cos(angle) * speed - this.vx) * turnSpeed;
+                    this.vy += (Math.sin(angle) * speed - this.vy) * turnSpeed;
+                }
             }
+            this.timer += dt;
         } else if (this.type === "knife" || this.type === "large_knife" || this.type === "enhanced_knife" || this.type === "ki_blast" || this.type === "thrown_axe") {
             if (this.type !== "ki_blast" && this.type !== "thrown_axe") this.vy += GRAVITY * 0.1;
         }
@@ -624,7 +633,7 @@ class Projectile extends Entity {
                         for(let i=0; i<15; i++) game.particles.push(new Particle(this.x, this.y, "#ffffff", (Math.random()-0.5)*20, (Math.random()-0.5)*20, 300, 6));
                         for(let i=0; i<10; i++) game.particles.push(new Particle(this.x, this.y, "#ffd700", (Math.random()-0.5)*15, (Math.random()-0.5)*15, 400, 4));
                     } else {
-                        let noKnockback = (this.type === "bullet" || this.type === "ki_blast" || this.type === "magic_burst" || this.type === "paper_plane" || this.type === "blue_paper_plane" || this.type === "fire_bolt" || this.type === "water_bolt" || this.type === "tidal_wave"); 
+                        let noKnockback = (this.type === "bullet" || this.type === "ki_blast" || this.type === "magic_burst" || this.type === "paper_plane" || this.type === "blue_paper_plane" || this.type === "fire_bolt" || this.type === "water_bolt" || this.type === "tidal_wave" || this.type === "volt_laser"); 
                         t.takeDamage(this.damage, this.owner, false, noKnockback);
                         if (this.type === "large_knife" || this.type === "enhanced_knife") t.buffs.slow = 5000;
                         if (this.type === "enhanced_knife") {
@@ -730,6 +739,13 @@ class Projectile extends Entity {
             ctx.fillStyle = this.color;
             ctx.beginPath(); ctx.arc(this.x+this.w/2, this.y+this.h/2, this.w/2, 0, Math.PI*2); ctx.fill();
             game.particles.push(new Particle(this.x+this.w/2, this.y+this.h/2, this.color, 0, 0, 100, 3));
+        } else if (this.type === "volt_laser") {
+            ctx.fillStyle = this.color;
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = "#00FFFF";
+            ctx.fillRect(this.x, this.y, this.w, this.h);
+            ctx.shadowBlur = 0;
+            game.particles.push(new Particle(this.x+this.w/2, this.y+this.h/2, "#00FFFF", 0, 0, 100, 2));
         } else if (this.type === "tidal_wave") {
             ctx.fillStyle = this.color;
             ctx.fillRect(this.x, this.y, this.w, this.h);
@@ -1115,6 +1131,13 @@ class Fighter extends Entity {
         this.waterStunImmunity = 0;
         this.burnTick = 0;
 
+        if (this.heroName === 'Volt') {
+            this.energy = 200;
+            this.maxEnergy = 200;
+            this.isOverloaded = false;
+            this.overdriveTimer = 0;
+        }
+
         if (this.heroName === 'Duke') {
             this.isMounted = true; this.maxHorseHp = 500; this.horseHp = 500; this.runTimer = 0;
             this.w = 70; this.h = 80;
@@ -1133,6 +1156,10 @@ class Fighter extends Entity {
             if (this.heroName === 'Kadaxi' && this.grapplePhase === 1) this.breakGrapple();
         }
         
+        if (this.heroName === 'Volt' && !isDoT) {
+            this.buffs.slow = Math.max(this.buffs.slow || 0, 200); 
+        }
+
         if (this.heroName === 'Artu') amt *= 0.9;
         if (attacker && attacker.buffs && attacker.buffs.battleCry > 0) amt *= 1.4; 
 
@@ -1162,7 +1189,7 @@ class Fighter extends Entity {
             for(let i=0; i<30; i++) game.particles.push(new Particle(this.x+this.w/2, this.y+this.h/2, "#000000", (Math.random()-0.5)*15, (Math.random()-0.5)*15, 1000, 8));
         }
 
-        if (this.heroName === 'Euclid' || this.heroName === 'Kae' || this.heroName === 'Ugo' || this.heroName === 'Kila') {
+        if (this.heroName === 'Euclid' || this.heroName === 'Kae' || this.heroName === 'Ugo' || this.heroName === 'Kila' || this.heroName === 'Volt') {
             if (this.attackState === 'windup') {
                 this.attackState = 'idle';
                 this.superWindupTimer = 0;
@@ -1228,6 +1255,39 @@ class Fighter extends Entity {
                 if (!this.hasHitFlip && checkAABB(this, enemy)) {
                     enemy.takeDamage(63, this); 
                     this.hasHitFlip = true;
+                }
+            }
+        }
+
+        if (this.heroName === 'Volt') {
+            if (this.overdriveTimer > 0) {
+                this.overdriveTimer -= dt;
+                this.energy = this.maxEnergy;
+                this.isOverloaded = false;
+                if (this.overdriveTimer <= 0) {
+                    this.energy = 50;
+                    this.isOverloaded = true;
+                }
+            } else {
+                if (this.isOverloaded) {
+                    this.energy += 25 * (dt / 1000);
+                    if (this.energy >= 100) {
+                        this.isOverloaded = false;
+                    }
+                } else {
+                    if (this.isGrounded) {
+                        this.energy += 15 * (dt / 1000);
+                    } else {
+                        this.energy -= 15 * (dt / 1000);
+                    }
+                }
+                this.energy = Math.max(0, Math.min(this.maxEnergy, this.energy));
+
+                if (this.energy <= 0 && !this.isOverloaded && this.overdriveTimer <= 0) {
+                    this.energy = 0;
+                    this.isOverloaded = true;
+                    this.takeDamage(30, null, true, true); 
+                    game.particles.push(new Particle(this.x+this.w/2, this.y+this.h/2, "#ff0000", 0, 0, 500, 15));
                 }
             }
         }
@@ -1347,24 +1407,36 @@ class Fighter extends Entity {
         let canAct = (this.stunTimer <= 0 && this.buffs.dizzy <= 0 && this.grapplePhase !== 1 && this.superWindupTimer <= 0 && this.euclidSwitchTimer <= 0 && !isKilaSwitching);
         let canMoveAndAttack = canAct && !hasPuppet;
 
-        if (keysPressed[this.controls.jump]) {
-            if (hasPuppet && canAct) {
-                activePuppet.doJump();
-            } else {
-                this.jumpBuffer = 150;
-                if (!this.isGrounded && !this.hasFlipped && (canMoveAndAttack && this.flipCooldown <= 0)) {
-                    let now = performance.now();
-                    if (now - this.lastJumpTime <= 500) {
-                        this.flipActive = 400;
-                        this.hasHitFlip = false;
-                        this.hasFlipped = true; 
-                        this.vy = -10; 
-                        this.flipCooldown = 3000; 
-                        this.jumpBuffer = 0; 
+        let applyGravity = true;
+
+        if (this.heroName === 'Volt' && !this.isOverloaded && (this.overdriveTimer > 0 || this.energy > 0) && canAct) {
+            if (!this.isGrounded || keys[this.controls.jump]) {
+                applyGravity = false;
+                this.vy *= 0.85; 
+                if (keys[this.controls.jump]) this.vy -= 1.2;
+                if (keys[this.controls.down]) this.vy += 1.2;
+                if (!this.isGrounded && Math.random() < 0.3) game.particles.push(new Particle(this.x+this.w/2, this.y+this.h, "#00FFFF", (Math.random()-0.5)*2, Math.random()*2, 200, 3));
+            }
+        } else {
+            if (keysPressed[this.controls.jump]) {
+                if (hasPuppet && canAct) {
+                    activePuppet.doJump();
+                } else {
+                    this.jumpBuffer = 150;
+                    if (!this.isGrounded && !this.hasFlipped && (canMoveAndAttack && this.flipCooldown <= 0)) {
+                        let now = performance.now();
+                        if (now - this.lastJumpTime <= 500) {
+                            this.flipActive = 400;
+                            this.hasHitFlip = false;
+                            this.hasFlipped = true; 
+                            this.vy = -10; 
+                            this.flipCooldown = 3000; 
+                            this.jumpBuffer = 0; 
+                        }
                     }
                 }
-            }
-        } else if (this.jumpBuffer > 0) this.jumpBuffer -= dt;
+            } else if (this.jumpBuffer > 0) this.jumpBuffer -= dt;
+        }
 
         if (this.isGrounded) { 
             this.coyoteTime = 100; 
@@ -1452,7 +1524,7 @@ class Fighter extends Entity {
             if (keys[this.controls.left]) { targetVx = -currentSpeed; this.facing = -1; } 
             else if (keys[this.controls.right]) { targetVx = currentSpeed; this.facing = 1; }
             
-            if (this.attackState === 'windup' && (this.heroName === 'Euclid' || this.heroName === 'Kae' || this.heroName === 'Ugo')) targetVx = 0;
+            if (this.attackState === 'windup' && (this.heroName === 'Euclid' || this.heroName === 'Kae' || this.heroName === 'Ugo' || this.heroName === 'Volt')) targetVx = 0;
 
             if (this.heroName === 'Duke' && this.isMounted) {
                 if ((keys[this.controls.left] || keys[this.controls.right]) && this.attackState === 'idle') this.runTimer += dt;
@@ -1472,7 +1544,7 @@ class Fighter extends Entity {
 
         let friction = 0.25;
         if (this.currentPlatform && this.currentPlatform.type === 'center') friction = 0.03; 
-        if (!canAct || ((this.heroName === 'Euclid' || this.heroName === 'Kae' || this.heroName === 'Ugo') && this.attackState === 'windup') || hasPuppet) friction = 0.1; 
+        if (!canAct || ((this.heroName === 'Euclid' || this.heroName === 'Kae' || this.heroName === 'Ugo' || this.heroName === 'Volt') && this.attackState === 'windup') || hasPuppet) friction = 0.1; 
         
         this.vx += (targetVx - this.vx) * friction;
 
@@ -1496,6 +1568,7 @@ class Fighter extends Entity {
                         if (this.heroName === 'Kae') activeTime = 100;
                         if (this.heroName === 'Ugo') activeTime = 100;
                         if (this.heroName === 'Kila') activeTime = 150;
+                        if (this.heroName === 'Volt') activeTime = this.overdriveTimer > 0 ? 25 : 50;
                         
                         this.attackState = 'active';
                         this.stateTimer = activeTime; this.maxStateTimer = activeTime;
@@ -1566,6 +1639,7 @@ class Fighter extends Entity {
                     if (this.heroName === 'Kae') recTime = this.kaeAwakened ? 100 : 200; 
                     if (this.heroName === 'Ugo') recTime = 150;
                     if (this.heroName === 'Kila') recTime = 200;
+                    if (this.heroName === 'Volt') recTime = this.overdriveTimer > 0 ? 75 : 150;
                     
                     this.attackState = 'recovery';
                     this.stateTimer = recTime; 
@@ -1589,7 +1663,7 @@ class Fighter extends Entity {
                 } else if (this.heroName === 'Ugo' && this.attackState === 'idle') {
                     if (activePuppet) {
                         activePuppet.dead = true; 
-                        game.createExplosion(activePuppet.x + activePuppet.w/2, activePuppet.y + activePuppet.h/2, 90, 100, this, false, 500); // 100 dmg = 10 WRD
+                        game.createExplosion(activePuppet.x + activePuppet.w/2, activePuppet.y + activePuppet.h/2, 90, 100, this, false, 500); 
                         for(let i=0; i<30; i++) game.particles.push(new Particle(activePuppet.x+activePuppet.w/2, activePuppet.y+activePuppet.h/2, "#fff", (Math.random()-0.5)*15, (Math.random()-0.5)*15, 600, 5));
                     } else {
                         this.attackState = 'windup';
@@ -1622,12 +1696,14 @@ class Fighter extends Entity {
             }
         }
 
-        this.vy += GRAVITY;
-        if (this.vy > 0) this.vy += GRAVITY * 0.4;
+        if (applyGravity) {
+            this.vy += GRAVITY;
+            if (this.vy > 0) this.vy += GRAVITY * 0.4;
+        }
 
-        if (!keys[this.controls.jump] && this.vy < 0) this.vy *= 0.8;
+        if (!keys[this.controls.jump] && this.vy < 0 && applyGravity) this.vy *= 0.8;
 
-        if (this.jumpBuffer > 0 && canMoveAndAttack) {
+        if (this.jumpBuffer > 0 && canMoveAndAttack && applyGravity) {
             if (this.coyoteTime > 0 || this.jumpsLeft > 0) {
                 if (this.coyoteTime <= 0) this.jumpsLeft--; else this.coyoteTime = 0;
                 this.vy = -currentJump; this.isGrounded = false; this.jumpBuffer = 0;
@@ -1663,7 +1739,7 @@ class Fighter extends Entity {
     }
 
     isMeleeAttack() {
-        if (this.heroName === 'Hason' || this.heroName === 'Willi' || this.heroName === 'Ugo' || this.heroName === 'Kila') return false;
+        if (this.heroName === 'Hason' || this.heroName === 'Willi' || this.heroName === 'Ugo' || this.heroName === 'Kila' || this.heroName === 'Volt') return false;
         if (this.heroName === 'Euclid' && this.euclidWeapon === 'magic') return false;
         if (this.heroName === 'Hunter' && this.hunterWeapon === 'musket') return false;
         if (this.heroName === 'Kadaxi' && this.comboCount === 3) return false; 
@@ -1707,6 +1783,13 @@ class Fighter extends Entity {
         if (this.heroName === 'Hason' && this.hasonAmmo <= 0) return; 
         if (this.heroName === 'Hunter' && this.hunterWeapon === 'musket' && this.hunterMusketCD > 0) return;
         if (this.heroName === 'Duke' && this.isMounted && this.runTimer < 3000) return; 
+        if (this.heroName === 'Volt') {
+            if (this.isOverloaded) return; 
+            if (this.overdriveTimer <= 0) {
+                if (this.energy < 10) return;
+                this.energy -= 10;
+            }
+        }
 
         this.attackState = 'windup';
         this.stateTimer = (this.heroName === 'Hunter' && this.hunterWeapon === 'sword') ? 200 : 100;
@@ -1719,6 +1802,7 @@ class Fighter extends Entity {
         if (this.heroName === 'Kae') this.stateTimer = this.kaeAwakened ? 25 : 50; 
         if (this.heroName === 'Ugo') this.stateTimer = 150; 
         if (this.heroName === 'Kila') this.stateTimer = this.kilaElement === 'fire' ? 500 : (this.kilaElement === 'water' ? 250 : 500);
+        if (this.heroName === 'Volt') this.stateTimer = this.overdriveTimer > 0 ? 25 : 50;
         
         this.maxStateTimer = this.stateTimer;
         this.hasHit = false;
@@ -1729,7 +1813,7 @@ class Fighter extends Entity {
     executeActiveAttack() {
         let target = game.getEnemyOf(this);
 
-        if (this.heroName === 'Hason' || this.heroName === 'Willi' || this.heroName === 'Euclid' || this.heroName === 'Ugo' || this.heroName === 'Kila') {
+        if (this.heroName === 'Hason' || this.heroName === 'Willi' || this.heroName === 'Euclid' || this.heroName === 'Ugo' || this.heroName === 'Kila' || this.heroName === 'Volt') {
             let minDist = Math.hypot(target.x - this.x, target.y - this.y);
             for (let m of game.minions) {
                 if (m.owner !== this && !m.dead) {
@@ -1801,6 +1885,10 @@ class Fighter extends Entity {
                 game.particles.push(new Particle(px, py, "#8B4513", this.facing*5, 0, 150, 5));
             }
         }
+        else if (this.heroName === 'Volt') {
+            let speed = 20;
+            game.projectiles.push(new Projectile(px, py, 15, 4, Math.cos(aimAngle)*speed, Math.sin(aimAngle)*speed, 18, this, "#00FFFF", "volt_laser")); 
+        }
         else if (this.heroName === 'Euclid') {
             if (this.euclidWeapon === 'magic') {
                 let dist = Math.hypot(tx - px, ty - py);
@@ -1830,6 +1918,17 @@ class Fighter extends Entity {
     }
 
     performSuper() {
+        if (this.heroName === 'Volt') {
+            if (this.superCooldown <= 0) {
+                this.superCooldown = this.superCooldownMax;
+                this.overdriveTimer = 10000;
+                this.isOverloaded = false;
+                this.energy = this.maxEnergy;
+                for(let i=0; i<30; i++) game.particles.push(new Particle(this.x+this.w/2, this.y+this.h/2, "#FFFF00", (Math.random()-0.5)*15, (Math.random()-0.5)*15, 600, 6));
+            }
+            return;
+        }
+
         if (this.heroName === 'Kila') {
             if (this.superCooldown <= 0 && this.kilaSwitchTimer <= 0) {
                 this.superCooldown = this.superCooldownMax;
@@ -2039,6 +2138,11 @@ class Fighter extends Entity {
             game.particles.push(new Particle(this.x + this.w/2, this.y + this.h/2, this.color, 0, 0, 100, 10));
         }
 
+        if (this.heroName === 'Volt' && this.overdriveTimer > 0) {
+            ctx.fillStyle = "rgba(255, 255, 0, 0.3)";
+            ctx.beginPath(); ctx.arc(0, 0, 45, 0, Math.PI*2); ctx.fill();
+        }
+
         if (this.facing === -1) ctx.scale(-1, 1);
         ctx.translate(0, -this.h/2); 
 
@@ -2070,6 +2174,14 @@ class Fighter extends Entity {
                 ctx.lineWidth = 4;
                 ctx.beginPath(); ctx.arc(0, 0, 50, 0, Math.PI*2); ctx.stroke();
                 ctx.restore();
+            }
+        } else if (this.heroName === 'Volt') {
+            let voltColor = this.isOverloaded ? "#555" : this.color;
+            ctx.fillStyle = "#111"; ctx.fillRect(-hw - 2, -2, this.w + 4, h + 4);
+            ctx.fillStyle = voltColor; ctx.fillRect(-hw, 0, this.w, h);
+            ctx.fillStyle = "#00FFFF"; ctx.fillRect(-hw, 25, this.w, 4); // Glowing belt
+            if (this.isOverloaded && Math.floor(Date.now()/200)%2===0) {
+                ctx.fillStyle = "rgba(255, 0, 0, 0.3)"; ctx.fillRect(-hw, 0, this.w, h); // Overload flash
             }
         } else if (this.heroName === 'Lique') {
             ctx.fillStyle = "#333"; ctx.fillRect(-hw - 2, -2, this.w + 4, h + 4);
@@ -2143,6 +2255,9 @@ class Fighter extends Entity {
             ctx.fillStyle = "#800000"; ctx.fillRect(-hw, 20, this.w, 8); ctx.beginPath(); ctx.moveTo(-hw + 5, 25); ctx.lineTo(-hw - 20, 15); ctx.lineTo(-hw - 15, 30); ctx.fill();
             ctx.fillStyle = "#fff"; ctx.fillRect(hw - 10, 12, 6, 4);
         }
+        else if (this.heroName === 'Volt') {
+            ctx.fillStyle = "#00FFFF"; ctx.fillRect(hw - 14, 10, 10, 6); // glowing visor
+        }
         else if (this.heroName === 'Kadaxi') {
             ctx.fillStyle = "#fff"; ctx.fillRect(-hw, 15, this.w, 20); 
             ctx.fillStyle = "#000"; ctx.fillRect(-hw, 30, this.w, 8); 
@@ -2158,6 +2273,11 @@ class Fighter extends Entity {
             ctx.save(); ctx.translate(hw, 25);
             let recoil = this.attackState === 'active' ? -0.5 * Math.sin(phaseProg * Math.PI) : 0;
             ctx.rotate(recoil); ctx.fillStyle = "#aaa"; ctx.fillRect(0, 0, 22, 6); ctx.fillRect(0, 0, 6, 14); ctx.restore();
+        }
+        else if (this.heroName === 'Volt') {
+            ctx.save(); ctx.translate(hw, 25);
+            let recoil = this.attackState === 'active' ? -0.3 * Math.sin(phaseProg * Math.PI) : 0;
+            ctx.rotate(recoil); ctx.fillStyle = "#222"; ctx.fillRect(0, -5, 25, 10); ctx.fillStyle = "#00FFFF"; ctx.fillRect(25, -2, 8, 4); ctx.restore();
         }
         else if (this.heroName === 'Duke') {
             ctx.save(); ctx.translate(hw, 25);
@@ -2272,7 +2392,6 @@ class Fighter extends Entity {
             else if (this.attackState === 'active') angle = -1.0 + (3.0 * phaseProg);
             else if (this.attackState === 'recovery') angle = 2.0 - (2.0 * phaseProg);
 
-            // 挥砍的半月形特效轨迹
             if (this.attackState === 'active') {
                 ctx.beginPath();
                 ctx.arc(0, 0, 55, -1.0, angle);
@@ -2281,7 +2400,7 @@ class Fighter extends Entity {
                 ctx.stroke();
             }
 
-            drawHatchet(angle); // Right hand
+            drawHatchet(angle); 
 
             if (this.buffs.bloodFrenzy > 0) {
                 ctx.translate(-this.w, 0); 
@@ -2292,7 +2411,7 @@ class Fighter extends Entity {
                     ctx.strokeStyle = "rgba(255, 50, 50, 0.7)";
                     ctx.stroke();
                 }
-                drawHatchet(angle + Math.PI/4); // Left hand dual wield offset
+                drawHatchet(angle + Math.PI/4); 
             }
             ctx.restore();
         }
@@ -2340,8 +2459,8 @@ class Game {
         this.lastTime = 0;
         this.state = 'MENU'; 
         
-        this.p1Choice = 'Ugo';
-        this.p2Choice = 'Kae'; 
+        this.p1Choice = 'Volt';
+        this.p2Choice = 'Ugo'; 
         
         this.setupMenu();
         updateControlsDisplay();
@@ -2442,8 +2561,8 @@ class Game {
         document.getElementById('p1-name').innerText = `Player 1: ${HEROES[this.p1Choice].name}`;
         document.getElementById('p2-name').innerText = `Player 2: ${HEROES[this.p2Choice].name}${isSinglePlayer ? ' [CPU]' : ''}`;
         
-        document.getElementById('p1-horse-container').classList.toggle('hidden', this.p1Choice !== 'Duke');
-        document.getElementById('p2-horse-container').classList.toggle('hidden', this.p2Choice !== 'Duke');
+        document.getElementById('p1-horse-container').classList.toggle('hidden', this.p1Choice !== 'Duke' && this.p1Choice !== 'Volt');
+        document.getElementById('p2-horse-container').classList.toggle('hidden', this.p2Choice !== 'Duke' && this.p2Choice !== 'Volt');
 
         this.state = 'PLAYING';
         this.lastTime = performance.now();
@@ -2468,7 +2587,14 @@ class Game {
 
     updateUI() {
         document.getElementById('p1-hp').style.width = `${Math.max(0, (this.p1.hp / this.p1.maxHp) * 100)}%`;
-        if (this.p1.heroName === 'Duke') document.getElementById('p1-horse-hp').style.width = `${Math.max(0, (this.p1.horseHp / this.p1.maxHorseHp) * 100)}%`;
+        if (this.p1.heroName === 'Duke') {
+            document.getElementById('p1-horse-hp').style.width = `${Math.max(0, (this.p1.horseHp / this.p1.maxHorseHp) * 100)}%`;
+            document.getElementById('p1-horse-hp').style.background = '#8B4513';
+        } else if (this.p1.heroName === 'Volt') {
+            document.getElementById('p1-horse-hp').style.width = `${Math.max(0, (this.p1.energy / this.p1.maxEnergy) * 100)}%`;
+            document.getElementById('p1-horse-hp').style.background = this.p1.isOverloaded ? '#ff0000' : (this.p1.energy <= 20 && Math.floor(Date.now()/200)%2===0 ? '#ff0000' : '#FFFF00');
+        }
+
         let p1Sup = 100 - (this.p1.superCooldown / this.p1.superCooldownMax) * 100;
         document.getElementById('p1-super').style.width = `${p1Sup}%`;
         if (p1Sup >= 100) document.getElementById('p1-super').classList.add('ready'); else document.getElementById('p1-super').classList.remove('ready');
@@ -2508,6 +2634,11 @@ class Game {
             if (this.p1.kilaSwitchTimer > 0) p1Stat += ` (SWITCHING)`;
             else if (this.p1.kilaSwitchCD > 0) p1Stat += ` [CD: ${(this.p1.kilaSwitchCD/1000).toFixed(1)}s]`;
         }
+        if (this.p1.heroName === 'Volt') {
+            p1Stat += ` [ENERGY: ${Math.floor(this.p1.energy)}/200]`;
+            if (this.p1.isOverloaded) p1Stat += " [OVERLOAD!]";
+            if (this.p1.overdriveTimer > 0) p1Stat += " [OVERDRIVE]";
+        }
         if (this.p1.buffs.poison > 0) p1Stat += " [POISONED]";
         if (this.p1.buffs.burn > 0) p1Stat += " [BURN]";
         if (this.p1.buffs.dizzy > 0) p1Stat += " [DIZZY]";
@@ -2515,7 +2646,14 @@ class Game {
         document.getElementById('p1-status').innerText = p1Stat;
 
         document.getElementById('p2-hp').style.width = `${Math.max(0, (this.p2.hp / this.p2.maxHp) * 100)}%`;
-        if (this.p2.heroName === 'Duke') document.getElementById('p2-horse-hp').style.width = `${Math.max(0, (this.p2.horseHp / this.p2.maxHorseHp) * 100)}%`;
+        if (this.p2.heroName === 'Duke') {
+            document.getElementById('p2-horse-hp').style.width = `${Math.max(0, (this.p2.horseHp / this.p2.maxHorseHp) * 100)}%`;
+            document.getElementById('p2-horse-hp').style.background = '#8B4513';
+        } else if (this.p2.heroName === 'Volt') {
+            document.getElementById('p2-horse-hp').style.width = `${Math.max(0, (this.p2.energy / this.p2.maxEnergy) * 100)}%`;
+            document.getElementById('p2-horse-hp').style.background = this.p2.isOverloaded ? '#ff0000' : (this.p2.energy <= 20 && Math.floor(Date.now()/200)%2===0 ? '#ff0000' : '#FFFF00');
+        }
+
         let p2Sup = 100 - (this.p2.superCooldown / this.p2.superCooldownMax) * 100;
         document.getElementById('p2-super').style.width = `${p2Sup}%`;
         if (p2Sup >= 100) document.getElementById('p2-super').classList.add('ready'); else document.getElementById('p2-super').classList.remove('ready');
@@ -2554,6 +2692,11 @@ class Game {
             p2Stat += `Stance: ${elName}`;
             if (this.p2.kilaSwitchTimer > 0) p2Stat += ` (SWITCHING)`;
             else if (this.p2.kilaSwitchCD > 0) p2Stat += ` [CD: ${(this.p2.kilaSwitchCD/1000).toFixed(1)}s]`;
+        }
+        if (this.p2.heroName === 'Volt') {
+            p2Stat += ` [ENERGY: ${Math.floor(this.p2.energy)}/200]`;
+            if (this.p2.isOverloaded) p2Stat += " [OVERLOAD!]";
+            if (this.p2.overdriveTimer > 0) p2Stat += " [OVERDRIVE]";
         }
         if (this.p2.buffs.poison > 0) p2Stat += " [POISONED]";
         if (this.p2.buffs.burn > 0) p2Stat += " [BURN]";
@@ -2651,7 +2794,6 @@ class Game {
             if (p2.heroName === 'Lique') attackRange = 65;
             if (p2.heroName === 'Kae') attackRange = 55;
             if (p2.heroName === 'Euclid' && p2.euclidWeapon === 'magic') attackRange = 400; 
-            if (p2.heroName === 'Ugo' && p2Puppet) attackRange = 60; 
 
             if (p2.heroName === 'Kadaxi') {
                 if (p2.grapplePhase === 1) {
@@ -2739,7 +2881,24 @@ class Game {
                 }
             }
 
-            if (dist < attackRange - 30 && !isMelee) scores.moveBackward += 60; 
+            // Volt AI Logic
+            if (p2.heroName === 'Volt') {
+                if (p2.energy < 50 && p2.superCooldown <= 0) scores.superSkill += 500;
+                if (p2.isOverloaded) {
+                    scores.moveBackward += 200; 
+                } else {
+                    if (p2.energy > 30) {
+                        if (p2.y > p1.y - 150) scores.jump += 200; 
+                        if (p2.y < p1.y - 250) keys[p2.controls.down] = true;
+                        scores.attack += 100;
+                        scores.moveBackward += 50; 
+                    } else {
+                        scores.moveBackward += 150; // Try to land safely
+                    }
+                }
+            }
+
+            if (dist < attackRange - 30 && !isMelee && p2.heroName !== 'Volt') scores.moveBackward += 60; 
             if (tacticalState === 'defensive') scores.moveBackward += 40;
             if (p2.heroName === 'Kadaxi' && p2.comboCount === 2) scores.moveBackward += 20; 
             
@@ -2762,7 +2921,7 @@ class Game {
             let superRange = (p2.heroName === 'Duke' && !p2.isMounted) ? 600 : attackRange + 100;
             if (p2.heroName === 'Kadaxi') superRange = 200; 
             
-            if (skillReady && dist <= superRange && Math.abs(dy) < 60 && p2.heroName !== 'Kae' && p2.heroName !== 'Ugo' && p2.heroName !== 'Kila') {
+            if (skillReady && dist <= superRange && Math.abs(dy) < 60 && p2.heroName !== 'Kae' && p2.heroName !== 'Ugo' && p2.heroName !== 'Kila' && p2.heroName !== 'Volt') {
                 scores.superSkill += 100;
                 if (tacticalState === 'aggressive') scores.superSkill += 50;
             }
@@ -2770,7 +2929,7 @@ class Game {
                 scores.superSkill += 500; 
             }
 
-            if (dy < -40) {
+            if (dy < -40 && p2.heroName !== 'Volt') {
                 if (p2.isGrounded) {
                     scores.jump += 80;
                 } else if (p2.jumpsLeft > 0 && p2.vy > -2) {
@@ -2778,7 +2937,7 @@ class Game {
                 }
             }
             
-            if (dist < 100 && Math.random() < 0.2) scores.jump += 60; 
+            if (dist < 100 && Math.random() < 0.2 && p2.heroName !== 'Volt') scores.jump += 60; 
             
             if (p2.heroName === 'Kadaxi' && !p2.isGrounded && !p2.hasFlipped && p2.flipCooldown <= 0) {
                 if (dist < 150 && Math.abs(dy) < 80) scores.jump += 100;
@@ -2791,14 +2950,14 @@ class Game {
                     let isYAligned = (proj.y + proj.h > sourceEntity.y - 20) && (proj.y < sourceEntity.y + sourceEntity.h + 80);
                     
                     if (isHeadingTowards && isYAligned && Math.abs(dxProj) < 300) {
-                        if (!sourceEntity.isGrounded && sourceEntity.vy < -2 && p2.heroName !== 'Kadaxi') {
+                        if (!sourceEntity.isGrounded && sourceEntity.vy < -2 && p2.heroName !== 'Kadaxi' && p2.heroName !== 'Volt') {
                         } else {
                             scores.jump += 200; 
                         }
                         
                         scores.moveBackward += 80; 
                         
-                        if (!sourceEntity.isGrounded && Math.abs(dxProj) < 200) {
+                        if (!sourceEntity.isGrounded && Math.abs(dxProj) < 200 && p2.heroName !== 'Volt') {
                             if (!p2.hasFlipped && p2.flipCooldown <= 0) {
                                 scores.jump += 300;
                                 setTimeout(() => { if (!p2.dead) keysPressed[p2.controls.jump] = true; }, 50);
@@ -2900,4 +3059,3 @@ window.dispatchEvent(new Event('resize'));
 </script>
 </body>
 </html>
-
