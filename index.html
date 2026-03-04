@@ -431,7 +431,7 @@ const HEROES = {
     Kae: {
         name: "Kae", desc: "Assassin of Thunder",
         color: "#00CED1", maxHp: 650, speed: 6.0, jump: 16, width: 35, height: 65, superCD: 12000,
-        ui: { hp: "65 WRD", atk: "2.0 WRD (Thunder Fist)", passive: "Fast melee. Every 4th hit deals +1 WRD & stuns target for 0.5s. Below 50% HP, turns into a shadow, doubling ATK & move speed.", super: "<span class='skill-tag'>Shadow Thunder Step</span> Teleports behind an enemy anywhere in the arena and stuns them for 1s. 0.3s cast time." }
+        ui: { hp: "65 WRD", atk: "3.0 WRD (Thunder Fist)", passive: "Fast melee. Every 4th hit deals +1 WRD & stuns target for 1s. Below 50% HP, turns into a shadow, doubling ATK & move speed, increasing damage by 40%.", super: "<span class='skill-tag'>Shadow Thunder Step</span> Teleports behind an enemy anywhere in the arena and stuns them for 1s. 0.3s cast time." }
     }
 };
 
@@ -1204,8 +1204,9 @@ class Fighter extends Entity {
                             if (this.kaeComboCount >= 4) {
                                 this.kaeComboCount = 0;
                                 targetsHit.forEach(t => {
-                                    t.takeDamage(10, this);
-                                    t.buffs.dizzy = 500; // 强化普攻附带 0.5 秒眩晕
+                                    let extraDmg = this.kaeAwakened ? 14 : 10;
+                                    t.takeDamage(extraDmg, this);
+                                    t.buffs.dizzy = 1000; // 强化普攻附带 1 秒眩晕
                                     for(let i=0; i<10; i++) game.particles.push(new Particle(t.x + t.w/2, t.y + t.h/2, "#00FFFF", (Math.random()-0.5)*10, (Math.random()-0.5)*10, 300, 5));
                                 });
                             } else {
@@ -1337,7 +1338,7 @@ class Fighter extends Entity {
         if (this.heroName === 'Kadaxi') return 33; 
         if (this.heroName === 'Euclid') return 12; 
         if (this.heroName === 'Lique') return 18; 
-        if (this.heroName === 'Kae') return 20; 
+        if (this.heroName === 'Kae') return this.kaeAwakened ? 42 : 30; // 3 WRD base, +40% = 4.2 WRD
         return 13;
     }
 
@@ -1642,8 +1643,7 @@ class Fighter extends Entity {
         } else if (this.heroName === 'Lique') {
             ctx.fillStyle = "#333"; ctx.fillRect(-hw - 2, -2, this.w + 4, h + 4);
             ctx.fillStyle = this.color; ctx.fillRect(-hw, 0, this.w, h);
-            ctx.fillStyle = "#222"; ctx.fillRect(-hw, h/2 - 5, this.w, 10); // belt
-            // Frenzy aura
+            ctx.fillStyle = "#222"; ctx.fillRect(-hw, h/2 - 5, this.w, 10); 
             if (this.buffs.bloodFrenzy > 0) {
                 ctx.strokeStyle = "rgba(255, 0, 0, 0.5)"; ctx.lineWidth = 4; ctx.strokeRect(-hw-4, -4, this.w+8, h+8);
             }
@@ -1898,9 +1898,6 @@ class Game {
         const p1Roster = document.getElementById('p1-roster');
         const p2Roster = document.getElementById('p2-roster');
         
-        p1Roster.innerHTML = '';
-        p2Roster.innerHTML = '';
-        
         const attachHover = (btn, key) => {
             btn.onmouseover = () => {
                 const info = HEROES[key];
@@ -1939,9 +1936,7 @@ class Game {
             p2Roster.appendChild(b2);
         });
 
-        if (p1Roster.children.length > 0) {
-            p1Roster.children[Object.keys(HEROES).indexOf(this.p1Choice)].onmouseover();
-        }
+        p1Roster.children[Object.keys(HEROES).indexOf(this.p1Choice)].onmouseover();
 
         document.getElementById('btn-sp').onclick = () => this.startGame(true);
         document.getElementById('btn-mp').onclick = () => this.startGame(false);
@@ -1973,7 +1968,6 @@ class Game {
         this.isSinglePlayer = isSinglePlayer;
 
         let p2StartX = CANVAS_W - 150; 
-        
         this.p1 = new Fighter('p1', this.p1Choice, 100, currentBinds.p1, true);
         this.p2 = new Fighter('p2', this.p2Choice, p2StartX, currentBinds.p2, false);
         this.p2.facing = -1;
