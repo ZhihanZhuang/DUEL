@@ -451,8 +451,8 @@ const HEROES = {
     },
     Gensan: {
         name: "Gensan", desc: "Phantom Blade Master",
-        color: "#cccccc", maxHp: 800, speed: 5.5, jump: 15, width: 40, height: 70, superCD: 18000,
-        ui: { hp: "80 WRD", atk: "2.2 WRD (Sword)", passive: "Every 4th attack deals 3.5 WRD with +30% range and slows for 1.2s. Moving continuously for 5s leaves a Sword Shadow (Max 2).", super: "<span class='skill-tag'>White Peak Array</span> Creates a large sword array (6 WRD total over 3s) that slows enemies by 40%. Press [Switch] to teleport to furthest shadow (6s CD)." }
+        color: "#cccccc", maxHp: 800, speed: 7, jump: 15, width: 40, height: 70, superCD: 18000,
+        ui: { hp: "80 WRD", atk: "3.2 WRD (Sword)", passive: "Every 4th attack deals 5.2 WRD with +30% range and slows for 1.2s. Moving continuously for 5s leaves a Sword Shadow (Max 2).", super: "<span class='skill-tag'>White Peak Array</span> Creates a large sword array (6 WRD total over 3s) that slows enemies by 40%. Press [Switch] to teleport to furthest shadow (6s CD)." }
     }
 };
 
@@ -1931,8 +1931,8 @@ class Fighter extends Entity {
         if (this.heroName === 'Euclid') return 12; 
         if (this.heroName === 'Lique') return 18; 
         if (this.heroName === 'Kae') return this.kaeAwakened ? 35 : 25; 
-        if (this.heroName === 'Gensan') return this.gensanCombo === 3 ? 35 : 22;
-        return 13;
+        if (this.heroName === 'Gensan') return this.gensanCombo === 3 ? 35 : 52;
+        return 33;
     }
 
     performAttack() {
@@ -3239,3 +3239,4 @@ window.dispatchEvent(new Event('resize'));
 </script>
 </body>
 </html>
+
