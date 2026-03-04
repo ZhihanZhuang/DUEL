@@ -227,21 +227,21 @@
 
     <!-- Main Menu Screen -->
     <div id="menu-screen" class="screen">
-        <h1>Otokojuku: Legends Duel</h1>
-        <h2>Select Your Heroes</h2>
+        <h1 data-i18n="title">Otokojuku: Legends Duel</h1>
+        <h2 data-i18n="selectHeroes">Select Your Heroes</h2>
         
         <div class="menu-content">
             <div class="selection-container">
                 <!-- P1 Select -->
                 <div class="player-select">
-                    <h3>Player 1</h3>
+                    <h3 data-i18n="player1">Player 1</h3>
                     <div id="p1-roster"></div>
                     <div class="controls-info" id="p1-controls-display"></div>
                 </div>
                 
                 <!-- P2 Select -->
                 <div class="player-select">
-                    <h3>Player 2</h3>
+                    <h3 data-i18n="player2">Player 2</h3>
                     <div id="p2-roster"></div>
                     <div class="controls-info" id="p2-controls-display"></div>
                 </div>
@@ -256,35 +256,43 @@
         </div>
         
         <div class="btn-row">
-            <button class="btn-start" id="btn-sp">1 Player (Vs CPU)</button>
-            <button class="btn-start" id="btn-mp">2 Players (Local)</button>
-            <button class="btn-settings" id="btn-open-settings">⚙ Settings</button>
+            <button class="btn-start" id="btn-sp" data-i18n="btn1p">1 Player (Vs CPU)</button>
+            <button class="btn-start" id="btn-mp" data-i18n="btn2p">2 Players (Local)</button>
+            <button class="btn-settings" id="btn-open-settings" data-i18n="btnSettings">⚙ Settings</button>
         </div>
     </div>
 
     <!-- Settings Screen -->
     <div id="settings-screen" class="screen hidden">
-        <h1 style="color: white;">Key Bindings</h1>
+        <h1 data-i18n="settingsTitle" style="color: white;">Settings & Key Bindings</h1>
+        <div style="margin-bottom: 20px;">
+            <span data-i18n="language" style="color: #fff; margin-right: 10px; font-weight: bold;">Language:</span>
+            <select id="lang-select" style="padding: 5px 10px; font-size: 1.1rem; background: #333; color: white; border: 1px solid #555; border-radius: 4px; outline: none; cursor: pointer;">
+                <option value="en">English</option>
+                <option value="de">Deutsch</option>
+                <option value="zh_tw">繁體中文</option>
+            </select>
+        </div>
         <div class="settings-grid">
             <div class="player-select">
-                <h3 style="color: var(--primary);">Player 1</h3>
+                <h3 data-i18n="player1" style="color: var(--primary);">Player 1</h3>
                 <div id="p1-bindings"></div>
             </div>
             <div class="player-select">
-                <h3 style="color: #2196f3;">Player 2</h3>
+                <h3 data-i18n="player2" style="color: #2196f3;">Player 2</h3>
                 <div id="p2-bindings"></div>
             </div>
         </div>
         <div class="btn-row">
-            <button class="btn-settings" id="btn-reset-bindings">Reset Default</button>
-            <button class="btn-start" id="btn-close-settings">Save & Close</button>
+            <button class="btn-settings" id="btn-reset-bindings" data-i18n="resetDefault">Reset Default</button>
+            <button class="btn-start" id="btn-close-settings" data-i18n="saveClose">Save & Close</button>
         </div>
     </div>
 
     <!-- Game Over Screen -->
     <div id="game-over-screen" class="screen hidden">
         <div id="winner-text">Player 1 Wins!</div>
-        <button class="btn-start" id="btn-restart" style="font-size: 1.2rem; padding: 10px 30px; margin-top: 10px;">Main Menu</button>
+        <button class="btn-start" id="btn-restart" data-i18n="btnRestart" style="font-size: 1.2rem; padding: 10px 30px; margin-top: 10px;">Main Menu</button>
     </div>
 </div>
 
@@ -293,6 +301,48 @@
  * Otokojuku: Legends Duel
  * A 2D Canvas Platform Fighter
  */
+
+// --- I18N / Localization ---
+const I18N = {
+    en: {
+        title: "Otokojuku: Legends Duel", selectHeroes: "Select Your Heroes", player1: "Player 1", player2: "Player 2",
+        btn1p: "1 Player (Vs CPU)", btn2p: "2 Players (Local)", btnSettings: "⚙ Settings", settingsTitle: "Settings & Key Bindings",
+        resetDefault: "Reset Default", saveClose: "Save & Close", language: "Language:", random: "Random", 
+        randomDesc: "Let fate decide your hero!", btnRestart: "Main Menu", winnerP1: "Player 1", winnerP2: "Player 2", wins: "Wins!"
+    },
+    de: {
+        title: "Otokojuku: Legenden Duell", selectHeroes: "Wähle deine Helden", player1: "Spieler 1", player2: "Spieler 2",
+        btn1p: "1 Spieler (Gegen CPU)", btn2p: "2 Spieler (Lokal)", btnSettings: "⚙ Einstellungen", settingsTitle: "Einstellungen & Tastenbelegung",
+        resetDefault: "Standard zurück", saveClose: "Speichern & Schließen", language: "Sprache:", random: "Zufällig", 
+        randomDesc: "Lass das Schicksal entscheiden!", btnRestart: "Hauptmenü", winnerP1: "Spieler 1", winnerP2: "Spieler 2", wins: "Gewinnt!"
+    },
+    zh_tw: {
+        title: "男塾：傳奇對決", selectHeroes: "選擇你的英雄", player1: "玩家 1", player2: "玩家 2",
+        btn1p: "單人遊戲 (對戰 CPU)", btn2p: "雙人遊戲 (本地)", btnSettings: "⚙ 設定", settingsTitle: "設定與按鍵綁定",
+        resetDefault: "重置為預設", saveClose: "儲存並關閉", language: "語言:", random: "隨機", 
+        randomDesc: "讓命運決定你的英雄！", btnRestart: "主選單", winnerP1: "玩家 1", winnerP2: "玩家 2", wins: "獲勝！"
+    }
+};
+
+let currentLang = localStorage.getItem('otokojuku_lang') || 'en';
+
+function applyLang() {
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+        let key = el.getAttribute('data-i18n');
+        if (I18N[currentLang][key]) el.innerText = I18N[currentLang][key];
+    });
+    document.getElementById('lang-select').value = currentLang;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('lang-select').addEventListener('change', (e) => {
+        currentLang = e.target.value;
+        localStorage.setItem('otokojuku_lang', currentLang);
+        applyLang();
+        if (window.game) game.setupMenu(); // 刷新名字显示
+    });
+    applyLang();
+});
 
 // --- Input & KeyBinding Manager ---
 const DEFAULT_BINDS = {
@@ -305,69 +355,6 @@ let currentBinds = JSON.parse(localStorage.getItem('otokojuku_binds')) || JSON.p
 function saveBinds() {
     localStorage.setItem('otokojuku_binds', JSON.stringify(currentBinds));
     updateControlsDisplay();
-}
-
-let listeningKey = null;
-
-window.addEventListener('keydown', e => {
-    if (listeningKey) {
-        e.preventDefault();
-        currentBinds[listeningKey.player][listeningKey.action] = e.code;
-        listeningKey.btn.innerText = formatKey(e.code);
-        listeningKey.btn.classList.remove('listening');
-        listeningKey = null;
-        saveBinds();
-    } else {
-        keys[e.code] = true;
-        if (!e.repeat) keysPressed[e.code] = true;
-    }
-});
-window.addEventListener('keyup', e => {
-    if (!listeningKey) keys[e.code] = false;
-});
-
-function formatKey(code) {
-    return code.replace('Key', '').replace('Arrow', '').replace('Numpad', 'Num ');
-}
-
-function updateControlsDisplay() {
-    document.getElementById('p1-controls-display').innerHTML = `
-        Move: <span>${formatKey(currentBinds.p1.left)}, ${formatKey(currentBinds.p1.down)}, ${formatKey(currentBinds.p1.right)}</span><br>
-        Jump: <span>${formatKey(currentBinds.p1.jump)}</span><br>
-        Attack: <span>${formatKey(currentBinds.p1.attack)}</span><br>
-        Super: <span>${formatKey(currentBinds.p1.super)}</span><br>
-        Switch/Misc: <span>${formatKey(currentBinds.p1.switch)}</span>
-    `;
-    document.getElementById('p2-controls-display').innerHTML = `
-        Move: <span>${formatKey(currentBinds.p2.left)}, ${formatKey(currentBinds.p2.down)}, ${formatKey(currentBinds.p2.right)}</span><br>
-        Jump: <span>${formatKey(currentBinds.p2.jump)}</span><br>
-        Attack: <span>${formatKey(currentBinds.p2.attack)}</span><br>
-        Super: <span>${formatKey(currentBinds.p2.super)}</span><br>
-        Switch/Misc: <span>${formatKey(currentBinds.p2.switch)}</span>
-    `;
-}
-
-function buildSettingsUI() {
-    ['p1', 'p2'].forEach(p => {
-        const container = document.getElementById(`${p}-bindings`);
-        container.innerHTML = '';
-        Object.keys(currentBinds[p]).forEach(action => {
-            let row = document.createElement('div');
-            row.className = 'keybind-row';
-            row.innerHTML = `<span style="text-transform:capitalize">${action}:</span>`;
-            let btn = document.createElement('button');
-            btn.className = 'key-btn';
-            btn.innerText = formatKey(currentBinds[p][action]);
-            btn.onclick = () => {
-                if (listeningKey) listeningKey.btn.classList.remove('listening');
-                listeningKey = { player: p, action: action, btn: btn };
-                btn.classList.add('listening');
-                btn.innerText = 'Press Any Key...';
-            };
-            row.appendChild(btn);
-            container.appendChild(row);
-        });
-    });
 }
 
 // --- Constants & Game Data ---
@@ -1682,8 +1669,8 @@ class Game {
         this.lastTime = 0;
         this.state = 'MENU'; 
         
-        this.p1Choice = 'Euclid';
-        this.p2Choice = 'Kadaxi'; 
+        this.p1Choice = 'Random'; // 默认加入随机选择
+        this.p2Choice = 'Random'; 
         
         this.setupMenu();
         updateControlsDisplay();
@@ -1693,19 +1680,55 @@ class Game {
         const p1Roster = document.getElementById('p1-roster');
         const p2Roster = document.getElementById('p2-roster');
         
-        const attachHover = (btn, key) => {
+        // Clear roster first to avoid dupes on re-render
+        p1Roster.innerHTML = '';
+        p2Roster.innerHTML = '';
+        
+        const attachHover = (btn, key, isRandom = false) => {
             btn.onmouseover = () => {
-                const info = HEROES[key];
-                document.getElementById('info-name').innerText = info.name;
-                document.getElementById('info-desc').innerText = info.desc;
-                document.getElementById('info-details').innerHTML = `
-                    <div class="info-stat">HP: <span style="color:#4caf50">${info.ui.hp}</span></div>
-                    <div class="info-stat">ATK: <span style="color:#ff5252">${info.ui.atk}</span></div><br>
-                    <div class="info-stat">Passive:</div> <div class="info-desc">${info.ui.passive}</div>
-                    <div class="info-stat">Super Skill:</div> <div class="info-desc">${info.ui.super}</div>
-                `;
+                if (isRandom) {
+                    document.getElementById('info-name').innerText = I18N[currentLang].random;
+                    document.getElementById('info-desc').innerText = I18N[currentLang].randomDesc;
+                    document.getElementById('info-details').innerHTML = `
+                        <div style="font-size:3rem; text-align:center; color:#555; margin-top:30px;">?</div>
+                    `;
+                } else {
+                    const info = HEROES[key];
+                    document.getElementById('info-name').innerText = info.name;
+                    document.getElementById('info-desc').innerText = info.desc;
+                    document.getElementById('info-details').innerHTML = `
+                        <div class="info-stat">HP: <span style="color:#4caf50">${info.ui.hp}</span></div>
+                        <div class="info-stat">ATK: <span style="color:#ff5252">${info.ui.atk}</span></div><br>
+                        <div class="info-stat">Passive:</div> <div class="info-desc">${info.ui.passive}</div>
+                        <div class="info-stat">Super Skill:</div> <div class="info-desc">${info.ui.super}</div>
+                    `;
+                }
             };
         };
+
+        // Inject Random Button for P1
+        let b1Rand = document.createElement('button');
+        b1Rand.className = `hero-btn ${this.p1Choice === 'Random' ? 'selected' : ''}`;
+        b1Rand.innerText = `🎲 ${I18N[currentLang].random}`;
+        b1Rand.onclick = () => {
+            this.p1Choice = 'Random';
+            Array.from(p1Roster.children).forEach(c => c.classList.remove('selected'));
+            b1Rand.classList.add('selected');
+        };
+        attachHover(b1Rand, 'Random', true);
+        p1Roster.appendChild(b1Rand);
+
+        // Inject Random Button for P2
+        let b2Rand = document.createElement('button');
+        b2Rand.className = `hero-btn ${this.p2Choice === 'Random' ? 'selected' : ''}`;
+        b2Rand.innerText = `🎲 ${I18N[currentLang].random}`;
+        b2Rand.onclick = () => {
+            this.p2Choice = 'Random';
+            Array.from(p2Roster.children).forEach(c => c.classList.remove('selected'));
+            b2Rand.classList.add('selected');
+        };
+        attachHover(b2Rand, 'Random', true);
+        p2Roster.appendChild(b2Rand);
 
         Object.keys(HEROES).forEach(key => {
             let b1 = document.createElement('button');
@@ -1731,7 +1754,9 @@ class Game {
             p2Roster.appendChild(b2);
         });
 
-        p1Roster.children[Object.keys(HEROES).indexOf(this.p1Choice)].onmouseover();
+        // Trigger default hover
+        if (this.p1Choice === 'Random') b1Rand.onmouseover();
+        else p1Roster.children[Object.keys(HEROES).indexOf(this.p1Choice) + 1].onmouseover();
 
         document.getElementById('btn-sp').onclick = () => this.startGame(true);
         document.getElementById('btn-mp').onclick = () => this.startGame(false);
@@ -1763,18 +1788,28 @@ class Game {
         this.isSinglePlayer = isSinglePlayer;
 
         let p2StartX = CANVAS_W - 150; 
-        this.p1 = new Fighter('p1', this.p1Choice, 100, currentBinds.p1, true);
-        this.p2 = new Fighter('p2', this.p2Choice, p2StartX, currentBinds.p2, false);
+        
+        let heroKeys = Object.keys(HEROES);
+        
+        // 处理随机选择英雄
+        this.p1ActualHero = this.p1Choice === 'Random' ? heroKeys[Math.floor(Math.random() * heroKeys.length)] : this.p1Choice;
+        this.p2ActualHero = this.p2Choice === 'Random' ? heroKeys[Math.floor(Math.random() * heroKeys.length)] : this.p2Choice;
+
+        this.p1 = new Fighter('p1', this.p1ActualHero, 100, currentBinds.p1, true);
+        this.p2 = new Fighter('p2', this.p2ActualHero, p2StartX, currentBinds.p2, false);
         this.p2.facing = -1;
 
         this.projectiles = []; this.particles = []; this.minions = [];
         this.hurricane = null; this.hitstop = 0; this.aiTimer = 0;
 
-        document.getElementById('p1-name').innerText = `P1: ${HEROES[this.p1Choice].name}`;
-        document.getElementById('p2-name').innerText = `P2: ${HEROES[this.p2Choice].name}${isSinglePlayer ? ' [CPU]' : ''}`;
+        let p1Label = I18N[currentLang].player1;
+        let p2Label = I18N[currentLang].player2;
+
+        document.getElementById('p1-name').innerText = `${p1Label}: ${HEROES[this.p1ActualHero].name}`;
+        document.getElementById('p2-name').innerText = `${p2Label}: ${HEROES[this.p2ActualHero].name}${isSinglePlayer ? ' [CPU]' : ''}`;
         
-        document.getElementById('p1-horse-container').classList.toggle('hidden', this.p1Choice !== 'Duke');
-        document.getElementById('p2-horse-container').classList.toggle('hidden', this.p2Choice !== 'Duke');
+        document.getElementById('p1-horse-container').classList.toggle('hidden', this.p1ActualHero !== 'Duke');
+        document.getElementById('p2-horse-container').classList.toggle('hidden', this.p2ActualHero !== 'Duke');
 
         this.state = 'PLAYING';
         this.lastTime = performance.now();
@@ -1862,10 +1897,14 @@ class Game {
     endGame(winnerText) {
         if (this.state === 'GAMEOVER') return;
         this.state = 'GAMEOVER';
+        
+        let winTextLoc = winnerText === "Player 1" ? I18N[currentLang].winnerP1 : (winnerText === "Player 2" ? I18N[currentLang].winnerP2 : winnerText);
+        let fullWinStr = `${winTextLoc} ${I18N[currentLang].wins}`;
+
         setTimeout(() => {
             document.getElementById('game-ui').classList.add('hidden');
             document.getElementById('game-over-screen').classList.remove('hidden');
-            document.getElementById('winner-text').innerText = `${winnerText} Wins!`;
+            document.getElementById('winner-text').innerText = fullWinStr;
         }, 1500); 
     }
 
