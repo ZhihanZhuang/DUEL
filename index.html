@@ -397,7 +397,7 @@ const HEROES = {
     Macu: {
         name: "Macu", desc: "Ainu Warrior with Long Spear",
         color: "#2E8B57", maxHp: 900, speed: 4, jump: 16, width: 40, height: 75, superCD: 45000,
-        ui: { hp: "90 WRD", atk: "2.2 WRD (Long Range Melee)", passive: "Spear dynamically tracks the closest enemy's height. Extended melee range.", super: "[BattleCry] +40% Speed, +20% Jump, +40% Damage. Grants 3s Poison on hit." }
+        ui: { hp: "90 WRD", atk: "2.8 WRD (Long Range Melee)", passive: "Spear dynamically tracks the closest enemy's height. Extended melee range.", super: "[BattleCry] +40% Speed, +20% Jump, +40% Damage. Grants 3s Poison on hit." }
     },
     Willi: {
         name: "Willi", desc: "Ninja with Throwing Knives",
@@ -1338,7 +1338,7 @@ class Fighter extends Entity {
     getMeleeDamage() {
         if (this.heroName === 'Duke' && this.isMounted) return 33; 
         if (this.heroName === 'Artu') return 73;  
-        if (this.heroName === 'Macu') return 22;  
+        if (this.heroName === 'Macu') return 28;  
         if (this.heroName === 'Hunter') return 17; 
         if (this.heroName === 'Duke' && !this.isMounted) return 15; 
         if (this.heroName === 'Kadaxi') return 33; 
@@ -2358,3 +2358,4 @@ window.dispatchEvent(new Event('resize'));
 </script>
 </body>
 </html>
+
