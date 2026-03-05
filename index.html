@@ -296,8 +296,9 @@
 
 // --- Input & KeyBinding Manager ---
 const DEFAULT_BINDS = {
-    p1: { left: 'KeyA', right: 'KeyD', jump: 'KeyW', down: 'KeyS', attack: 'Space', super: 'KeyE', switch: 'KeyT' },
-    p2: { left: 'ArrowLeft', right: 'ArrowRight', jump: 'ArrowUp', down: 'ArrowDown', attack: 'Numpad9', super: 'NumpadEnter', switch: 'Numpad8' }
+    // 增加了一个 extra 键位，用于触发 Gensan 的剑影（和未来可能的额外技能）
+    p1: { left: 'KeyA', right: 'KeyD', jump: 'KeyW', down: 'KeyS', attack: 'Space', super: 'KeyE', switch: 'KeyT', extra: 'KeyG' },
+    p2: { left: 'ArrowLeft', right: 'ArrowRight', jump: 'ArrowUp', down: 'ArrowDown', attack: 'Numpad9', super: 'NumpadEnter', switch: 'Numpad8', extra: 'Numpad7' }
 };
 
 let currentBinds = JSON.parse(localStorage.getItem('otokojuku_binds')) || JSON.parse(JSON.stringify(DEFAULT_BINDS));
@@ -337,14 +338,16 @@ function updateControlsDisplay() {
         Jump: <span>${formatKey(currentBinds.p1.jump)}</span><br>
         Attack: <span>${formatKey(currentBinds.p1.attack)}</span><br>
         Super: <span>${formatKey(currentBinds.p1.super)}</span><br>
-        Switch/Misc: <span>${formatKey(currentBinds.p1.switch)}</span>
+        Switch/Misc: <span>${formatKey(currentBinds.p1.switch)}</span><br>
+        Extra (Shadow): <span>${formatKey(currentBinds.p1.extra)}</span>
     `;
     document.getElementById('p2-controls-display').innerHTML = `
         Move: <span>${formatKey(currentBinds.p2.left)}, ${formatKey(currentBinds.p2.down)}, ${formatKey(currentBinds.p2.right)}</span><br>
         Jump: <span>${formatKey(currentBinds.p2.jump)}</span><br>
         Attack: <span>${formatKey(currentBinds.p2.attack)}</span><br>
         Super: <span>${formatKey(currentBinds.p2.super)}</span><br>
-        Switch/Misc: <span>${formatKey(currentBinds.p2.switch)}</span>
+        Switch/Misc: <span>${formatKey(currentBinds.p2.switch)}</span><br>
+        Extra (Shadow): <span>${formatKey(currentBinds.p2.extra)}</span>
     `;
 }
 
@@ -446,13 +449,13 @@ const HEROES = {
     },
     Volt: {
         name: "Volt", desc: "Flying Energy Marksman",
-        color: "#FFD700", maxHp: 650, speed: 4.0, jump: 15, width: 35, height: 65, superCD: 30000,
-        ui: { hp: "65 WRD", atk: "0.6 WRD (Homing Lasers)", passive: "Hold [Jump]/[Down] to Free Fly. Flight costs 15 Energy/s, Attacks cost 10 Energy. Depleting Energy causes Overload (No attack/flight, take 3 WRD dmg). Below 20 Energy warning.", super: "<span class='skill-tag'>Overdrive Mode</span> Unlimited Energy and +100% Attack Speed for 10 seconds. Forces overload when it ends." }
+        color: "#FFD700", maxHp: 650, speed: 4.0, jump: 15, width: 35, height: 65, superCD: 18000,
+        ui: { hp: "65 WRD", atk: "1.8 WRD (Homing Lasers)", passive: "Hold [Jump]/[Down] to Free Fly. Flight costs 15 Energy/s, Attacks cost 10 Energy. Depleting Energy causes Overload (No attack/flight, take 3 WRD dmg). Below 20 Energy warning.", super: "<span class='skill-tag'>Overdrive Mode</span> Unlimited Energy and +100% Attack Speed for 10 seconds. Forces overload when it ends." }
     },
     Gensan: {
         name: "Gensan", desc: "Phantom Blade Master",
         color: "#cccccc", maxHp: 800, speed: 7, jump: 15, width: 40, height: 70, superCD: 18000,
-        ui: { hp: "80 WRD", atk: "3.2 WRD (Sword)", passive: "Every 4th attack deals 5.2 WRD with +30% range and slows for 1.2s. Moving continuously for 5s leaves a Sword Shadow (Max 2).", super: "<span class='skill-tag'>White Peak Array</span> Drops 3 giant swords at the enemy's position (9 WRD AoE, 5s Stun) and leaves a Sword Shadow at your position for 8s. Press [Switch] to teleport to furthest shadow (No CD)." }
+        ui: { hp: "80 WRD", atk: "3.2 WRD (Sword)", passive: "Every 4th attack deals 5.2 WRD with +30% range and slows for 1.2s. Press [Extra] to leave a Sword Shadow (Max 2, 3s CD).", super: "<span class='skill-tag'>White Peak Array</span> Drops 3 giant swords at the enemy's position (9 WRD AoE, 5s Stun) and leaves a Sword Shadow at your position for 8s. Press [Switch] to teleport to furthest shadow (No CD)." }
     },
     Noae: {
         name: "Noae", desc: "Mine Engineer",
@@ -577,7 +580,7 @@ class GiantSword extends Entity {
             if (hitGround) {
                 this.damageDealt = true;
                 // 修复：爆炸造成 9 WRD 伤害 (90点) 和 5 秒控制 (5000ms)
-                game.createExplosion(this.x + this.w/2, this.y + this.h, 150, 90, this.owner, false, 2500); 
+                game.createExplosion(this.x + this.w/2, this.y + this.h, 150, 90, this.owner, false, 5000); 
                 for(let i=0; i<30; i++) game.particles.push(new Particle(this.x+this.w/2, this.y+this.h, "#fff", (Math.random()-0.5)*20, -Math.random()*15, 600));
             }
         } else {
@@ -1327,7 +1330,7 @@ class Puppet extends Entity {
 
 class Hurricane extends Entity {
     constructor(owner, x, y) {
-        super(x, y, 100, 120); // 修复：将高度从 300 降低到 120，使其可以被跳过
+        super(x, y, 100, 120); 
         this.owner = owner; this.timer = 5000; this.tickTimer = 0; this.stunTickTimer = 0;
     }
     update(dt) {
@@ -1405,11 +1408,9 @@ class Fighter extends Entity {
         
         if (this.heroName === 'Gensan') {
             this.gensanCombo = 0;
-            this.gensanMoveTimer = 0;
+            this.gensanShadowCD = 0;
             this.gensanShadows = [];
             this.gensanSwitchCD = 0;
-            this.lastX = this.x;
-            this.lastY = this.y;
         }
 
         if (this.heroName === 'Duke') {
@@ -1535,26 +1536,28 @@ class Fighter extends Entity {
             }
         }
 
+        let isKilaSwitching = this.heroName === 'Kila' && this.kilaSwitchTimer > 0;
+        let hasPuppet = this.heroName === 'Ugo' && game.minions.some(m => m.type === 'puppet' && m.owner === this && !m.dead);
+        let canAct = (this.stunTimer <= 0 && this.buffs.dizzy <= 0 && this.grapplePhase !== 1 && this.superWindupTimer <= 0 && this.euclidSwitchTimer <= 0 && !isKilaSwitching);
+        let canMoveAndAttack = canAct && !hasPuppet;
+
         if (this.heroName === 'Gensan') {
-            let distMoved = Math.hypot(this.x - this.lastX, this.y - this.lastY);
-            if (distMoved > 1) {
-                this.gensanMoveTimer += dt;
-                if (this.gensanMoveTimer >= 5000) {
-                    this.gensanMoveTimer = 0;
-                    let shadow = new SwordShadow(this, this.x, this.y);
-                    this.gensanShadows.push(shadow);
-                    game.minions.push(shadow);
-                    if (this.gensanShadows.length > 2) {
-                        let oldShadow = this.gensanShadows.shift();
-                        if(oldShadow) oldShadow.dead = true;
-                    }
-                    for(let i=0; i<15; i++) game.particles.push(new Particle(this.x+this.w/2, this.y+this.h/2, "#fff", (Math.random()-0.5)*5, (Math.random()-0.5)*5, 400));
+            if (this.gensanSwitchCD > 0) this.gensanSwitchCD -= dt;
+            if (this.gensanShadowCD > 0) this.gensanShadowCD -= dt;
+
+            // Extra key places the shadow for Gensan
+            if (canAct && keysPressed[this.controls.extra] && this.gensanShadowCD <= 0) {
+                this.gensanShadowCD = 3000; // 3 seconds CD
+                let shadow = new SwordShadow(this, this.x, this.y);
+                this.gensanShadows.push(shadow);
+                game.minions.push(shadow);
+                if (this.gensanShadows.length > 2) {
+                    let oldShadow = this.gensanShadows.shift();
+                    if(oldShadow) oldShadow.dead = true;
                 }
-            } else {
-                this.gensanMoveTimer = Math.max(0, this.gensanMoveTimer - dt * 2); // decay quickly if standing still
+                for(let i=0; i<15; i++) game.particles.push(new Particle(this.x+this.w/2, this.y+this.h/2, "#fff", (Math.random()-0.5)*5, (Math.random()-0.5)*5, 400));
             }
-            this.lastX = this.x;
-            this.lastY = this.y;
+            
             this.gensanShadows = this.gensanShadows.filter(s => s && !s.dead);
         }
 
@@ -1614,10 +1617,8 @@ class Fighter extends Entity {
         }
 
         let activePuppet = null;
-        let hasPuppet = false;
         if (this.heroName === 'Ugo') {
             activePuppet = game.minions.find(m => m.type === 'puppet' && m.owner === this && !m.dead);
-            hasPuppet = !!activePuppet;
         }
         
         if (this.buffs.bloodFrenzy > 0) {
@@ -1704,10 +1705,6 @@ class Fighter extends Entity {
 
         if (this.hasonSuperWindow > 0) { this.hasonSuperWindow -= dt; if (this.hasonSuperWindow <= 0) this.hasonSuperCharges = 0; }
         if (this.williSuperWindow > 0) { this.williSuperWindow -= dt; if (this.williSuperWindow <= 0) this.williSuperCharges = 0; }
-
-        let isKilaSwitching = this.heroName === 'Kila' && this.kilaSwitchTimer > 0;
-        let canAct = (this.stunTimer <= 0 && this.buffs.dizzy <= 0 && this.grapplePhase !== 1 && this.superWindupTimer <= 0 && this.euclidSwitchTimer <= 0 && !isKilaSwitching);
-        let canMoveAndAttack = canAct && !hasPuppet;
 
         let applyGravity = true;
 
@@ -1996,7 +1993,7 @@ class Fighter extends Entity {
                         for(let i=0; i<30; i++) game.particles.push(new Particle(this.x+this.w/2, this.y+this.h/2, c, (Math.random()-0.5)*15, (Math.random()-0.5)*15, 800, 6));
                     }
                 } else if (this.heroName === 'Gensan') {
-                    if (this.gensanShadows.length > 0) {
+                    if (this.gensanSwitchCD <= 0 && this.gensanShadows.length > 0) {
                         let targetShadow = this.gensanShadows[0];
                         let maxD = 0;
                         for(let s of this.gensanShadows) {
@@ -2009,6 +2006,8 @@ class Fighter extends Entity {
                             this.x = targetShadow.x;
                             this.y = targetShadow.y;
                             targetShadow.dead = true;
+                            // Gensan teleport no longer has CD
+                            this.gensanSwitchCD = 0; 
                             this.invincible = 200;
                             if (this.buffs) this.buffs.msBoost = 500;
                             for(let i=0; i<20; i++) game.particles.push(new Particle(this.x+this.w/2, this.y+this.h/2, "#fff", (Math.random()-0.5)*10, (Math.random()-0.5)*10, 400));
@@ -2236,7 +2235,7 @@ class Fighter extends Entity {
         }
         else if (this.heroName === 'Volt') {
             let speed = 20;
-            game.projectiles.push(new Projectile(px, py, 15, 4, Math.cos(aimAngle)*speed, Math.sin(aimAngle)*speed, 6, this, "#00FFFF", "volt_laser")); 
+            game.projectiles.push(new Projectile(px, py, 15, 4, Math.cos(aimAngle)*speed, Math.sin(aimAngle)*speed, 18, this, "#00FFFF", "volt_laser")); 
         }
         else if (this.heroName === 'Euclid') {
             if (this.euclidWeapon === 'magic') {
@@ -3040,7 +3039,7 @@ class Game {
         }
         if (this.p1.heroName === 'Gensan') {
             p1Stat += `[Combo: ${this.p1.gensanCombo}/3] [Shadows: ${this.p1.gensanShadows.length}/2]`;
-            // Removed Teleport CD display
+            if (this.p1.gensanShadowCD > 0) p1Stat += ` (Shadow CD: ${(this.p1.gensanShadowCD/1000).toFixed(1)}s)`;
         }
         if (this.p1.heroName === 'Volt') {
             p1Stat += ` [ENERGY: ${Math.floor(this.p1.energy)}/200]`;
@@ -3107,7 +3106,7 @@ class Game {
         }
         if (this.p2.heroName === 'Gensan') {
             p2Stat += `[Combo: ${this.p2.gensanCombo}/3] [Shadows: ${this.p2.gensanShadows.length}/2]`;
-            // Removed Teleport CD display
+            if (this.p2.gensanShadowCD > 0) p2Stat += ` (Shadow CD: ${(this.p2.gensanShadowCD/1000).toFixed(1)}s)`;
         }
         if (this.p2.heroName === 'Volt') {
             p2Stat += ` [ENERGY: ${Math.floor(this.p2.energy)}/200]`;
@@ -3499,6 +3498,7 @@ window.dispatchEvent(new Event('resize'));
 </script>
 </body>
 </html>
+
 
 
 
