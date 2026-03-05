@@ -452,12 +452,12 @@ const HEROES = {
     Gensan: {
         name: "Gensan", desc: "Phantom Blade Master",
         color: "#cccccc", maxHp: 800, speed: 7, jump: 15, width: 40, height: 70, superCD: 18000,
-        ui: { hp: "80 WRD", atk: "3.2 WRD (Sword)", passive: "Every 4th attack deals 5.2 WRD with +30% range and slows for 1.2s. Moving continuously for 5s leaves a Sword Shadow (Max 2).", super: "<span class='skill-tag'>White Peak Array</span> Drops a giant sword in front (6 WRD AoE) and leaves a Sword Shadow at your position for 8s. Press [Switch] to teleport to furthest shadow (6s CD)." }
+        ui: { hp: "80 WRD", atk: "3.2 WRD (Sword)", passive: "Every 4th attack deals 5.2 WRD with +30% range and slows for 1.2s. Moving continuously for 5s leaves a Sword Shadow (Max 2).", super: "<span class='skill-tag'>White Peak Array</span> Drops 3 giant swords at the enemy's position (9 WRD AoE, 5s Stun) and leaves a Sword Shadow at your position for 8s. Press [Switch] to teleport to furthest shadow (No CD)." }
     },
     Noae: {
         name: "Noae", desc: "Mine Engineer",
         color: "#B8860B", maxHp: 650, speed: 4.8, jump: 14, width: 40, height: 70, superCD: 22000,
-        ui: { hp: "65 WRD", atk: "1.9 WRD (Pickaxe)", passive: "Press [Switch] to plant a Land Mine (Max 3, 2.5 WRD + 0.4s stun).", super: "Summons a bouncing Minecart (10s) that deals 2 WRD + 0.5s stun. Minecart detonates mines." }
+        ui: { hp: "65 WRD", atk: "1.9 WRD (Pickaxe)", passive: "Press [Switch] to plant a Land Mine (Max 3, 2.5 WRD + 0.4s stun).", super: "Summons a bouncing Minecart (4.5s) that deals 2 WRD + 0.5s stun. Minecart detonates mines." }
     }
 };
 
@@ -568,18 +568,16 @@ class GiantSword extends Entity {
         if (!this.damageDealt) {
             this.y += this.vy;
             let hitGround = false;
-            if (this.y + this.h >= GROUND_Y) { this.y = GROUND_Y - this.h; hitGround = true; }
-            else {
-                for (let plat of PLATFORMS) {
-                    if (this.y + this.h >= plat.y && this.y + this.h - this.vy <= plat.y && this.x + this.w > plat.x && this.x < plat.x + plat.w) {
-                        this.y = plat.y - this.h; hitGround = true; break;
-                    }
-                }
+            // 修复：取消平台检测，落剑直接穿透平台直到地面
+            if (this.y + this.h >= GROUND_Y) { 
+                this.y = GROUND_Y - this.h; 
+                hitGround = true; 
             }
             
             if (hitGround) {
                 this.damageDealt = true;
-                game.createExplosion(this.x + this.w/2, this.y + this.h, 150, 60, this.owner, false, 800); 
+                // 修复：爆炸造成 9 WRD 伤害 (90点) 和 5 秒控制 (5000ms)
+                game.createExplosion(this.x + this.w/2, this.y + this.h, 150, 90, this.owner, false, 5000); 
                 for(let i=0; i<30; i++) game.particles.push(new Particle(this.x+this.w/2, this.y+this.h, "#fff", (Math.random()-0.5)*20, -Math.random()*15, 600));
             }
         } else {
@@ -642,7 +640,7 @@ class Minecart extends Entity {
         this.owner = owner;
         this.facing = owner.facing;
         this.vx = this.facing * 15;
-        this.life = 10000;
+        this.life = 4500;
         this.hp = 80;
         this.maxHp = 80;
         this.untargetable = false;
@@ -1538,7 +1536,6 @@ class Fighter extends Entity {
         }
 
         if (this.heroName === 'Gensan') {
-            if (this.gensanSwitchCD > 0) this.gensanSwitchCD -= dt;
             let distMoved = Math.hypot(this.x - this.lastX, this.y - this.lastY);
             if (distMoved > 1) {
                 this.gensanMoveTimer += dt;
@@ -1999,7 +1996,7 @@ class Fighter extends Entity {
                         for(let i=0; i<30; i++) game.particles.push(new Particle(this.x+this.w/2, this.y+this.h/2, c, (Math.random()-0.5)*15, (Math.random()-0.5)*15, 800, 6));
                     }
                 } else if (this.heroName === 'Gensan') {
-                    if (this.gensanSwitchCD <= 0 && this.gensanShadows.length > 0) {
+                    if (this.gensanShadows.length > 0) {
                         let targetShadow = this.gensanShadows[0];
                         let maxD = 0;
                         for(let s of this.gensanShadows) {
@@ -2012,7 +2009,6 @@ class Fighter extends Entity {
                             this.x = targetShadow.x;
                             this.y = targetShadow.y;
                             targetShadow.dead = true;
-                            this.gensanSwitchCD = 6000;
                             this.invincible = 200;
                             if (this.buffs) this.buffs.msBoost = 500;
                             for(let i=0; i<20; i++) game.particles.push(new Particle(this.x+this.w/2, this.y+this.h/2, "#fff", (Math.random()-0.5)*10, (Math.random()-0.5)*10, 400));
@@ -2280,11 +2276,16 @@ class Fighter extends Entity {
         if (this.heroName === 'Gensan') {
             if (this.superCooldown <= 0) {
                 this.superCooldown = this.superCooldownMax;
-                // Giant Sword forward
-                let swordX = this.facing === 1 ? this.x + 150 : this.x - 150;
-                game.minions.push(new GiantSword(this, swordX - 30, -150)); 
                 
-                // Sword shadow at current position
+                let enemy = game.getEnemyOf(this);
+                let targetX = enemy && !enemy.dead ? enemy.x + enemy.w/2 : this.x + this.facing * 200;
+
+                // 召唤三把巨剑，中间一把对准敌人
+                game.minions.push(new GiantSword(this, targetX - 150 - 30, -150)); 
+                game.minions.push(new GiantSword(this, targetX - 30, -150)); 
+                game.minions.push(new GiantSword(this, targetX + 150 - 30, -150)); 
+                
+                // 在原地留下持续8s的剑影
                 let shadow = new SwordShadow(this, this.x, this.y);
                 shadow.life = 8000;
                 shadow.maxLife = 8000;
@@ -3039,7 +3040,7 @@ class Game {
         }
         if (this.p1.heroName === 'Gensan') {
             p1Stat += `[Combo: ${this.p1.gensanCombo}/3] [Shadows: ${this.p1.gensanShadows.length}/2]`;
-            if (this.p1.gensanSwitchCD > 0) p1Stat += ` (Teleport CD)`;
+            // Removed Teleport CD display
         }
         if (this.p1.heroName === 'Volt') {
             p1Stat += ` [ENERGY: ${Math.floor(this.p1.energy)}/200]`;
@@ -3106,7 +3107,7 @@ class Game {
         }
         if (this.p2.heroName === 'Gensan') {
             p2Stat += `[Combo: ${this.p2.gensanCombo}/3] [Shadows: ${this.p2.gensanShadows.length}/2]`;
-            if (this.p2.gensanSwitchCD > 0) p2Stat += ` (Teleport CD)`;
+            // Removed Teleport CD display
         }
         if (this.p2.heroName === 'Volt') {
             p2Stat += ` [ENERGY: ${Math.floor(this.p2.energy)}/200]`;
@@ -3248,7 +3249,7 @@ class Game {
                     scores.attack += 100;
                 }
             }
-            
+
             if (p2.heroName === 'Kae') {
                 if (p2.kaeAggroTimer > 0) p2.kaeAggroTimer -= dt;
                 if (hpRatioP2 > 0.3 && p2.superCooldown <= 0 && p1.superCooldown > 0) {
@@ -3498,4 +3499,5 @@ window.dispatchEvent(new Event('resize'));
 </script>
 </body>
 </html>
+
 
