@@ -442,7 +442,7 @@ const HEROES = {
     Kila: {
         name: "Kila", desc: "Elemental Stance Mage",
         color: "#555555", maxHp: 750, speed: 4.8, jump: 14, width: 40, height: 70, superCD: 18000,
-        ui: { hp: "75 WRD", atk: "3~5 WRD (Multi)", passive: "Press [Switch] to rotate Elements (Fire->Water->Earth). 2s Invincibility while switching, but heavily slowed and cannot attack. 8s CD.", super: "Fire: Homing explosive Dragon. Water: Massive CC Wave. Earth: Spawns spikes on all platforms." }
+        ui: { hp: "75 WRD", atk: "3~5 WRD (Multi)", passive: "Press [Switch] to rotate Elements (Fire->Water->Earth). 2s Invincibility while switching, but heavily slowed and cannot attack. 10s CD.", super: "Fire: Homing explosive Dragon. Water: Massive CC Wave. Earth: Spawns spikes on platforms and ground (10 WRD, 5s Stun)." }
     },
     Volt: {
         name: "Volt", desc: "Flying Energy Marksman",
@@ -452,7 +452,12 @@ const HEROES = {
     Gensan: {
         name: "Gensan", desc: "Phantom Blade Master",
         color: "#cccccc", maxHp: 800, speed: 7, jump: 15, width: 40, height: 70, superCD: 18000,
-        ui: { hp: "80 WRD", atk: "3.2 WRD (Sword)", passive: "Every 4th attack deals 5.2 WRD with +30% range and slows for 1.2s. Moving continuously for 5s leaves a Sword Shadow (Max 2).", super: "<span class='skill-tag'>White Peak Array</span> Creates a large sword array (16 WRD total over 3s) that slows enemies by 40%. Press [Switch] to teleport to furthest shadow (6s CD)." }
+        ui: { hp: "80 WRD", atk: "3.2 WRD (Sword)", passive: "Every 4th attack deals 5.2 WRD with +30% range and slows for 1.2s. Moving continuously for 5s leaves a Sword Shadow (Max 2).", super: "<span class='skill-tag'>White Peak Array</span> Drops a giant sword in front (6 WRD AoE) and leaves a Sword Shadow at your position for 8s. Press [Switch] to teleport to furthest shadow (6s CD)." }
+    },
+    Noae: {
+        name: "Noae", desc: "Mine Engineer",
+        color: "#B8860B", maxHp: 650, speed: 4.8, jump: 14, width: 40, height: 70, superCD: 22000,
+        ui: { hp: "65 WRD", atk: "1.9 WRD (Pickaxe)", passive: "Press [Switch] to plant a Land Mine (Max 3, 2.5 WRD + 0.4s stun).", super: "Summons a bouncing Minecart (4.5s) that deals 2 WRD + 0.5s stun. Minecart detonates mines." }
     }
 };
 
@@ -477,7 +482,6 @@ class Entity {
         this.untargetable = false; 
     }
     update(dt) {} draw(ctx) {}
-    // 兜底方法，防止没有血量的实体被攻击时报错
     takeDamage(amt, attacker, isDoT = false, noKnockback = false) {} 
 }
 
@@ -504,19 +508,18 @@ class SwordShadow extends Entity {
         super(x, y, 40, 70);
         this.owner = owner;
         this.type = "sword_shadow";
-        this.life = 20000; // 20 seconds
+        this.life = 20000; 
         this.maxLife = 20000;
         this.facing = owner.facing;
         this.hp = 10;
         this.maxHp = 10;
-        this.untargetable = false; // 允许被敌人选定和攻击
+        this.untargetable = false; 
         this.buffs = {};
     }
     takeDamage(amt, attacker) {
         this.hp -= amt;
         if (this.hp <= 0) {
             this.dead = true;
-            // 击碎时产生白色碎片特效
             for(let i=0; i<15; i++) game.particles.push(new Particle(this.x+this.w/2, this.y+this.h/2, "#fff", (Math.random()-0.5)*10, (Math.random()-0.5)*10, 400));
         }
     }
@@ -537,13 +540,12 @@ class SwordShadow extends Entity {
         ctx.fillStyle = "#fff";
         ctx.fillRect(-this.w/2, 0, this.w, this.h);
         ctx.fillStyle = "#222";
-        ctx.fillRect(this.w/2 - 12, 10, 8, 8); // eye
+        ctx.fillRect(this.w/2 - 12, 10, 8, 8); 
         ctx.fillStyle = "#ddd"; 
-        ctx.fillRect(-this.w/2-2, -50, 4, 50); // sword
+        ctx.fillRect(-this.w/2-2, -50, 4, 50); 
         
         ctx.restore();
         
-        // 绘制剑影的血条
         ctx.fillStyle = "red"; ctx.fillRect(this.x, this.y - 12, this.w, 4);
         ctx.fillStyle = "#fff"; ctx.fillRect(this.x, this.y - 12, this.w * Math.max(0, this.hp/this.maxHp), 4);
         
@@ -551,66 +553,181 @@ class SwordShadow extends Entity {
     }
 }
 
-class SwordArray extends Entity {
-    constructor(owner, x, y, facing) {
-        super(x, y, 300, 100);
+class GiantSword extends Entity {
+    constructor(owner, x, y) {
+        super(x, y, 60, 150);
         this.owner = owner;
-        this.facing = facing;
-        if (facing === -1) this.x -= this.w; 
-        this.life = 3000;
-        this.tickTimer = 0;
-        this.type = "sword_array";
+        this.vy = 25; 
+        this.damageDealt = false;
         this.untargetable = true;
+        this.life = 1000; 
+    }
+    update(dt) {
+        if (this.life <= 0) { this.dead = true; return; }
+        
+        if (!this.damageDealt) {
+            this.y += this.vy;
+            let hitGround = false;
+            if (this.y + this.h >= GROUND_Y) { this.y = GROUND_Y - this.h; hitGround = true; }
+            else {
+                for (let plat of PLATFORMS) {
+                    if (this.y + this.h >= plat.y && this.y + this.h - this.vy <= plat.y && this.x + this.w > plat.x && this.x < plat.x + plat.w) {
+                        this.y = plat.y - this.h; hitGround = true; break;
+                    }
+                }
+            }
+            
+            if (hitGround) {
+                this.damageDealt = true;
+                game.createExplosion(this.x + this.w/2, this.y + this.h, 150, 60, this.owner, false, 800); 
+                for(let i=0; i<30; i++) game.particles.push(new Particle(this.x+this.w/2, this.y+this.h, "#fff", (Math.random()-0.5)*20, -Math.random()*15, 600));
+            }
+        } else {
+            this.life -= dt;
+        }
+    }
+    draw(ctx) {
+        ctx.globalAlpha = this.damageDealt ? this.life / 1000 : 1;
+        ctx.fillStyle = "#fff";
+        ctx.fillRect(this.x + 20, this.y, 20, this.h); 
+        ctx.fillStyle = "#8b4513";
+        ctx.fillRect(this.x + 10, this.y + 20, 40, 10); 
+        ctx.globalAlpha = 1.0;
+    }
+}
+
+class LandMine extends Entity {
+    constructor(owner, x, y) {
+        super(x, y, 20, 10);
+        this.owner = owner;
+        this.hp = 10;
+        this.maxHp = 10;
+        this.type = "landmine";
+        this.life = 20000;
+        this.untargetable = false;
+        this.blinkTimer = 0;
+    }
+    takeDamage(amt, attacker) {
+        if (this.dead) return;
+        this.explode();
+    }
+    explode() {
+        if (this.dead) return;
+        this.dead = true;
+        game.createExplosion(this.x + this.w/2, this.y + this.h/2, 60, 25, this.owner, false, 400); 
+    }
+    update(dt) {
+        this.life -= dt;
+        if (this.life <= 0) this.dead = true;
+        this.blinkTimer += dt;
+        
+        let enemy = game.getEnemyOf(this.owner);
+        if (enemy && !enemy.dead && Math.hypot((enemy.x+enemy.w/2) - (this.x+this.w/2), (enemy.y+enemy.h/2) - (this.y+this.h/2)) < 50) {
+            this.explode();
+        }
+    }
+    draw(ctx) {
+        ctx.fillStyle = "#555";
+        ctx.fillRect(this.x, this.y, this.w, this.h);
+        if (this.blinkTimer % 500 < 250) {
+            ctx.fillStyle = "red";
+            ctx.fillRect(this.x + 8, this.y - 4, 4, 4);
+        }
+    }
+}
+
+class Minecart extends Entity {
+    constructor(owner, x, y) {
+        super(x, y, 60, 40);
+        this.owner = owner;
+        this.facing = owner.facing;
+        this.vx = this.facing * 15;
+        this.life = 4500;
+        this.hp = 80;
+        this.maxHp = 80;
+        this.untargetable = false;
+        this.hitTargets = new Map(); 
+    }
+    takeDamage(amt, attacker) {
+        this.hp -= amt;
+        if (this.hp <= 0) {
+            this.dead = true;
+            game.createExplosion(this.x+this.w/2, this.y+this.h/2, 60, 10, this.owner, false);
+        }
     }
     update(dt) {
         this.life -= dt;
         if (this.life <= 0) this.dead = true;
         
-        this.tickTimer += dt;
-        if (this.tickTimer >= 500) {
-            this.tickTimer = 0;
-            // Safe filter: ignore dead, untargetable, the owner, and owner's minions
-            let targets = [game.p1, game.p2, ...game.minions].filter(t => t && !t.untargetable && t !== this.owner && t.owner !== this.owner && !t.dead && !(t.invincible > 0));
-            for (let t of targets) {
-                if (checkAABB(this, t)) {
-                    t.takeDamage(10, this.owner, true); // 1 WRD
-                    if (t.buffs) t.buffs.slow = Math.max(t.buffs.slow || 0, 500); // 40% slow applied continuously
+        this.vy += GRAVITY;
+        this.x += this.vx;
+        this.y += this.vy;
+        
+        let isGrounded = false;
+        if (this.y + this.h >= GROUND_Y) { this.y = GROUND_Y - this.h; this.vy = 0; isGrounded = true; }
+        
+        if (this.vy >= 0) {
+            for (let plat of PLATFORMS) {
+                if (this.y + this.h - this.vy <= plat.y && this.y + this.h >= plat.y && this.x + this.w > plat.x && this.x < plat.x + plat.w) {
+                    this.y = plat.y - this.h; this.vy = 0; isGrounded = true;
                 }
             }
         }
         
-        if (Math.random() < 0.5) {
-            let px = this.x + Math.random() * this.w;
-            game.particles.push(new Particle(px, this.y + this.h, "#fff", 0, -10 - Math.random()*10, 300, 3));
+        if (this.x <= 0) {
+            this.x = 0; this.vx *= -1; this.facing = 1;
+            for(let i=0;i<5;i++) game.particles.push(new Particle(this.x, this.y+this.h, "#ffaa00", (Math.random())*5, -Math.random()*5, 300));
+            this.hitTargets.clear(); 
+        } else if (this.x + this.w >= CANVAS_W) {
+            this.x = CANVAS_W - this.w; this.vx *= -1; this.facing = -1;
+            for(let i=0;i<5;i++) game.particles.push(new Particle(this.x+this.w, this.y+this.h, "#ffaa00", -(Math.random())*5, -Math.random()*5, 300));
+            this.hitTargets.clear();
+        }
+        
+        let targets = [game.p1, game.p2, ...game.minions].filter(t => t && t !== this && t !== this.owner && !t.dead);
+        for(let t of targets) {
+            if (checkAABB(this, t)) {
+                if (t instanceof LandMine) {
+                    t.explode();
+                } else if (!t.untargetable && (!this.hitTargets.has(t) || Date.now() - this.hitTargets.get(t) > 1000)) {
+                    t.takeDamage(20, this.owner);
+                    if (t.buffs) t.buffs.dizzy = Math.max(t.buffs.dizzy || 0, 500);
+                    this.hitTargets.set(t, Date.now());
+                }
+            }
         }
     }
     draw(ctx) {
-        ctx.fillStyle = "rgba(255, 255, 255, 0.3)";
-        ctx.fillRect(this.x, this.y, this.w, this.h);
-        ctx.strokeStyle = "#fff";
-        ctx.lineWidth = 2;
-        ctx.strokeRect(this.x, this.y, this.w, this.h);
+        ctx.save();
+        ctx.translate(this.x + this.w/2, this.y + this.h/2);
+        if (this.facing === -1) ctx.scale(-1, 1);
         
-        for(let i=0; i<this.w; i+=30) {
-            let hOffset = Math.sin((Date.now() + i*100) * 0.01) * 20 + 40;
-            ctx.fillStyle = "rgba(255, 255, 255, 0.6)";
-            ctx.beginPath();
-            ctx.moveTo(this.x + i, this.y + this.h);
-            ctx.lineTo(this.x + i + 10, this.y + this.h - hOffset);
-            ctx.lineTo(this.x + i + 20, this.y + this.h);
-            ctx.fill();
-        }
+        ctx.fillStyle = "#4a4a4a";
+        ctx.fillRect(-this.w/2, -this.h/2, this.w, this.h - 10);
+        ctx.fillStyle = "#222";
+        ctx.beginPath(); ctx.arc(-this.w/2 + 15, this.h/2 - 5, 10, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(this.w/2 - 15, this.h/2 - 5, 10, 0, Math.PI*2); ctx.fill();
+        
+        ctx.fillStyle = "#ffd700";
+        ctx.fillRect(-10, -this.h/2 - 5, 20, 10);
+        
+        ctx.restore();
+        
+        ctx.fillStyle = "red"; ctx.fillRect(this.x, this.y - 10, this.w, 4);
+        ctx.fillStyle = "#00ff00"; ctx.fillRect(this.x, this.y - 10, this.w * (this.hp/this.maxHp), 4);
     }
 }
 
+
 class Hazard extends Entity {
-    constructor(x, y, w, h, delay, duration, damage, owner, color) {
+    constructor(x, y, w, h, delay, duration, damage, owner, color, ccDuration = 0) {
         super(x, y, w, h);
         this.delay = delay; 
         this.duration = duration; 
         this.damage = damage;
         this.owner = owner; 
         this.color = color; 
+        this.ccDuration = ccDuration;
         this.hitTargets = new Set();
         this.untargetable = true;
     }
@@ -628,6 +745,9 @@ class Hazard extends Entity {
         for (let t of targets) {
             if (checkAABB(this, t) && !this.hitTargets.has(t)) {
                 t.takeDamage(this.damage, this.owner);
+                if (this.ccDuration > 0 && t.buffs) {
+                    t.buffs.dizzy = Math.max(t.buffs.dizzy || 0, this.ccDuration);
+                }
                 this.hitTargets.add(t);
             }
         }
@@ -712,7 +832,7 @@ class Projectile extends Entity {
             let target = game.getEnemyOf(this.owner);
             let minDist = target ? Math.hypot(target.x - this.x, target.y - this.y) : 9999;
             for (let m of game.minions) {
-                if (m.owner !== this.owner && !m.dead && !m.untargetable) {
+                if (m && m.owner !== this.owner && !m.dead && !m.untargetable) {
                     let d = Math.hypot(m.x - this.x, m.y - this.y);
                     if (d < minDist) { minDist = d; target = m; }
                 }
@@ -743,7 +863,7 @@ class Projectile extends Entity {
         }
 
         if (!this.dead && this.type !== "dynamite") {
-            let targets = [game.getEnemyOf(this.owner), ...game.minions.filter(m => m.owner !== this.owner)];
+            let targets = [game.getEnemyOf(this.owner), ...game.minions.filter(m => m && m.owner !== this.owner)];
             for (let t of targets) {
                 if (!t || t.untargetable) continue; 
                 
@@ -757,7 +877,7 @@ class Projectile extends Entity {
                         for(let i=0; i<15; i++) game.particles.push(new Particle(this.x, this.y, "#ffffff", (Math.random()-0.5)*20, (Math.random()-0.5)*20, 300, 6));
                         for(let i=0; i<10; i++) game.particles.push(new Particle(this.x, this.y, "#ffd700", (Math.random()-0.5)*15, (Math.random()-0.5)*15, 400, 4));
                     } else {
-                        let noKnockback = (this.type === "bullet" || this.type === "homing_bullet" || this.type === "ki_blast" || this.type === "magic_burst" || this.type === "paper_plane" || this.type === "blue_paper_plane" || this.type === "fire_bolt" || this.type === "water_bolt" || this.type === "tidal_wave" || this.type === "volt_laser"); 
+                        let noKnockback = (this.type === "bullet" || this.type === "homing_bullet" || this.type === "ki_blast" || this.type === "magic_burst" || this.type === "paper_plane" || this.type === "blue_paper_plane" || this.type === "fire_bolt" || this.type === "water_bolt" || this.type === "tidal_wave" || this.type === "volt_laser" || this.type === "pickaxe"); 
                         t.takeDamage(this.damage, this.owner, false, noKnockback);
                         
                         if (t.buffs) {
@@ -794,7 +914,11 @@ class Projectile extends Entity {
                             this.owner.hp = Math.min(this.owner.maxHp, this.owner.hp + 50); 
                             for(let i=0; i<8; i++) game.particles.push(new Particle(this.owner.x + Math.random()*this.owner.w, this.owner.y + Math.random()*this.owner.h, "#32CD32", 0, -Math.random()*4, 500, 5));
                         }
-                        for(let i=0; i<5; i++) game.particles.push(new Particle(this.x, this.y, this.color, (Math.random()-0.5)*5, (Math.random()-0.5)*5, 300));
+                        if (this.type === "pickaxe") {
+                            for(let i=0; i<8; i++) game.particles.push(new Particle(this.x, this.y, "#888", (Math.random()-0.5)*8, (Math.random()-0.5)*8, 200, 3));
+                        } else {
+                            for(let i=0; i<5; i++) game.particles.push(new Particle(this.x, this.y, this.color, (Math.random()-0.5)*5, (Math.random()-0.5)*5, 300));
+                        }
                     }
                     
                     this.hitTargets.add(t);
@@ -847,6 +971,20 @@ class Projectile extends Entity {
             ctx.fillStyle = "#ccc";
             ctx.beginPath(); ctx.moveTo(0, -10); ctx.lineTo(15, -20); ctx.lineTo(20, 0); ctx.lineTo(0, 5); ctx.fill();
             ctx.beginPath(); ctx.moveTo(0, -10); ctx.lineTo(-15, -20); ctx.lineTo(-20, 0); ctx.lineTo(0, 5); ctx.fill(); 
+            ctx.restore();
+            this.timer += 16;
+        } else if (this.type === "pickaxe") {
+            ctx.save(); ctx.translate(this.x + this.w/2, this.y + this.h/2);
+            ctx.rotate(this.timer * 0.02 * (this.vx > 0 ? 1 : -1));
+            ctx.fillStyle = "#8B4513";
+            ctx.fillRect(-3, -15, 6, 30);
+            ctx.fillStyle = "#A9A9A9";
+            ctx.beginPath();
+            ctx.moveTo(-15, -10);
+            ctx.quadraticCurveTo(0, -25, 15, -10);
+            ctx.lineTo(15, -5);
+            ctx.quadraticCurveTo(0, -15, -15, -5);
+            ctx.fill();
             ctx.restore();
             this.timer += 16;
         } else if (this.type === "paper_plane" || this.type === "blue_paper_plane") {
@@ -1192,7 +1330,7 @@ class Puppet extends Entity {
 class Hurricane extends Entity {
     constructor(owner, x, y) {
         super(x, y, 100, 120); // 修复：将高度从 300 降低到 120，使其可以被跳过
-        this.owner = owner; this.timer = 15000; this.tickTimer = 0; this.stunTickTimer = 0;
+        this.owner = owner; this.timer = 5000; this.tickTimer = 0; this.stunTickTimer = 0;
     }
     update(dt) {
         this.timer -= dt; if (this.timer <= 0) this.dead = true;
@@ -1880,6 +2018,13 @@ class Fighter extends Entity {
                             for(let i=0; i<20; i++) game.particles.push(new Particle(this.x+this.w/2, this.y+this.h/2, "#fff", (Math.random()-0.5)*10, (Math.random()-0.5)*10, 400));
                         }
                     }
+                } else if (this.heroName === 'Noae' && this.attackState === 'idle') {
+                    let mineCount = game.minions.filter(m => m.type === 'landmine' && m.owner === this).length;
+                    if (mineCount >= 3) {
+                        let oldestMine = game.minions.find(m => m.type === 'landmine' && m.owner === this);
+                        if (oldestMine) oldestMine.dead = true;
+                    }
+                    game.minions.push(new LandMine(this, this.x + this.w/2 - 10, this.y + this.h - 10));
                 }
             }
             if (keysPressed[this.controls.attack] && this.attackState === 'idle') {
@@ -1940,7 +2085,7 @@ class Fighter extends Entity {
     }
 
     isMeleeAttack() {
-        if (this.heroName === 'Hason' || this.heroName === 'Willi' || this.heroName === 'Ugo' || this.heroName === 'Kila' || this.heroName === 'Volt') return false;
+        if (this.heroName === 'Hason' || this.heroName === 'Willi' || this.heroName === 'Ugo' || this.heroName === 'Kila' || this.heroName === 'Volt' || this.heroName === 'Noae') return false;
         if (this.heroName === 'Euclid' && this.euclidWeapon === 'magic') return false;
         if (this.heroName === 'Hunter' && this.hunterWeapon === 'musket') return false;
         if (this.heroName === 'Kadaxi' && this.comboCount === 3) return false; 
@@ -2009,6 +2154,7 @@ class Fighter extends Entity {
         if (this.heroName === 'Kila') this.stateTimer = this.kilaElement === 'fire' ? 500 : (this.kilaElement === 'water' ? 250 : 500);
         if (this.heroName === 'Volt') this.stateTimer = this.overdriveTimer > 0 ? 25 : 50;
         if (this.heroName === 'Gensan') this.stateTimer = 100;
+        if (this.heroName === 'Noae') this.stateTimer = 150;
         
         this.maxStateTimer = this.stateTimer;
         this.hasHit = false;
@@ -2019,7 +2165,7 @@ class Fighter extends Entity {
     executeActiveAttack() {
         let target = game.getEnemyOf(this);
 
-        if (this.heroName === 'Hason' || this.heroName === 'Willi' || this.heroName === 'Euclid' || this.heroName === 'Ugo' || this.heroName === 'Kila' || this.heroName === 'Volt') {
+        if (this.heroName === 'Hason' || this.heroName === 'Willi' || this.heroName === 'Euclid' || this.heroName === 'Ugo' || this.heroName === 'Kila' || this.heroName === 'Volt' || this.heroName === 'Noae') {
             let minDist = target ? Math.hypot(target.x - this.x, target.y - this.y) : 9999;
             for (let m of game.minions) {
                 if (m && m.owner !== this && !m.dead) {
@@ -2124,13 +2270,26 @@ class Fighter extends Entity {
             let color = this.buffs.bloodFrenzy > 0 ? "#ff0000" : "#ffffff";
             for(let i=0; i<4; i++) game.particles.push(new Particle(px, py, color, this.facing*(Math.random()*5+5), (Math.random()-0.5)*5, 150, 3));
         }
+        else if (this.heroName === 'Noae') {
+            let speed = 18;
+            game.projectiles.push(new Projectile(px, py, 25, 25, Math.cos(aimAngle)*speed, Math.sin(aimAngle)*speed, 19, this, "#A9A9A9", "pickaxe"));
+        }
     }
 
     performSuper() {
         if (this.heroName === 'Gensan') {
             if (this.superCooldown <= 0) {
                 this.superCooldown = this.superCooldownMax;
-                game.minions.push(new SwordArray(this, this.facing === 1 ? this.x + this.w : this.x, GROUND_Y - 100, this.facing));
+                // Giant Sword forward
+                let swordX = this.facing === 1 ? this.x + 150 : this.x - 150;
+                game.minions.push(new GiantSword(this, swordX - 30, -150)); 
+                
+                // Sword shadow at current position
+                let shadow = new SwordShadow(this, this.x, this.y);
+                shadow.life = 8000;
+                shadow.maxLife = 8000;
+                this.gensanShadows.push(shadow);
+                game.minions.push(shadow);
             }
             return;
         }
@@ -2154,9 +2313,12 @@ class Fighter extends Entity {
                 } else if (this.kilaElement === 'water') {
                     game.projectiles.push(new Projectile(this.facing === 1 ? this.x+this.w : this.x-80, this.y-50, 80, 120, this.facing * 12, 0, 10, this, "rgba(30, 144, 255, 0.7)", "tidal_wave"));
                 } else if (this.kilaElement === 'earth') {
+                    let earthDmg = 100; // 10 WRD
+                    let earthCC = 5000; // 5 seconds stun
                     PLATFORMS.forEach(p => {
-                        game.hazards.push(new Hazard(p.x, p.y - 30, p.w, 30, 0, 1500, 30, this, "#8B4513"));
+                        game.hazards.push(new Hazard(p.x, p.y - 30, p.w, 30, 0, 1500, earthDmg, this, "#8B4513", earthCC));
                     });
+                    game.hazards.push(new Hazard(0, GROUND_Y - 30, CANVAS_W, 30, 0, 1500, earthDmg, this, "#8B4513", earthCC));
                 }
             }
             return;
@@ -2281,6 +2443,13 @@ class Fighter extends Entity {
             game.projectiles.push(new Projectile(px, py, 40, 8, knifeFacing * 25, 0, 53, this, "#0ff", "large_knife"));
             return;
         }
+        
+        if (this.heroName === 'Noae') {
+            this.superCooldown = this.superCooldownMax;
+            let mcX = this.facing === 1 ? this.x + this.w : this.x - 60;
+            game.minions.push(new Minecart(this, mcX, this.y));
+            return;
+        }
 
         this.superCooldown = this.superCooldownMax;
         
@@ -2289,7 +2458,7 @@ class Fighter extends Entity {
         if (this.heroName === 'Hunter') {
             this.maxHp += 50; this.hp += 50; this.baseJump = 18;
             let hx = this.facing === 1 ? this.x + this.w + 10 : this.x - 110;
-            game.hurricane = new Hurricane(this, hx, GROUND_Y - 120); // 修复：生成时的 Y 坐标也要减去新的高度 120 (原为 300)
+            game.hurricane = new Hurricane(this, hx, GROUND_Y - 120); 
         }
         else if (this.heroName === 'Macu') {
             this.buffs.battleCry = 30000; 
@@ -2541,12 +2710,12 @@ class Fighter extends Entity {
                 if (baseAimAngle > Math.PI/3) baseAimAngle = Math.PI/3; if (baseAimAngle < -Math.PI/3) baseAimAngle = -Math.PI/3;
                 let thrust = 0; let angle = baseAimAngle;
                 if (this.attackState === 'windup') { thrust = -30 * phaseProg; angle = baseAimAngle - (0.2 * phaseProg); }
-                else if (this.attackState === 'active') { thrust = -30 + (110 * Math.sin(phaseProg * Math.PI)); angle = baseAimAngle; } 
+                else if (this.attackState === 'active') { thrust = -30 + (140 * Math.sin(phaseProg * Math.PI)); angle = baseAimAngle; } // longer visual thrust
                 else if (this.attackState === 'recovery') { thrust = 0; angle = baseAimAngle; }
                 ctx.rotate(angle);
                 if (this.attackState === 'active') { ctx.fillStyle = "rgba(200, 255, 200, 0.5)"; ctx.fillRect(-2, -50 - thrust, 4, thrust + 20); }
-                ctx.fillStyle = "#8B4513"; ctx.fillRect(-3, -50 - thrust, 6, 110); 
-                ctx.fillStyle = "#ddd"; ctx.beginPath(); ctx.moveTo(0, -50 - thrust); ctx.lineTo(-6, -75 - thrust); ctx.lineTo(6, -75 - thrust); ctx.fill(); 
+                ctx.fillStyle = "#8B4513"; ctx.fillRect(-3, -50 - thrust, 6, 110 + (this.attackState === 'active' ? 40 : 0)); // Spear elongates
+                ctx.fillStyle = "#ddd"; ctx.beginPath(); ctx.moveTo(0, -50 - thrust); ctx.lineTo(-6, -75 - thrust - (this.attackState==='active'?40:0)); ctx.lineTo(6, -75 - thrust - (this.attackState==='active'?40:0)); ctx.fill(); 
             }
             ctx.restore();
         }
@@ -2653,6 +2822,18 @@ class Fighter extends Entity {
             }
             ctx.restore();
         }
+        else if (this.heroName === 'Noae') {
+            ctx.save(); ctx.translate(hw, 20);
+            let angle = 0;
+            if (this.attackState === 'windup') angle = -1.0 * phaseProg;
+            else if (this.attackState === 'active') angle = -1.0 + (3.0 * phaseProg);
+            else if (this.attackState === 'recovery') angle = 2.0 - (2.0 * phaseProg);
+            ctx.rotate(angle);
+            ctx.fillStyle = "#8B4513"; ctx.fillRect(-3, -20, 6, 40); 
+            ctx.fillStyle = "#A9A9A9";
+            ctx.beginPath(); ctx.moveTo(-15, -15); ctx.quadraticCurveTo(0, -30, 15, -15); ctx.lineTo(15, -10); ctx.quadraticCurveTo(0, -20, -15, -10); ctx.fill();
+            ctx.restore();
+        }
 
         ctx.restore();
         
@@ -2679,8 +2860,8 @@ class Game {
         this.lastTime = 0;
         this.state = 'MENU'; 
         
-        this.p1Choice = 'Gensan';
-        this.p2Choice = 'Ugo'; 
+        this.p1Choice = 'Noae';
+        this.p2Choice = 'Gensan'; 
         
         this.setupMenu();
         updateControlsDisplay();
@@ -2799,7 +2980,8 @@ class Game {
             if (!friendlyFire && (t === owner || t.owner === owner)) continue;
             if (!t.dead && Math.hypot((t.x + t.w/2) - x, (t.y + t.h/2) - y) <= radius) {
                 t.takeDamage(damage, owner);
-                if (stunDuration > 0 && !t.dead && t.invincible <= 0) {
+                if (stunDuration > 0 && !t.dead && !(t.invincible > 0)) {
+                    if(!t.buffs) t.buffs = {};
                     t.buffs.dizzy = Math.max(t.buffs.dizzy || 0, stunDuration);
                 }
             }
@@ -2864,6 +3046,10 @@ class Game {
             if (this.p1.isOverloaded) p1Stat += " [OVERLOAD!]";
             if (this.p1.overdriveTimer > 0) p1Stat += " [OVERDRIVE]";
         }
+        if (this.p1.heroName === 'Noae') {
+            let mineCount = this.minions.filter(m => m.type === 'landmine' && m.owner === this.p1).length;
+            p1Stat += `[Mines: ${mineCount}/3]`;
+        }
         if (this.p1.buffs.poison > 0) p1Stat += " [POISONED]";
         if (this.p1.buffs.burn > 0) p1Stat += " [BURN]";
         if (this.p1.buffs.dizzy > 0) p1Stat += " [DIZZY]";
@@ -2926,6 +3112,10 @@ class Game {
             p2Stat += ` [ENERGY: ${Math.floor(this.p2.energy)}/200]`;
             if (this.p2.isOverloaded) p2Stat += " [OVERLOAD!]";
             if (this.p2.overdriveTimer > 0) p2Stat += " [OVERDRIVE]";
+        }
+        if (this.p2.heroName === 'Noae') {
+            let mineCount = this.minions.filter(m => m.type === 'landmine' && m.owner === this.p2).length;
+            p2Stat += `[Mines: ${mineCount}/3]`;
         }
         if (this.p2.buffs.poison > 0) p2Stat += " [POISONED]";
         if (this.p2.buffs.burn > 0) p2Stat += " [BURN]";
@@ -3023,6 +3213,7 @@ class Game {
             if (p2.heroName === 'Lique') attackRange = 65;
             if (p2.heroName === 'Kae') attackRange = 55;
             if (p2.heroName === 'Euclid' && p2.euclidWeapon === 'magic') attackRange = 400; 
+            if (p2.heroName === 'Noae') attackRange = 300;
 
             if (p2.heroName === 'Kadaxi') {
                 if (p2.grapplePhase === 1) {
@@ -3116,6 +3307,16 @@ class Game {
                     } else if (p2.kilaElement === 'earth') {
                         if (dist < 600 && p2.superCooldown <= 0) scores.superSkill += 150; 
                     }
+                }
+            }
+
+            if (p2.heroName === 'Noae') {
+                let mineCount = this.minions.filter(m => m.type === 'landmine' && m.owner === p2).length;
+                if (mineCount < 3 && dist > 150 && Math.random() < 0.05) {
+                    scores.switch += 150; // randomly plant mines
+                }
+                if (dist < 300 && p2.superCooldown <= 0) {
+                    scores.superSkill += 200; // use minecart
                 }
             }
 
@@ -3297,4 +3498,3 @@ window.dispatchEvent(new Event('resize'));
 </script>
 </body>
 </html>
-
