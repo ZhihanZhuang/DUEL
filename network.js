@@ -1,17 +1,11 @@
-// ==========================================
-// Otokojuku: Legends Duel - Network & P2P Module
-// ==========================================
-import { initializeApp } from "firebase/app";
+console.log("【Debug】network.js 已经开始执行！");
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
 import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 import { getFirestore, doc, setDoc, getDoc, updateDoc, onSnapshot, arrayUnion, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 // --- 1. Firebase 初始化与配置 ---
 // 在 WebStorm 本地开发时，请替换为你自己的 Firebase 配置，否则联机服务将无法连接。
-// Import the functions you need from the SDKs you need
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
-
-// Your web app's Firebase configuration
 const firebaseConfig = {
     apiKey: "AIzaSyBmBPtd8ugMe4nOnH5o0u60EbTCEtU-_n0",
     authDomain: "duel-48831.firebaseapp.com",
@@ -20,9 +14,6 @@ const firebaseConfig = {
     messagingSenderId: "908084167975",
     appId: "1:908084167975:web:4df8cb555e8aabd3309502"
 };
-
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
 
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'otokojuku-duel-local';
 let app, auth, db;
