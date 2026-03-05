@@ -457,7 +457,7 @@ const HEROES = {
     Noae: {
         name: "Noae", desc: "Mine Engineer",
         color: "#B8860B", maxHp: 650, speed: 4.8, jump: 14, width: 40, height: 70, superCD: 22000,
-        ui: { hp: "65 WRD", atk: "1.9 WRD (Pickaxe)", passive: "Press [Switch] to plant a Land Mine (Max 3, 2.5 WRD + 0.4s stun).", super: "Summons a bouncing Minecart (4.5s) that deals 2 WRD + 0.5s stun. Minecart detonates mines." }
+        ui: { hp: "65 WRD", atk: "1.9 WRD (Pickaxe)", passive: "Press [Switch] to plant a Land Mine (Max 3, 2.5 WRD + 0.4s stun).", super: "Summons a bouncing Minecart (10s) that deals 2 WRD + 0.5s stun. Minecart detonates mines." }
     }
 };
 
@@ -642,7 +642,7 @@ class Minecart extends Entity {
         this.owner = owner;
         this.facing = owner.facing;
         this.vx = this.facing * 15;
-        this.life = 4500;
+        this.life = 10000;
         this.hp = 80;
         this.maxHp = 80;
         this.untargetable = false;
@@ -3498,3 +3498,4 @@ window.dispatchEvent(new Event('resize'));
 </script>
 </body>
 </html>
+
