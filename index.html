@@ -566,7 +566,7 @@ class SwordArray extends Entity {
             let targets = [game.p1, game.p2, ...game.minions].filter(t => !t.untargetable && t !== this.owner && t.owner !== this.owner && !t.dead && !(t.invincible > 0));
             for (let t of targets) {
                 if (checkAABB(this, t)) {
-                    t.takeDamage(120, this.owner, true); // 1 WRD
+                    t.takeDamage(100, this.owner, true); // 1 WRD
                     if (t.buffs) t.buffs.slow = Math.max(t.buffs.slow || 0, 1200); // 40% slow applied continuously
                 }
             }
@@ -3281,5 +3281,6 @@ window.dispatchEvent(new Event('resize'));
 </script>
 </body>
 </html>
+
 
 
