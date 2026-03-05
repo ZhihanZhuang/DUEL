@@ -1191,8 +1191,8 @@ class Puppet extends Entity {
 
 class Hurricane extends Entity {
     constructor(owner, x, y) {
-        super(x, y, 100, 120);
-        this.owner = owner; this.timer = 5000; this.tickTimer = 0; this.stunTickTimer = 0;
+        super(x, y, 100, 120); // 修复：将高度从 300 降低到 120，使其可以被跳过
+        this.owner = owner; this.timer = 15000; this.tickTimer = 0; this.stunTickTimer = 0;
     }
     update(dt) {
         this.timer -= dt; if (this.timer <= 0) this.dead = true;
@@ -2289,7 +2289,7 @@ class Fighter extends Entity {
         if (this.heroName === 'Hunter') {
             this.maxHp += 50; this.hp += 50; this.baseJump = 18;
             let hx = this.facing === 1 ? this.x + this.w + 10 : this.x - 110;
-            game.hurricane = new Hurricane(this, hx, GROUND_Y - 120); 
+            game.hurricane = new Hurricane(this, hx, GROUND_Y - 120); // 修复：生成时的 Y 坐标也要减去新的高度 120 (原为 300)
         }
         else if (this.heroName === 'Macu') {
             this.buffs.battleCry = 30000; 
