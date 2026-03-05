@@ -442,7 +442,7 @@ const HEROES = {
     Kila: {
         name: "Kila", desc: "Elemental Stance Mage",
         color: "#555555", maxHp: 750, speed: 4.8, jump: 14, width: 40, height: 70, superCD: 18000,
-        ui: { hp: "75 WRD", atk: "3~5 WRD (Multi)", passive: "Press [Switch] to rotate Elements (Fire->Water->Earth). 2s Invincibility while switching, but heavily slowed and cannot attack. 8s CD.", super: "Fire: Homing explosive Dragon. Water: Massive CC Wave. Earth: Spawns spikes on all platforms." }
+        ui: { hp: "75 WRD", atk: "3~5 WRD (Multi)", passive: "Press [Switch] to rotate Elements (Fire->Water->Earth). 2s Invincibility while switching, but heavily slowed and cannot attack. 8s CD.", super: "Fire: Homing explosive Dragon. Water: Massive CC Wave. Earth: Spawns spikes on platforms and ground (10 WRD, 5s Stun)." }
     },
     Volt: {
         name: "Volt", desc: "Flying Energy Marksman",
@@ -597,13 +597,14 @@ class SwordArray extends Entity {
 }
 
 class Hazard extends Entity {
-    constructor(x, y, w, h, delay, duration, damage, owner, color) {
+    constructor(x, y, w, h, delay, duration, damage, owner, color, ccDuration = 0) {
         super(x, y, w, h);
         this.delay = delay; 
         this.duration = duration; 
         this.damage = damage;
         this.owner = owner; 
         this.color = color; 
+        this.ccDuration = ccDuration;
         this.hitTargets = new Set();
         this.untargetable = true;
     }
@@ -621,6 +622,9 @@ class Hazard extends Entity {
         for (let t of targets) {
             if (checkAABB(this, t) && !this.hitTargets.has(t)) {
                 t.takeDamage(this.damage, this.owner);
+                if (this.ccDuration > 0 && t.buffs) {
+                    t.buffs.dizzy = Math.max(t.buffs.dizzy || 0, this.ccDuration);
+                }
                 this.hitTargets.add(t);
             }
         }
@@ -1236,6 +1240,7 @@ class Fighter extends Entity {
         this.grappledBy = null; 
         this.flipCooldown = 0; 
         this.timeSinceLastDamage = 0; 
+        this.flightDisabled = false;
         
         this.hasonAmmo = 6; this.hasonReloadTimer = 0; this.hasonSuperCharges = 0; this.hasonSuperWindow = 0;
         this.williSuperCharges = 0; this.williSuperWindow = 0; this.williDashCooldown = 0; 
@@ -1333,6 +1338,7 @@ class Fighter extends Entity {
             this.vx = direction * (amt * 0.5);
             this.vy = -Math.min(amt * 0.3, 10);
             game.hitstop = 60;
+            if (this.heroName === 'Volt') this.flightDisabled = true;
         }
         
         for(let i=0; i<6; i++) {
@@ -1495,6 +1501,7 @@ class Fighter extends Entity {
         if (this.buffs.dizzy > 0) {
             this.buffs.dizzy -= dt;
             if (this.attackState !== 'idle') this.attackState = 'idle';
+            if (this.heroName === 'Volt') this.flightDisabled = true;
         }
         if (this.buffs.slow > 0) {
             this.buffs.slow -= dt; currentSpeed *= 0.5; 
@@ -1566,7 +1573,7 @@ class Fighter extends Entity {
 
         let applyGravity = true;
 
-        if (this.heroName === 'Volt' && !this.isOverloaded && (this.overdriveTimer > 0 || this.energy > 0) && canAct) {
+        if (this.heroName === 'Volt' && !this.isOverloaded && (this.overdriveTimer > 0 || this.energy > 0) && canAct && !this.flightDisabled) {
             if (!this.isGrounded || keys[this.controls.jump]) {
                 applyGravity = false;
                 this.vy *= 0.85; 
@@ -1599,6 +1606,7 @@ class Fighter extends Entity {
             this.coyoteTime = 100; 
             this.jumpsLeft = this.maxJumps; 
             this.hasFlipped = false; 
+            this.flightDisabled = false;
         } 
         else { this.coyoteTime -= dt; }
 
@@ -2135,9 +2143,12 @@ class Fighter extends Entity {
                 } else if (this.kilaElement === 'water') {
                     game.projectiles.push(new Projectile(this.facing === 1 ? this.x+this.w : this.x-80, this.y-50, 80, 120, this.facing * 12, 0, 10, this, "rgba(30, 144, 255, 0.7)", "tidal_wave"));
                 } else if (this.kilaElement === 'earth') {
+                    let earthDmg = 100; // 10 WRD
+                    let earthCC = 5000; // 5 seconds stun
                     PLATFORMS.forEach(p => {
-                        game.hazards.push(new Hazard(p.x, p.y - 30, p.w, 30, 0, 1500, 30, this, "#8B4513"));
+                        game.hazards.push(new Hazard(p.x, p.y - 30, p.w, 30, 0, 1500, earthDmg, this, "#8B4513", earthCC));
                     });
+                    game.hazards.push(new Hazard(0, GROUND_Y - 30, CANVAS_W, 30, 0, 1500, earthDmg, this, "#8B4513", earthCC));
                 }
             }
             return;
