@@ -538,7 +538,13 @@ class SwordArray extends Entity {
         this.tickTimer += dt;
         if (this.tickTimer >= 500) {
             this.tickTimer = 0;
-            let targets = [game.p1, game.p2, ...game.minions].filter(t => t.owner !== this.owner && !t.dead && t.invincible <= 0);
+            // 确保同时排除“施法者本人”和“施法者的召唤物”
+            let targets = [game.p1, game.p2, ...game.minions].filter(t => 
+                t !== this.owner &&             // 【必须加这句】排除 Gensan 本人
+                t.owner !== this.owner &&       // 排除 Gensan 召唤的剑影
+                !t.dead && 
+                t.invincible <= 0
+            );
             for (let t of targets) {
                 if (checkAABB(this, t)) {
                     t.takeDamage(10, this.owner, true); // 1 WRD
@@ -3239,4 +3245,5 @@ window.dispatchEvent(new Event('resize'));
 </script>
 </body>
 </html>
+
 
