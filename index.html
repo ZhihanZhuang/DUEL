@@ -391,7 +391,7 @@ const HEROES = {
     },
     Hunter: {
         name: "Hunter", desc: "Pirate with Musket & Great Sword",
-        color: "#008080", maxHp: 750, speed: 4.5, jump: 14, width: 45, height: 70, superCD: 13000,
+        color: "#008080", maxHp: 750, speed: 4.5, jump: 14, width: 45, height: 70, superCD: 25000,
         ui: { hp: "75 WRD", atk: "1.7 WRD (Sword) / 2.0 WRD (Musket Homing)", passive: "Press [Switch] to swap weapons. Switching instantly resets musket cooldown (1s).", super: "Summons a hurricane that damages, stuns (0.5s), and blocks projectiles. Boosts HP & Jump." }
     },
     Macu: {
@@ -1189,7 +1189,7 @@ class Puppet extends Entity {
 class Hurricane extends Entity {
     constructor(owner, x, y) {
         super(x, y, 100, 300);
-        this.owner = owner; this.timer = 15000; this.tickTimer = 0; this.stunTickTimer = 0;
+        this.owner = owner; this.timer = 10000; this.tickTimer = 0; this.stunTickTimer = 0;
     }
     update(dt) {
         this.timer -= dt; if (this.timer <= 0) this.dead = true;
@@ -1207,7 +1207,7 @@ class Hurricane extends Entity {
             this.stunTickTimer = 0;
             let targets = [game.getEnemyOf(this.owner), ...game.minions.filter(m => m.owner !== this.owner && !m.untargetable)];
             for (let t of targets) {
-                if (!t.dead && checkAABB(this, t)) { t.buffs = t.buffs || {}; t.buffs.dizzy = 500; }
+                if (!t.dead && checkAABB(this, t)) { t.buffs = t.buffs || {}; t.buffs.dizzy = 100; }
             }
         }
         if(Math.random() < 0.3) game.particles.push(new Particle(this.x + Math.random()*this.w, this.y + Math.random()*this.h, "#aaddff", (Math.random()-0.5)*4, -Math.random()*5, 400));
@@ -3281,6 +3281,7 @@ window.dispatchEvent(new Event('resize'));
 </script>
 </body>
 </html>
+
 
 
 
