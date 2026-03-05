@@ -547,7 +547,7 @@ class SwordArray extends Entity {
             );
             for (let t of targets) {
                 if (checkAABB(this, t)) {
-                    t.takeDamage(10, this.owner, true); // 1 WRD
+                    t.takeDamage(50, this.owner, true); // 1 WRD
                     t.buffs.slow = Math.max(t.buffs.slow || 0, 500); // 40% slow applied continuously
                 }
             }
@@ -3245,5 +3245,6 @@ window.dispatchEvent(new Event('resize'));
 </script>
 </body>
 </html>
+
 
 
