@@ -577,7 +577,7 @@ class GiantSword extends Entity {
             if (hitGround) {
                 this.damageDealt = true;
                 // 修复：爆炸造成 9 WRD 伤害 (90点) 和 5 秒控制 (5000ms)
-                game.createExplosion(this.x + this.w/2, this.y + this.h, 150, 90, this.owner, false, 5000); 
+                game.createExplosion(this.x + this.w/2, this.y + this.h, 150, 90, this.owner, false, 2500); 
                 for(let i=0; i<30; i++) game.particles.push(new Particle(this.x+this.w/2, this.y+this.h, "#fff", (Math.random()-0.5)*20, -Math.random()*15, 600));
             }
         } else {
@@ -3499,5 +3499,6 @@ window.dispatchEvent(new Event('resize'));
 </script>
 </body>
 </html>
+
 
 
