@@ -451,8 +451,8 @@ const HEROES = {
     },
     Gensan: {
         name: "Gensan", desc: "Phantom Blade Master",
-        color: "#cccccc", maxHp: 800, speed: 5.5, jump: 15, width: 40, height: 70, superCD: 18000,
-        ui: { hp: "80 WRD", atk: "2.2 WRD (Sword)", passive: "Every 4th attack deals 3.5 WRD with +30% range and slows for 1.2s. Moving continuously for 5s leaves a Sword Shadow (Max 2).", super: "<span class='skill-tag'>White Peak Array</span> Creates a large sword array (6 WRD total over 3s) that slows enemies by 40%. Press [Switch] to teleport to furthest shadow (6s CD)." }
+        color: "#cccccc", maxHp: 800, speed: 8, jump: 18, width: 40, height: 70, superCD: 6000,
+        ui: { hp: "80 WRD", atk: "2.2 WRD (Sword)", passive: "Every 4th attack deals 3.5 WRD with +30% range and slows for 1.2s. Moving continuously for 5s leaves a Sword Shadow (Max 2).", super: "<span class='skill-tag'>White Peak Array</span> Creates a large sword array (16 WRD total over 3s) that slows enemies by 40%. Press [Switch] to teleport to furthest shadow (6s CD)." }
     }
 };
 
@@ -501,7 +501,7 @@ class SwordShadow extends Entity {
         this.maxLife = 20000;
         this.facing = owner.facing;
         this.hp = 10;
-        this.maxHp = 10;
+        this.maxHp = 100;
         this.untargetable = false; // 允许被敌人选定和攻击
         this.buffs = {};
     }
@@ -566,8 +566,8 @@ class SwordArray extends Entity {
             let targets = [game.p1, game.p2, ...game.minions].filter(t => !t.untargetable && t !== this.owner && t.owner !== this.owner && !t.dead && !(t.invincible > 0));
             for (let t of targets) {
                 if (checkAABB(this, t)) {
-                    t.takeDamage(10, this.owner, true); // 1 WRD
-                    if (t.buffs) t.buffs.slow = Math.max(t.buffs.slow || 0, 500); // 40% slow applied continuously
+                    t.takeDamage(160, this.owner, true); // 1 WRD
+                    if (t.buffs) t.buffs.slow = Math.max(t.buffs.slow || 0, 1000); // 40% slow applied continuously
                 }
             }
         }
@@ -3281,3 +3281,4 @@ window.dispatchEvent(new Event('resize'));
 </script>
 </body>
 </html>
+
