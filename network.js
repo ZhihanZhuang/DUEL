@@ -37,9 +37,10 @@ window.isHost = false;
 window.mySelectedHero = 'Noae';
 window.currentRoomUnsub = null;
 
-// 防连点锁
+// 防连点锁与状态追踪
 let hostHandlingRtc = false;
 let clientHandlingRtc = false;
+let currentOfferSdp = null; // 用于追踪房主是否重新发起了连接
 
 // --- 2. 初始化网络 ---
 const initNetwork = async () => {
@@ -197,12 +198,12 @@ document.getElementById('btn-create-room').onclick = async () => {
     try {
         hostHandlingRtc = false;
         clientHandlingRtc = false;
+        currentOfferSdp = null;
         const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId);
         await setDoc(roomRef, {
             status: 'waiting', hostId: window.myUserId, hostName: window.myUserName, hostHero: 'Noae',
             clientId: null, clientName: null, clientHero: 'Wolf', 
-            messages: [{ sender: 'System', text: `房间创建成功！告诉朋友代码：${roomId}`, ts: Date.now() }],
-            callerCandidates: [], calleeCandidates: []
+            messages: [{ sender: 'System', text: `房间创建成功！告诉朋友代码：${roomId}`, ts: Date.now() }]
         });
         
         window.currentRoomId = roomId;
@@ -221,6 +222,7 @@ document.getElementById('btn-join-room').onclick = async () => {
     try {
         hostHandlingRtc = false;
         clientHandlingRtc = false;
+        currentOfferSdp = null;
         const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', code);
         const snap = await getDoc(roomRef);
         if (!snap.exists()) return alert("房间不存在或已解散！");
@@ -305,7 +307,10 @@ function enterRoom(roomId) {
         if (window.isHost) {
             if (data.status === 'starting' || data.status === 'playing') {
                 btnStart.style.display = 'none';
-                if(data.status === 'playing') statusText.innerText = "游戏中...";
+                // 仅在非失败状态下锁定文字
+                if(statusText.innerText.indexOf("失败") === -1 && statusText.innerText.indexOf("重试") === -1) {
+                    statusText.innerText = data.status === 'playing' ? "游戏中..." : "等待挑战者响应与穿透...";
+                }
             } else if (data.clientId) {
                 btnStart.style.display = 'inline-block'; 
                 statusText.innerText = "双方已就绪！";
@@ -317,9 +322,12 @@ function enterRoom(roomId) {
         } else {
             if (data.status === 'waiting') {
                 statusText.innerText = "等待房主开始游戏...";
-            } else if (data.status === 'starting' && !clientHandlingRtc) {
-                statusText.innerText = "收到房主邀请，准备穿透...";
-                handleClientWebRTC(roomId, data);
+            } else if (data.status === 'starting') {
+                // 如果是全新的 offer，或者是第一次执行，则启动客户端的穿透逻辑
+                if (!clientHandlingRtc || (data.offer && data.offer.sdp !== currentOfferSdp)) {
+                    currentOfferSdp = data.offer ? data.offer.sdp : null;
+                    handleClientWebRTC(roomId, data);
+                }
             } else if (data.status === 'playing') {
                 statusText.innerText = "游戏中...";
             }
@@ -342,28 +350,25 @@ function leaveRoom() {
 }
 
 
-// --- 8. WebRTC 穿透核心 (P2P 对战) ---
-// 涵盖各种穿透方案的最强配置
+// --- 8. WebRTC 穿透核心 (采用更稳健的 Vanilla ICE 等待模式) ---
 const rtcConfig = { 
     iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
         { urls: 'stun:stun1.l.google.com:19302' },
         { urls: 'stun:stun.qq.com:3478' },
-        { urls: 'stun:stun.miwifi.com:3478' }
+        { urls: 'stun:stun.miwifi.com:3478' },
+        { urls: 'stun:stun.cloudflare.com:3478' }
     ] 
 };
 
-// 实时显示打洞状态
 function setupIceStateListener(pc) {
     pc.oniceconnectionstatechange = () => {
         let statusEl = document.getElementById('room-status-text');
         if(statusEl) {
-            statusEl.innerText = `P2P 连接状态: ${pc.iceConnectionState}`;
-            if(pc.iceConnectionState === 'failed' || pc.iceConnectionState === 'disconnected') {
-                statusEl.style.color = "#ff5252";
-            } else {
-                statusEl.style.color = "#FFD700";
-            }
+            let s = pc.iceConnectionState;
+            statusEl.innerText = `P2P状态: ${s} ...`;
+            if (s === 'failed' || s === 'disconnected') statusEl.style.color = "#ff5252";
+            else statusEl.style.color = "#FFD700";
         }
     };
 }
@@ -373,9 +378,8 @@ async function initiateWebRTC(roomId, roomData) {
     hostHandlingRtc = true;
 
     document.getElementById('btn-start-game').style.display = 'none';
-    document.getElementById('room-status-text').innerText = "生成连接凭证中...";
+    document.getElementById('room-status-text').innerText = "收集网络节点中(约需1~2秒)...";
     
-    // 如果之前有残留连接，强制清理
     if (window.pc) window.pc.close();
 
     window.pc = new RTCPeerConnection(rtcConfig);
@@ -384,55 +388,49 @@ async function initiateWebRTC(roomId, roomData) {
     window.dataChannel = window.pc.createDataChannel('gameSync');
     setupDataChannel(window.dataChannel, roomData);
 
-    const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId);
-    window.pc.onicecandidate = async e => {
-        if (e.candidate) {
-            try { await updateDoc(roomRef, { callerCandidates: arrayUnion(e.candidate.toJSON()) }); } catch(err){}
-        }
-    };
-
     const offer = await window.pc.createOffer();
     await window.pc.setLocalDescription(offer);
     
-    await updateDoc(roomRef, { status: 'starting', offer: { type: offer.type, sdp: offer.sdp }, answer: null, callerCandidates: [], calleeCandidates: [] });
+    // 【核心改动 1】等待所有的网络候选节点收集完毕，然后再一次性发送，彻底避免错位！
+    await new Promise((resolve) => {
+        if (window.pc.iceGatheringState === 'complete') return resolve();
+        const checkState = () => { 
+            if (window.pc.iceGatheringState === 'complete') { 
+                window.pc.removeEventListener('icegatheringstatechange', checkState); 
+                resolve(); 
+            } 
+        };
+        window.pc.addEventListener('icegatheringstatechange', checkState);
+        setTimeout(resolve, 2000); // 最多等 2 秒
+    });
 
-    let addedCalleeCandidates = new Set(); 
+    const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId);
+    // 一次性把包含了所有节点的 SDP 发给对方
+    await updateDoc(roomRef, { 
+        status: 'starting', 
+        offer: { type: window.pc.localDescription.type, sdp: window.pc.localDescription.sdp }, 
+        answer: null 
+    });
 
+    // 监听客户端的应答包
     const unsubRtc = onSnapshot(roomRef, async (snap) => {
         const data = snap.data();
         if (!data || data.status !== 'starting') return;
-        
         if (data.answer && !window.pc.currentRemoteDescription) {
-            await window.pc.setRemoteDescription(new RTCSessionDescription(data.answer));
-        }
-        
-        if (window.pc.currentRemoteDescription && data.calleeCandidates && data.calleeCandidates.length > 0) {
-            data.calleeCandidates.forEach(async (c, index) => { 
-                if (!addedCalleeCandidates.has(index)) { 
-                    addedCalleeCandidates.add(index);
-                    try { await window.pc.addIceCandidate(new RTCIceCandidate(c)); } catch(e){} 
-                }
-            });
+            try { await window.pc.setRemoteDescription(new RTCSessionDescription(data.answer)); } 
+            catch(err) { console.error("设置远端描述失败:", err); }
         }
     });
 }
 
 async function handleClientWebRTC(roomId, roomData) {
-    if (clientHandlingRtc || !roomData.offer) return;
     clientHandlingRtc = true; 
+    document.getElementById('room-status-text').innerText = "收到凭证，生成响应包(约需1~2秒)...";
     
     if (window.pc) window.pc.close();
 
     window.pc = new RTCPeerConnection(rtcConfig);
     setupIceStateListener(window.pc);
-
-    const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId);
-
-    window.pc.onicecandidate = async e => {
-        if (e.candidate) {
-            try { await updateDoc(roomRef, { calleeCandidates: arrayUnion(e.candidate.toJSON()) }); } catch(err){}
-        }
-    };
 
     window.pc.ondatachannel = e => {
         window.dataChannel = e.channel;
@@ -443,22 +441,22 @@ async function handleClientWebRTC(roomId, roomData) {
     const answer = await window.pc.createAnswer();
     await window.pc.setLocalDescription(answer);
     
-    await updateDoc(roomRef, { answer: { type: answer.type, sdp: answer.sdp } });
-
-    let addedCallerCandidates = new Set(); 
-
-    const unsubRtc = onSnapshot(roomRef, async (snap) => {
-        const data = snap.data();
-        if (!data || data.status !== 'starting') return;
-        
-        if (window.pc.currentRemoteDescription && data.callerCandidates && data.callerCandidates.length > 0) {
-            data.callerCandidates.forEach(async (c, index) => { 
-                if (!addedCallerCandidates.has(index)) { 
-                    addedCallerCandidates.add(index);
-                    try { await window.pc.addIceCandidate(new RTCIceCandidate(c)); } catch(e){} 
-                }
-            });
-        }
+    // 【核心改动 2】客户端也等待所有节点收集完毕，一次性发回给房主
+    await new Promise((resolve) => {
+        if (window.pc.iceGatheringState === 'complete') return resolve();
+        const checkState = () => { 
+            if (window.pc.iceGatheringState === 'complete') { 
+                window.pc.removeEventListener('icegatheringstatechange', checkState); 
+                resolve(); 
+            } 
+        };
+        window.pc.addEventListener('icegatheringstatechange', checkState);
+        setTimeout(resolve, 2000); // 最多等 2 秒
+    });
+    
+    const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId);
+    await updateDoc(roomRef, { 
+        answer: { type: window.pc.localDescription.type, sdp: window.pc.localDescription.sdp } 
     });
 }
 
@@ -467,7 +465,7 @@ function setupDataChannel(channel, roomData) {
         if (channel.readyState !== 'open') {
             let statusEl = document.getElementById('room-status-text');
             if(statusEl) {
-                statusEl.innerText = "网络穿透超时或失败，请房主重试！";
+                statusEl.innerText = "打洞超时，请房主点击下方重试！";
                 statusEl.style.color = "#ff5252";
             }
             if (window.isHost) {
@@ -477,22 +475,21 @@ function setupDataChannel(channel, roomData) {
                     btnStart.innerText = "重新打洞 (Retry)";
                 }
             }
-            hostHandlingRtc = false;
+            hostHandlingRtc = false; // 解除锁，允许房主重新点击
             clientHandlingRtc = false;
         }
-    }, 10000); 
+    }, 12000); // 增加到 12 秒超时
 
-    // 【关键修复核心】将进入游戏的逻辑独立为一个函数
     const performGameStart = () => {
         clearTimeout(connectionTimeout); 
-        document.getElementById('room-status-text').innerText = "P2P 穿透成功！正在加载战场...";
+        document.getElementById('room-status-text').innerText = "穿透成功！马上进入战场...";
         document.getElementById('room-status-text').style.color = "#FFD700";
         
         setTimeout(() => {
             document.getElementById('room-screen').classList.add('hidden');
             document.getElementById('game-ui').classList.remove('hidden');
             document.getElementById('ping-display').classList.remove('hidden');
-            document.getElementById('ping-display').innerText = "P2P Online Active";
+            document.getElementById('ping-display').innerText = "P2P 直连开启";
             
             if (window.isHost) {
                 const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', window.currentRoomId);
@@ -507,21 +504,14 @@ function setupDataChannel(channel, roomData) {
                 document.getElementById('p1-name').innerText = `[HOST] ${roomData.hostName}`;
                 document.getElementById('p2-name').innerText = `[CLIENT] ${roomData.clientName}`;
                 window.game.startGame(false);
-            } else {
-                alert("严重错误：游戏引擎未加载完成！");
             }
         }, 1000);
     };
 
-    // 【解决 DataChannel 已打开但事件丢失的 Bug】
     if (channel.readyState === 'open') {
-        console.log("【Debug】通道在绑定事件前已经就绪，直接启动！");
         performGameStart();
     } else {
-        channel.onopen = () => {
-            console.log("【Debug】通道 onopen 事件触发！");
-            performGameStart();
-        };
+        channel.onopen = () => performGameStart();
     }
     
     channel.onmessage = (event) => {
