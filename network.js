@@ -1,5 +1,5 @@
 // ==========================================
-// Otokojuku: Legends Duel - 完整联机网络模块
+// dantao: Legends Duel - 完整联机网络模块
 // ==========================================
 console.log("【Debug】network.js 已经启动...");
 
@@ -17,7 +17,7 @@ const firebaseConfig = {
     appId: "1:908084167975:web:4df8cb555e8aabd3309502"
 };
 
-const appId = 'otokojuku-duel-local';
+const appId = 'dantao-duel-local';
 let auth, db, user;
 
 const statusEl = document.getElementById('login-status');
@@ -31,7 +31,7 @@ const updateStatus = (msg, isError = false) => {
 
 // 全局状态变量，挂载在 window 上以确保各个函数能读到
 window.myUserId = null;
-window.myUserName = localStorage.getItem('otokojuku_username') || '';
+window.myUserName = localStorage.getItem('dantao_username') || '';
 window.currentRoomId = null;
 window.isHost = false;
 window.mySelectedHero = 'Noae';
@@ -147,7 +147,7 @@ document.getElementById('btn-login').onclick = () => {
     const inputName = document.getElementById('username-input').value.trim();
     if (inputName.length < 2) return alert("昵称至少2个字符！");
     window.myUserName = inputName;
-    localStorage.setItem('otokojuku_username', inputName);
+    localStorage.setItem('dantao_username', inputName);
     document.getElementById('login-title').innerText = `你好, ${inputName}`;
     updateStatus("身份配置已保存，可以创建或加入房间了。");
 };
@@ -421,4 +421,5 @@ function setupDataChannel(channel, roomData) {
         document.getElementById('ping-display').innerText = "连接已断开";
         setTimeout(()=> document.getElementById('btn-restart').click(), 2000);
     };
+
 }
