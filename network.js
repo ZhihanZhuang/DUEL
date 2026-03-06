@@ -302,12 +302,10 @@ function enterRoom(roomId) {
         const btnStart = document.getElementById('btn-start-game');
         const statusText = document.getElementById('room-status-text');
         
-        // 修复状态互相覆盖的Bug
         if (window.isHost) {
             if (data.status === 'starting' || data.status === 'playing') {
-                // 如果已经在建立连接或游戏中，隐藏按钮并锁死文字
                 btnStart.style.display = 'none';
-                statusText.innerText = data.status === 'starting' ? "正在建立 P2P 网络直连..." : "游戏中...";
+                if(data.status === 'playing') statusText.innerText = "游戏中...";
             } else if (data.clientId) {
                 btnStart.style.display = 'inline-block'; 
                 statusText.innerText = "双方已就绪！";
@@ -319,8 +317,8 @@ function enterRoom(roomId) {
         } else {
             if (data.status === 'waiting') {
                 statusText.innerText = "等待房主开始游戏...";
-            } else if (data.status === 'starting') {
-                statusText.innerText = "正在建立 P2P 网络直连...";
+            } else if (data.status === 'starting' && !clientHandlingRtc) {
+                statusText.innerText = "收到房主邀请，准备穿透...";
                 handleClientWebRTC(roomId, data);
             } else if (data.status === 'playing') {
                 statusText.innerText = "游戏中...";
@@ -345,22 +343,44 @@ function leaveRoom() {
 
 
 // --- 8. WebRTC 穿透核心 (P2P 对战) ---
+// 涵盖各种穿透方案的最强配置
 const rtcConfig = { 
     iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun.qq.com:3478' },      // 新增：腾讯公共STUN，国内穿透极快
-        { urls: 'stun:stun.miwifi.com:3478' }   // 新增：小米公共STUN，增加连通率
+        { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:stun.qq.com:3478' },
+        { urls: 'stun:stun.miwifi.com:3478' }
     ] 
 };
 
+// 实时显示打洞状态
+function setupIceStateListener(pc) {
+    pc.oniceconnectionstatechange = () => {
+        let statusEl = document.getElementById('room-status-text');
+        if(statusEl) {
+            statusEl.innerText = `P2P 连接状态: ${pc.iceConnectionState}`;
+            if(pc.iceConnectionState === 'failed' || pc.iceConnectionState === 'disconnected') {
+                statusEl.style.color = "#ff5252";
+            } else {
+                statusEl.style.color = "#FFD700";
+            }
+        }
+    };
+}
+
 async function initiateWebRTC(roomId, roomData) {
-    if (hostHandlingRtc) return; // 防连点锁
+    if (hostHandlingRtc) return; 
     hostHandlingRtc = true;
 
     document.getElementById('btn-start-game').style.display = 'none';
     document.getElementById('room-status-text').innerText = "生成连接凭证中...";
     
+    // 如果之前有残留连接，强制清理
+    if (window.pc) window.pc.close();
+
     window.pc = new RTCPeerConnection(rtcConfig);
+    setupIceStateListener(window.pc);
+
     window.dataChannel = window.pc.createDataChannel('gameSync');
     setupDataChannel(window.dataChannel, roomData);
 
@@ -376,9 +396,8 @@ async function initiateWebRTC(roomId, roomData) {
     
     await updateDoc(roomRef, { status: 'starting', offer: { type: offer.type, sdp: offer.sdp }, answer: null, callerCandidates: [], calleeCandidates: [] });
 
-    let addedCalleeCandidates = new Set(); // 新增：记录已添加的凭证，防重复导致拥堵
+    let addedCalleeCandidates = new Set(); 
 
-    // 监听客户端的应答
     const unsubRtc = onSnapshot(roomRef, async (snap) => {
         const data = snap.data();
         if (!data || data.status !== 'starting') return;
@@ -387,10 +406,9 @@ async function initiateWebRTC(roomId, roomData) {
             await window.pc.setRemoteDescription(new RTCSessionDescription(data.answer));
         }
         
-        // 必须等 remoteDescription 设置好之后才能添加 candidate，防止报错
         if (window.pc.currentRemoteDescription && data.calleeCandidates && data.calleeCandidates.length > 0) {
             data.calleeCandidates.forEach(async (c, index) => { 
-                if (!addedCalleeCandidates.has(index)) { // 新增：防重复添加逻辑
+                if (!addedCalleeCandidates.has(index)) { 
                     addedCalleeCandidates.add(index);
                     try { await window.pc.addIceCandidate(new RTCIceCandidate(c)); } catch(e){} 
                 }
@@ -401,9 +419,13 @@ async function initiateWebRTC(roomId, roomData) {
 
 async function handleClientWebRTC(roomId, roomData) {
     if (clientHandlingRtc || !roomData.offer) return;
-    clientHandlingRtc = true; // 防重复执行锁
+    clientHandlingRtc = true; 
     
+    if (window.pc) window.pc.close();
+
     window.pc = new RTCPeerConnection(rtcConfig);
+    setupIceStateListener(window.pc);
+
     const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId);
 
     window.pc.onicecandidate = async e => {
@@ -423,16 +445,15 @@ async function handleClientWebRTC(roomId, roomData) {
     
     await updateDoc(roomRef, { answer: { type: answer.type, sdp: answer.sdp } });
 
-    let addedCallerCandidates = new Set(); // 新增：记录已添加的凭证，防重复导致拥堵
+    let addedCallerCandidates = new Set(); 
 
-    // 监听房主的候选凭证
     const unsubRtc = onSnapshot(roomRef, async (snap) => {
         const data = snap.data();
         if (!data || data.status !== 'starting') return;
         
         if (window.pc.currentRemoteDescription && data.callerCandidates && data.callerCandidates.length > 0) {
             data.callerCandidates.forEach(async (c, index) => { 
-                if (!addedCallerCandidates.has(index)) { // 新增：防重复添加逻辑
+                if (!addedCallerCandidates.has(index)) { 
                     addedCallerCandidates.add(index);
                     try { await window.pc.addIceCandidate(new RTCIceCandidate(c)); } catch(e){} 
                 }
@@ -442,12 +463,11 @@ async function handleClientWebRTC(roomId, roomData) {
 }
 
 function setupDataChannel(channel, roomData) {
-    // 新增：10秒超时重试机制，防止无限卡在“正在建立网络直连”
     let connectionTimeout = setTimeout(() => {
         if (channel.readyState !== 'open') {
             let statusEl = document.getElementById('room-status-text');
             if(statusEl) {
-                statusEl.innerText = "网络穿透失败，请房主重试！(可多试几次)";
+                statusEl.innerText = "网络穿透超时或失败，请房主重试！";
                 statusEl.style.color = "#ff5252";
             }
             if (window.isHost) {
@@ -462,8 +482,9 @@ function setupDataChannel(channel, roomData) {
         }
     }, 10000); 
 
-    channel.onopen = () => {
-        clearTimeout(connectionTimeout); // 连接成功，取消超时报错
+    // 【关键修复核心】将进入游戏的逻辑独立为一个函数
+    const performGameStart = () => {
+        clearTimeout(connectionTimeout); 
         document.getElementById('room-status-text').innerText = "P2P 穿透成功！正在加载战场...";
         document.getElementById('room-status-text').style.color = "#FFD700";
         
@@ -491,6 +512,17 @@ function setupDataChannel(channel, roomData) {
             }
         }, 1000);
     };
+
+    // 【解决 DataChannel 已打开但事件丢失的 Bug】
+    if (channel.readyState === 'open') {
+        console.log("【Debug】通道在绑定事件前已经就绪，直接启动！");
+        performGameStart();
+    } else {
+        channel.onopen = () => {
+            console.log("【Debug】通道 onopen 事件触发！");
+            performGameStart();
+        };
+    }
     
     channel.onmessage = (event) => {
         const msg = JSON.parse(event.data);
