@@ -1,5 +1,5 @@
 /**
- * Otokojuku: Legends Duel
+ * Dantao: Legends Duel
  * Main Engine Core
  */
 
