@@ -1,5 +1,5 @@
 /**
- * Otokojuku: Legends Duel
+ * Dantao: Legends Duel
  * Entities & Minions
  */
 
@@ -886,4 +886,5 @@ class Hurricane extends Entity {
         ctx.beginPath(); ctx.moveTo(this.x, this.y); ctx.lineTo(this.x + this.w, this.y); ctx.lineTo(this.x + this.w/2 + 20, this.y + this.h); ctx.lineTo(this.x + this.w/2 - 20, this.y + this.h); ctx.fill();
         ctx.globalAlpha = 1.0;
     }
+
 }
