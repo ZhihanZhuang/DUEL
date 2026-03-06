@@ -159,8 +159,8 @@ const HEROES = {
     },
     Volt: {
         name: "Volt", desc: "Flying Energy Marksman",
-        color: "#FFD700", maxHp: 650, speed: 4.0, jump: 15, width: 35, height: 65, superCD: 18000,
-        ui: { hp: "65 WRD", atk: "1.8 WRD (Homing Lasers)", passive: "Hold [Jump]/[Down] to Free Fly. Flight costs 15 Energy/s, Attacks cost 10 Energy. Depleting Energy causes Overload (No attack/flight, take 3 WRD dmg). Below 20 Energy warning.", super: "<span class='skill-tag'>Overdrive Mode</span> Unlimited Energy and +100% Attack Speed for 10 seconds. Forces overload when it ends." }
+        color: "#FFD700", maxHp: 650, speed: 4.0, jump: 15, width: 35, height: 65, superCD: 30000,
+        ui: { hp: "65 WRD", atk: "0.6 WRD (Homing Lasers)", passive: "Hold [Jump]/[Down] to Free Fly. Flight costs 15 Energy/s, Attacks cost 10 Energy. Depleting Energy causes Overload (No attack/flight, take 3 WRD dmg). Below 20 Energy warning.", super: "<span class='skill-tag'>Overdrive Mode</span> Unlimited Energy and +100% Attack Speed for 10 seconds. Forces overload when it ends." }
     },
     Gensan: {
         name: "Gensan", desc: "Phantom Blade Master",
@@ -1951,7 +1951,7 @@ class Fighter extends Entity {
         }
         else if (this.heroName === 'Volt') {
             let speed = 20;
-            game.projectiles.push(new Projectile(px, py, 15, 4, Math.cos(aimAngle)*speed, Math.sin(aimAngle)*speed, 18, this, "#00FFFF", "volt_laser"));
+            game.projectiles.push(new Projectile(px, py, 15, 4, Math.cos(aimAngle)*speed, Math.sin(aimAngle)*speed, 6, this, "#00FFFF", "volt_laser"));
         }
         else if (this.heroName === 'Euclid') {
             if (this.euclidWeapon === 'magic') {
