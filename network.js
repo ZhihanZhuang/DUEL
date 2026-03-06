@@ -1,11 +1,12 @@
 // ==========================================
-// Otokojuku: Legends Duel - 坚如磐石的联机模块
+// Otokojuku: Legends Duel - 纯 Firebase 实时同步模块
+// 彻底放弃 WebRTC 穿透，确保 100% 连接成功率
 // ==========================================
-console.log("【Debug】network.js 已经启动...");
+console.log("【Debug】network.js (Firebase Sync 版) 已经启动...");
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
 import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-import { getFirestore, doc, setDoc, getDoc, updateDoc, onSnapshot, arrayUnion } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { getFirestore, doc, setDoc, getDoc, updateDoc, onSnapshot, arrayUnion, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 // --- 1. Firebase 配置 ---
 const firebaseConfig = {
@@ -36,11 +37,10 @@ window.currentRoomId = null;
 window.isHost = false;
 window.mySelectedHero = 'Noae';
 window.currentRoomUnsub = null;
+window.gameSyncUnsub = null;
 
-// 防连点锁与状态追踪
-let hostHandlingRtc = false;
-let clientHandlingRtc = false;
-let currentOfferSdp = null; // 用于追踪房主是否重新发起了连接
+// 防连点锁
+let isGameStarting = false;
 
 // --- 2. 初始化网络 ---
 const initNetwork = async () => {
@@ -66,10 +66,10 @@ const initNetwork = async () => {
     }
 };
 
-// --- 3. 动态劫持单机游戏循环 ---
+// --- 3. 动态劫持单机游戏循环 (改为纯 Firebase 同步) ---
 function applyNetworkPatch() {
     if (window.Game && window.Game.prototype) {
-        console.log("【成功】已读取到 game.js，正在注入网络联机补丁...");
+        console.log("【成功】已读取到 game.js，正在注入 Firebase 实时同步补丁...");
         
         window.Game.prototype.exportState = function() {
             const cloneEntity = (e) => {
@@ -87,13 +87,14 @@ function applyNetworkPatch() {
             return {
                 p1: cloneEntity(this.p1), p2: cloneEntity(this.p2),
                 projs: this.projectiles.map(cloneEntity), mins: this.minions.map(cloneEntity),
-                parts: this.particles.slice(-150).map(cloneEntity), hazards: this.hazards.map(cloneEntity),
+                // 为了节省带宽，粒子特效不同步，各算各的
+                hazards: this.hazards.map(cloneEntity),
                 hurricane: cloneEntity(this.hurricane), hitstop: this.hitstop
             };
         };
 
         window.Game.prototype.importState = function(state) {
-            if (!this.p1) return;
+            if (!this.p1 || !state) return;
             const hydrate = (stateObj) => {
                 if(!stateObj) return null;
                 let Cls = window[stateObj.classType];
@@ -103,33 +104,67 @@ function applyNetworkPatch() {
                 else if(inst.ownerId === 'p2') inst.owner = this.p2;
                 return inst;
             };
-            const merge = (target, src) => { for(let k in src) if(k!=='classType' && k!=='ownerId') target[k] = src[k]; };
+            const merge = (target, src) => { 
+                if(!src || !target) return;
+                for(let k in src) if(k!=='classType' && k!=='ownerId') target[k] = src[k]; 
+            };
             merge(this.p1, state.p1); merge(this.p2, state.p2);
-            this.projectiles = state.projs.map(hydrate); this.minions = state.mins.map(hydrate);
-            this.particles = state.parts.map(hydrate); this.hazards = state.hazards.map(hydrate);
-            this.hurricane = state.hurricane ? hydrate(state.hurricane) : null;
-            this.hitstop = state.hitstop;
+            if (state.projs) this.projectiles = state.projs.map(hydrate); 
+            if (state.mins) this.minions = state.mins.map(hydrate);
+            if (state.hazards) this.hazards = state.hazards.map(hydrate);
+            if (state.hurricane !== undefined) this.hurricane = state.hurricane ? hydrate(state.hurricane) : null;
+            if (state.hitstop !== undefined) this.hitstop = state.hitstop;
         };
 
         const originalUpdate = window.Game.prototype.update;
+        
+        // 控制同步频率 (Firebase 建议 10-15帧/秒)
+        let lastSyncTime = 0;
+        const SYNC_INTERVAL = 100; 
+
         window.Game.prototype.update = function(dt) {
             if (this.isOnline && this.netRole === 'client') {
+                // 客户端：只收集输入，并在满足间隔时写入 Firebase
                 let myInputs = {
-                    left: window.keys[window.currentBinds?.p1?.left || 'KeyA'], right: window.keys[window.currentBinds?.p1?.right || 'KeyD'],
-                    jump: window.keys[window.currentBinds?.p1?.jump || 'KeyW'], down: window.keys[window.currentBinds?.p1?.down || 'KeyS'],
-                    pJump: window.keysPressed[window.currentBinds?.p1?.jump || 'KeyW'], pAttack: window.keysPressed[window.currentBinds?.p1?.attack || 'Space'],
-                    pSuper: window.keysPressed[window.currentBinds?.p1?.super || 'KeyE'], pSwitch: window.keysPressed[window.currentBinds?.p1?.switch || 'KeyT'],
-                    pExtra: window.keysPressed[window.currentBinds?.p1?.extra || 'KeyG']
+                    left: window.keys[window.currentBinds?.p1?.left || 'KeyA'] || false, 
+                    right: window.keys[window.currentBinds?.p1?.right || 'KeyD'] || false,
+                    jump: window.keys[window.currentBinds?.p1?.jump || 'KeyW'] || false, 
+                    down: window.keys[window.currentBinds?.p1?.down || 'KeyS'] || false,
+                    pJump: window.keysPressed[window.currentBinds?.p1?.jump || 'KeyW'] || false, 
+                    pAttack: window.keysPressed[window.currentBinds?.p1?.attack || 'Space'] || false,
+                    pSuper: window.keysPressed[window.currentBinds?.p1?.super || 'KeyE'] || false, 
+                    pSwitch: window.keysPressed[window.currentBinds?.p1?.switch || 'KeyT'] || false,
+                    pExtra: window.keysPressed[window.currentBinds?.p1?.extra || 'KeyG'] || false
                 };
-                if(window.dataChannel && window.dataChannel.readyState === 'open') {
-                    window.dataChannel.send(JSON.stringify({ type: 'inputs', inputs: myInputs }));
+
+                let now = performance.now();
+                if (now - lastSyncTime > SYNC_INTERVAL && window.currentRoomId) {
+                    lastSyncTime = now;
+                    // 异步写入，不阻塞主循环
+                    updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', window.currentRoomId), {
+                        clientInputs: myInputs
+                    }).catch(e => console.error("输入同步失败", e));
                 }
+
+                // 客户端自己也要更新一下特效动画
+                this.particles.forEach(p => p.update(dt));
+                this.particles = this.particles.filter(p => !p.dead);
+                
                 this.updateUI();
                 return;
             }
+
+            // 房主：运行完整的游戏逻辑
             originalUpdate.call(this, dt);
-            if (this.isOnline && this.netRole === 'host' && window.dataChannel && window.dataChannel.readyState === 'open') {
-                window.dataChannel.send(JSON.stringify({ type: 'state', state: this.exportState() }));
+
+            if (this.isOnline && this.netRole === 'host' && window.currentRoomId) {
+                let now = performance.now();
+                if (now - lastSyncTime > SYNC_INTERVAL) {
+                    lastSyncTime = now;
+                    updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', window.currentRoomId), {
+                        gameState: this.exportState()
+                    }).catch(e => console.error("状态同步失败", e));
+                }
             }
         };
     } else {
@@ -196,14 +231,15 @@ document.getElementById('btn-create-room').onclick = async () => {
     const roomId = Math.random().toString(36).substring(2, 6).toUpperCase();
     
     try {
-        hostHandlingRtc = false;
-        clientHandlingRtc = false;
-        currentOfferSdp = null;
+        isGameStarting = false;
         const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId);
         await setDoc(roomRef, {
-            status: 'waiting', hostId: window.myUserId, hostName: window.myUserName, hostHero: 'Noae',
+            status: 'waiting', 
+            hostId: window.myUserId, hostName: window.myUserName, hostHero: 'Noae',
             clientId: null, clientName: null, clientHero: 'Wolf', 
-            messages: [{ sender: 'System', text: `房间创建成功！告诉朋友代码：${roomId}`, ts: Date.now() }]
+            messages: [{ sender: 'System', text: `房间创建成功！告诉朋友代码：${roomId}`, ts: Date.now() }],
+            gameState: null,
+            clientInputs: null
         });
         
         window.currentRoomId = roomId;
@@ -220,9 +256,7 @@ document.getElementById('btn-join-room').onclick = async () => {
     if (code.length !== 4) return alert("请输入4位房间代码");
     
     try {
-        hostHandlingRtc = false;
-        clientHandlingRtc = false;
-        currentOfferSdp = null;
+        isGameStarting = false;
         const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', code);
         const snap = await getDoc(roomRef);
         if (!snap.exists()) return alert("房间不存在或已解散！");
@@ -242,7 +276,7 @@ document.getElementById('btn-join-room').onclick = async () => {
     }
 };
 
-// --- 7. 房间大厅渲染 ---
+// --- 7. 房间大厅与游戏循环核心 ---
 function enterRoom(roomId) {
     document.getElementById('login-screen').classList.add('hidden');
     document.getElementById('room-screen').classList.remove('hidden');
@@ -279,260 +313,134 @@ function enterRoom(roomId) {
     let lastMsgCount = 0;
 
     window.currentRoomUnsub = onSnapshot(roomRef, (snap) => {
-        if (!snap.exists()) { alert("房间被关闭"); leaveRoom(); return; }
+        if (!snap.exists()) { 
+            alert("房间已被解散"); 
+            leaveRoom(); 
+            return; 
+        }
         const data = snap.data();
         
-        if (document.getElementById('room-p1-name')) document.getElementById('room-p1-name').innerText = data.hostName || '等待中...';
-        if (document.getElementById('room-p2-name')) document.getElementById('room-p2-name').innerText = data.clientName || '等待加入...';
-        if (document.getElementById('room-p1-hero')) document.getElementById('room-p1-hero').innerText = (window.HEROES && window.HEROES[data.hostHero]?.name) || data.hostHero || '无';
-        if (document.getElementById('room-p2-hero')) document.getElementById('room-p2-hero').innerText = (window.HEROES && window.HEROES[data.clientHero]?.name) || data.clientHero || '无';
-        
-        document.querySelectorAll('.hero-card').forEach(c => { c.classList.remove('selected-p1'); c.classList.remove('selected-p2'); });
-        let p1Card = document.getElementById(`card-${data.hostHero}`);
-        let p2Card = document.getElementById(`card-${data.clientHero}`);
-        if (p1Card) p1Card.classList.add('selected-p1');
-        if (p2Card) p2Card.classList.add('selected-p2');
+        // --- 1. 更新大厅 UI ---
+        if (document.getElementById('room-screen').classList.contains('hidden') === false) {
+            if (document.getElementById('room-p1-name')) document.getElementById('room-p1-name').innerText = data.hostName || '等待中...';
+            if (document.getElementById('room-p2-name')) document.getElementById('room-p2-name').innerText = data.clientName || '等待加入...';
+            if (document.getElementById('room-p1-hero')) document.getElementById('room-p1-hero').innerText = (window.HEROES && window.HEROES[data.hostHero]?.name) || data.hostHero || '无';
+            if (document.getElementById('room-p2-hero')) document.getElementById('room-p2-hero').innerText = (window.HEROES && window.HEROES[data.clientHero]?.name) || data.clientHero || '无';
+            
+            document.querySelectorAll('.hero-card').forEach(c => { c.classList.remove('selected-p1'); c.classList.remove('selected-p2'); });
+            let p1Card = document.getElementById(`card-${data.hostHero}`);
+            let p2Card = document.getElementById(`card-${data.clientHero}`);
+            if (p1Card) p1Card.classList.add('selected-p1');
+            if (p2Card) p2Card.classList.add('selected-p2');
 
-        if (data.messages && data.messages.length > lastMsgCount) {
-            for (let i = lastMsgCount; i < data.messages.length; i++) {
-                let m = data.messages[i];
-                appendChat(m.sender, m.text, m.sender === 'System');
-            }
-            lastMsgCount = data.messages.length;
-        }
-
-        const btnStart = document.getElementById('btn-start-game');
-        const statusText = document.getElementById('room-status-text');
-        
-        if (window.isHost) {
-            if (data.status === 'starting' || data.status === 'playing') {
-                btnStart.style.display = 'none';
-                // 仅在非失败状态下锁定文字
-                if(statusText.innerText.indexOf("失败") === -1 && statusText.innerText.indexOf("重试") === -1) {
-                    statusText.innerText = data.status === 'playing' ? "游戏中..." : "等待挑战者响应与穿透...";
+            if (data.messages && data.messages.length > lastMsgCount) {
+                for (let i = lastMsgCount; i < data.messages.length; i++) {
+                    let m = data.messages[i];
+                    appendChat(m.sender, m.text, m.sender === 'System');
                 }
-            } else if (data.clientId) {
-                btnStart.style.display = 'inline-block'; 
-                statusText.innerText = "双方已就绪！";
-                btnStart.onclick = () => initiateWebRTC(roomId, data);
+                lastMsgCount = data.messages.length;
+            }
+
+            const btnStart = document.getElementById('btn-start-game');
+            const statusText = document.getElementById('room-status-text');
+            
+            if (window.isHost) {
+                if (data.status === 'playing') {
+                    btnStart.style.display = 'none';
+                    statusText.innerText = "马上进入战场...";
+                } else if (data.clientId) {
+                    btnStart.style.display = 'inline-block'; 
+                    statusText.innerText = "双方已就绪！";
+                    btnStart.onclick = async () => {
+                        if (isGameStarting) return;
+                        isGameStarting = true;
+                        btnStart.style.display = 'none';
+                        statusText.innerText = "通知客户端...";
+                        await updateDoc(roomRef, { status: 'playing' });
+                        startGameInstance(data);
+                    };
+                } else {
+                    btnStart.style.display = 'none'; 
+                    statusText.innerText = "等待挑战者加入...";
+                }
             } else {
-                btnStart.style.display = 'none'; 
-                statusText.innerText = "等待挑战者加入...";
-            }
-        } else {
-            if (data.status === 'waiting') {
-                statusText.innerText = "等待房主开始游戏...";
-            } else if (data.status === 'starting') {
-                // 如果是全新的 offer，或者是第一次执行，则启动客户端的穿透逻辑
-                if (!clientHandlingRtc || (data.offer && data.offer.sdp !== currentOfferSdp)) {
-                    currentOfferSdp = data.offer ? data.offer.sdp : null;
-                    handleClientWebRTC(roomId, data);
+                if (data.status === 'waiting') {
+                    statusText.innerText = "等待房主开始游戏...";
+                } else if (data.status === 'playing' && !isGameStarting) {
+                    isGameStarting = true;
+                    statusText.innerText = "房主已开始，马上进入战场...";
+                    startGameInstance(data);
                 }
-            } else if (data.status === 'playing') {
-                statusText.innerText = "游戏中...";
             }
         }
+
+        // --- 2. 游戏中的状态同步处理 ---
+        if (window.game && window.game.isOnline && data.status === 'playing') {
+            if (window.isHost && data.clientInputs) {
+                // 房主应用客户端传来的按键
+                let remote = data.clientInputs;
+                let p2Binds = window.currentBinds.p2;
+                window.keys[p2Binds.left] = remote.left; 
+                window.keys[p2Binds.right] = remote.right;
+                window.keys[p2Binds.jump] = remote.jump; 
+                window.keys[p2Binds.down] = remote.down;
+                if(remote.pJump) window.keysPressed[p2Binds.jump] = true;
+                if(remote.pAttack) window.keysPressed[p2Binds.attack] = true;
+                if(remote.pSuper) window.keysPressed[p2Binds.super] = true;
+                if(remote.pSwitch) window.keysPressed[p2Binds.switch] = true;
+                if(remote.pExtra) window.keysPressed[p2Binds.extra] = true;
+            } else if (!window.isHost && data.gameState) {
+                // 客户端强制覆盖由房主计算好的游戏状态
+                window.game.importState(data.gameState);
+            }
+        }
+
     }, (err) => {
         console.error("Snapshot error:", err);
     });
 }
 
-document.getElementById('btn-leave-room').onclick = leaveRoom;
+function startGameInstance(roomData) {
+    setTimeout(() => {
+        document.getElementById('room-screen').classList.add('hidden');
+        document.getElementById('game-ui').classList.remove('hidden');
+        document.getElementById('ping-display').classList.remove('hidden');
+        document.getElementById('ping-display').innerText = "Firebase Cloud Sync";
+        document.getElementById('ping-display').style.color = "#00bfff";
+        
+        if (window.Game && window.game) {
+            window.game.isOnline = true;
+            window.game.netRole = window.isHost ? 'host' : 'client';
+            window.game.p1Choice = roomData.hostHero;
+            window.game.p2Choice = roomData.clientHero;
+            document.getElementById('p1-name').innerText = `[HOST] ${roomData.hostName}`;
+            document.getElementById('p2-name').innerText = `[CLIENT] ${roomData.clientName}`;
+            window.game.startGame(false);
+        } else {
+            alert("严重错误：游戏引擎未加载完成！");
+        }
+    }, 1000);
+}
+
+document.getElementById('btn-leave-room').onclick = async () => {
+    if (window.isHost && window.currentRoomId) {
+        // 房主离开时，解散房间
+        try {
+            await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', window.currentRoomId));
+        } catch(e){}
+    }
+    leaveRoom();
+};
+
 function leaveRoom() {
     if (window.currentRoomUnsub) { window.currentRoomUnsub(); window.currentRoomUnsub = null; }
     window.currentRoomId = null; window.isHost = false;
-    hostHandlingRtc = false;
-    clientHandlingRtc = false;
-    if (window.pc) { window.pc.close(); window.pc = null; }
-    if (window.dataChannel) { window.dataChannel.close(); window.dataChannel = null; }
+    isGameStarting = false;
+    
     document.getElementById('room-screen').classList.add('hidden');
     document.getElementById('menu-screen').classList.remove('hidden');
-}
-
-
-// --- 8. WebRTC 穿透核心 (采用更稳健的 Vanilla ICE 等待模式) ---
-const rtcConfig = { 
-    iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' },
-        { urls: 'stun:stun.qq.com:3478' },
-        { urls: 'stun:stun.miwifi.com:3478' },
-        { urls: 'stun:stun.cloudflare.com:3478' }
-    ] 
-};
-
-function setupIceStateListener(pc) {
-    pc.oniceconnectionstatechange = () => {
-        let statusEl = document.getElementById('room-status-text');
-        if(statusEl) {
-            let s = pc.iceConnectionState;
-            statusEl.innerText = `P2P状态: ${s} ...`;
-            if (s === 'failed' || s === 'disconnected') statusEl.style.color = "#ff5252";
-            else statusEl.style.color = "#FFD700";
-        }
-    };
-}
-
-async function initiateWebRTC(roomId, roomData) {
-    if (hostHandlingRtc) return; 
-    hostHandlingRtc = true;
-
-    document.getElementById('btn-start-game').style.display = 'none';
-    document.getElementById('room-status-text').innerText = "收集网络节点中(约需1~2秒)...";
-    
-    if (window.pc) window.pc.close();
-
-    window.pc = new RTCPeerConnection(rtcConfig);
-    setupIceStateListener(window.pc);
-
-    window.dataChannel = window.pc.createDataChannel('gameSync');
-    setupDataChannel(window.dataChannel, roomData);
-
-    const offer = await window.pc.createOffer();
-    await window.pc.setLocalDescription(offer);
-    
-    // 【核心改动 1】等待所有的网络候选节点收集完毕，然后再一次性发送，彻底避免错位！
-    await new Promise((resolve) => {
-        if (window.pc.iceGatheringState === 'complete') return resolve();
-        const checkState = () => { 
-            if (window.pc.iceGatheringState === 'complete') { 
-                window.pc.removeEventListener('icegatheringstatechange', checkState); 
-                resolve(); 
-            } 
-        };
-        window.pc.addEventListener('icegatheringstatechange', checkState);
-        setTimeout(resolve, 2000); // 最多等 2 秒
-    });
-
-    const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId);
-    // 一次性把包含了所有节点的 SDP 发给对方
-    await updateDoc(roomRef, { 
-        status: 'starting', 
-        offer: { type: window.pc.localDescription.type, sdp: window.pc.localDescription.sdp }, 
-        answer: null 
-    });
-
-    // 监听客户端的应答包
-    const unsubRtc = onSnapshot(roomRef, async (snap) => {
-        const data = snap.data();
-        if (!data || data.status !== 'starting') return;
-        if (data.answer && !window.pc.currentRemoteDescription) {
-            try { await window.pc.setRemoteDescription(new RTCSessionDescription(data.answer)); } 
-            catch(err) { console.error("设置远端描述失败:", err); }
-        }
-    });
-}
-
-async function handleClientWebRTC(roomId, roomData) {
-    clientHandlingRtc = true; 
-    document.getElementById('room-status-text').innerText = "收到凭证，生成响应包(约需1~2秒)...";
-    
-    if (window.pc) window.pc.close();
-
-    window.pc = new RTCPeerConnection(rtcConfig);
-    setupIceStateListener(window.pc);
-
-    window.pc.ondatachannel = e => {
-        window.dataChannel = e.channel;
-        setupDataChannel(window.dataChannel, roomData);
-    };
-
-    await window.pc.setRemoteDescription(new RTCSessionDescription(roomData.offer));
-    const answer = await window.pc.createAnswer();
-    await window.pc.setLocalDescription(answer);
-    
-    // 【核心改动 2】客户端也等待所有节点收集完毕，一次性发回给房主
-    await new Promise((resolve) => {
-        if (window.pc.iceGatheringState === 'complete') return resolve();
-        const checkState = () => { 
-            if (window.pc.iceGatheringState === 'complete') { 
-                window.pc.removeEventListener('icegatheringstatechange', checkState); 
-                resolve(); 
-            } 
-        };
-        window.pc.addEventListener('icegatheringstatechange', checkState);
-        setTimeout(resolve, 2000); // 最多等 2 秒
-    });
-    
-    const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId);
-    await updateDoc(roomRef, { 
-        answer: { type: window.pc.localDescription.type, sdp: window.pc.localDescription.sdp } 
-    });
-}
-
-function setupDataChannel(channel, roomData) {
-    let connectionTimeout = setTimeout(() => {
-        if (channel.readyState !== 'open') {
-            let statusEl = document.getElementById('room-status-text');
-            if(statusEl) {
-                statusEl.innerText = "打洞超时，请房主点击下方重试！";
-                statusEl.style.color = "#ff5252";
-            }
-            if (window.isHost) {
-                let btnStart = document.getElementById('btn-start-game');
-                if(btnStart) {
-                    btnStart.style.display = 'inline-block';
-                    btnStart.innerText = "重新打洞 (Retry)";
-                }
-            }
-            hostHandlingRtc = false; // 解除锁，允许房主重新点击
-            clientHandlingRtc = false;
-        }
-    }, 12000); // 增加到 12 秒超时
-
-    const performGameStart = () => {
-        clearTimeout(connectionTimeout); 
-        document.getElementById('room-status-text').innerText = "穿透成功！马上进入战场...";
-        document.getElementById('room-status-text').style.color = "#FFD700";
-        
-        setTimeout(() => {
-            document.getElementById('room-screen').classList.add('hidden');
-            document.getElementById('game-ui').classList.remove('hidden');
-            document.getElementById('ping-display').classList.remove('hidden');
-            document.getElementById('ping-display').innerText = "P2P 直连开启";
-            
-            if (window.isHost) {
-                const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', window.currentRoomId);
-                updateDoc(roomRef, { status: 'playing' });
-            }
-            
-            if (window.Game && window.game) {
-                window.game.isOnline = true;
-                window.game.netRole = window.isHost ? 'host' : 'client';
-                window.game.p1Choice = roomData.hostHero;
-                window.game.p2Choice = roomData.clientHero;
-                document.getElementById('p1-name').innerText = `[HOST] ${roomData.hostName}`;
-                document.getElementById('p2-name').innerText = `[CLIENT] ${roomData.clientName}`;
-                window.game.startGame(false);
-            }
-        }, 1000);
-    };
-
-    if (channel.readyState === 'open') {
-        performGameStart();
-    } else {
-        channel.onopen = () => performGameStart();
+    if (window.game && window.game.state === 'PLAYING') {
+        window.game.state = 'MENU';
+        document.getElementById('game-ui').classList.add('hidden');
     }
-    
-    channel.onmessage = (event) => {
-        const msg = JSON.parse(event.data);
-        if (msg.type === 'state' && !window.isHost && window.game) {
-            window.game.importState(msg.state);
-        } else if (msg.type === 'inputs' && window.isHost && window.game) {
-            let remote = msg.inputs;
-            let p2Binds = window.currentBinds.p2;
-            window.keys[p2Binds.left] = remote.left; window.keys[p2Binds.right] = remote.right;
-            window.keys[p2Binds.jump] = remote.jump; window.keys[p2Binds.down] = remote.down;
-            if(remote.pJump) window.keysPressed[p2Binds.jump] = true;
-            if(remote.pAttack) window.keysPressed[p2Binds.attack] = true;
-            if(remote.pSuper) window.keysPressed[p2Binds.super] = true;
-            if(remote.pSwitch) window.keysPressed[p2Binds.switch] = true;
-            if(remote.pExtra) window.keysPressed[p2Binds.extra] = true;
-        }
-    };
-    
-    channel.onclose = () => { 
-        document.getElementById('ping-display').innerText = "连接已断开"; 
-        setTimeout(()=> { if (document.getElementById('btn-restart')) document.getElementById('btn-restart').click(); }, 2000);
-    };
 }
