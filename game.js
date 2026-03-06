@@ -135,7 +135,7 @@ const HEROES = {
     Euclid: {
         name: "Euclid", desc: "Necromantic Geometric Mage",
         color: "#8A2BE2", maxHp: 700, speed: 4.5, jump: 14, width: 40, height: 70, superCD: 10000,
-        ui: { hp: "70 WRD", atk: "1.2 WRD (Sword) / 10.3 WRD (Homing Burst)", passive: "Press [Switch] for Melee/Ranged (2s Invincible Channel). Magic takes 1s to cast, homes in, or heals skeletons if out of range.", super: "<span class='skill-tag'>Necromantic Summoning</span> 3s cast to summon 8 ultra-fast melee skeletons. Skeletons deal 3 WRD damage and explode on death (2.3 WRD)." }
+        ui: { hp: "70 WRD", atk: "1.2 WRD (Sword) / 10.3 WRD (Homing Burst)", passive: "Press [Switch] for Melee/Ranged (2s Invincible Channel). Magic takes 1s to cast, homes in, or heals skeletons if out of range.", super: "<span class='skill-tag'>Necromantic Summoning</span> 3s cast to summon 8 slow but deadly melee skeletons. Skeletons deal 6 WRD damage and explode on death (2.3 WRD)." }
     },
     Lique: {
         name: "Lique", desc: "Berserker with Hatchets",
@@ -160,7 +160,7 @@ const HEROES = {
     Volt: {
         name: "Volt", desc: "Flying Energy Marksman",
         color: "#FFD700", maxHp: 650, speed: 4.0, jump: 15, width: 35, height: 65, superCD: 30000,
-        ui: { hp: "65 WRD", atk: "0.6 WRD (Homing Lasers)", passive: "Hold [Jump]/[Down] to Free Fly. Flight costs 15 Energy/s, Attacks cost 10 Energy. Depleting Energy causes Overload (No attack/flight, take 3 WRD dmg). Below 20 Energy warning.", super: "<span class='skill-tag'>Overdrive Mode</span> Unlimited Energy and +100% Attack Speed for 10 seconds. Forces overload when it ends." }
+        ui: { hp: "65 WRD", atk: "0.6 WRD (Homing Lasers)", passive: "Hold [Jump]/[Down] to Free Fly. Flight costs 15 Energy/s, Attacks cost 25 Energy. Depleting Energy causes Overload (No attack/flight, take 3 WRD dmg). Below 20 Energy warning.", super: "<span class='skill-tag'>Overdrive Mode</span> Unlimited Energy and +100% Attack Speed for 10 seconds. Forces overload when it ends." }
     },
     Gensan: {
         name: "Gensan", desc: "Phantom Blade Master",
@@ -817,7 +817,7 @@ class Skeleton extends Entity {
         this.hp = 20;
         this.maxHp = 100;
         this.color = "#e0e0e0";
-        this.speed = 7;
+        this.speed = 2.5;
         this.jumpPower = 20;
         this.attackCooldown = 0;
         this.buffs = { dizzy: 0 };
@@ -864,7 +864,7 @@ class Skeleton extends Entity {
 
             if (this.attackCooldown > 0) this.attackCooldown -= dt;
             if (dist < 50 && Math.abs(dy) < 60 && this.attackCooldown <= 0) {
-                enemy.takeDamage(30, this.owner);
+                enemy.takeDamage(60, this.owner);
                 this.attackCooldown = 1000;
                 game.particles.push(new Particle(this.x + this.w/2, this.y, "#8A2BE2", dx>0?5:-5, 0, 200, 8));
             }
@@ -1847,8 +1847,8 @@ class Fighter extends Entity {
         if (this.heroName === 'Volt') {
             if (this.isOverloaded) return;
             if (this.overdriveTimer <= 0) {
-                if (this.energy < 10) return;
-                this.energy -= 10;
+                if (this.energy < 25) return;
+                this.energy -= 25;
             }
         }
 
