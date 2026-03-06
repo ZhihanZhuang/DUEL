@@ -1,5 +1,5 @@
 /**
- * Otokojuku: Legends Duel
+ * dantao: Legends Duel
  * Config & Data
  */
 
@@ -9,11 +9,11 @@ const DEFAULT_BINDS = {
     p2: { left: 'ArrowLeft', right: 'ArrowRight', jump: 'ArrowUp', down: 'ArrowDown', attack: 'Numpad9', super: 'NumpadEnter', switch: 'Numpad8', extra: 'Numpad7' }
 };
 
-var currentBinds = JSON.parse(localStorage.getItem('otokojuku_binds')) || JSON.parse(JSON.stringify(DEFAULT_BINDS));
+var currentBinds = JSON.parse(localStorage.getItem('dantao_binds')) || JSON.parse(JSON.stringify(DEFAULT_BINDS));
 window.currentBinds = currentBinds;
 
 function saveBinds() {
-    localStorage.setItem('otokojuku_binds', JSON.stringify(currentBinds));
+    localStorage.setItem('dantao_binds', JSON.stringify(currentBinds));
     updateControlsDisplay();
 }
 
@@ -195,4 +195,5 @@ window.keysPressed = keysPressed;
 function checkAABB(r1, r2) {
     if (!r1 || !r2) return false;
     return r1.x < r2.x + r2.w && r1.x + r1.w > r2.x && r1.y < r2.y + r2.h && r1.y + r1.h > r2.y;
+
 }
