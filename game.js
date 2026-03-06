@@ -134,7 +134,7 @@ const HEROES = {
     },
     Euclid: {
         name: "Euclid", desc: "Necromantic Geometric Mage",
-        color: "#8A2BE2", maxHp: 700, speed: 4.5, jump: 14, width: 40, height: 70, superCD: 50000,
+        color: "#8A2BE2", maxHp: 700, speed: 4.5, jump: 14, width: 40, height: 70, superCD: 45000,
         ui: { hp: "70 WRD", atk: "1.2 WRD (Sword) / 10.3 WRD (Homing Burst)", passive: "Press [Switch] for Melee/Ranged (2s Invincible Channel). Magic takes 0.5s to cast (Uninterruptible), homes in, or heals skeletons if out of range.", super: "<span class='skill-tag'>Necromantic Summoning</span> 1s cast to summon 5 slow but deadly melee skeletons. Skeletons deal 6 WRD damage and explode on death (2.3 WRD)." }
     },
     Lique: {
@@ -171,6 +171,11 @@ const HEROES = {
         name: "Noae", desc: "Mine Engineer",
         color: "#B8860B", maxHp: 650, speed: 4.8, jump: 14, width: 40, height: 70, superCD: 22000,
         ui: { hp: "65 WRD", atk: "1.9 WRD (Pickaxe)", passive: "Press [Switch] to plant a Land Mine (Max 3, 2.5 WRD + 0.4s stun).", super: "Summons a bouncing Minecart (4.5s) that deals 2 WRD + 0.5s stun. Minecart detonates mines." }
+    },
+    Wolf: {
+        name: "Wolf King", desc: "High Mobility Assassin",
+        color: "#696969", maxHp: 700, speed: 7.5, jump: 16, width: 40, height: 70, superCD: 20000,
+        ui: { hp: "70 WRD", atk: "2.0 WRD (Fast Claw)", passive: "Out of combat 1.5s: Next attack grants +30% SPD (2s) and deals +1.0 WRD. <br><span class='skill-tag'>Hunting Mark</span> 5 consecutive hits inflict 4s Bleed (0.5 WRD/s).", super: "<span class='skill-tag'>King's Pounce</span> 0.35s windup. Instantly leaps in front of the enemy for 15.0 WRD + 2.5s 40% Slow." }
     }
 };
 
@@ -1089,7 +1094,7 @@ class Fighter extends Entity {
         this.currentPlatform = null; this.aiIntent = { left: false, right: false };
         this.attackState = 'idle'; this.stateTimer = 0; this.maxStateTimer = 0; this.hasHit = false;
 
-        this.buffs = { poison: 0, battleCry: 0, shade: 0, dizzy: 0, slow: 0, hurricaneSlow: false, bloodFrenzy: 0, burn: 0, msBoost: 0 };
+        this.buffs = { poison: 0, battleCry: 0, shade: 0, dizzy: 0, slow: 0, hurricaneSlow: false, bloodFrenzy: 0, burn: 0, msBoost: 0, bleed: 0, bleedTick: 0 };
         this.invincible = 0; this.lastJumpTime = 0;
         this.flipActive = 0; this.hasHitFlip = false; this.hasFlipped = false;
         this.grapplePhase = 0; this.grappleTimer = 0;
@@ -1135,6 +1140,12 @@ class Fighter extends Entity {
         if (this.heroName === 'Kadaxi') {
             this.comboCount = 0; this.comboTimer = 0;
             this.grappleTarget = null;
+        }
+
+        if (this.heroName === 'Wolf') {
+            this.wolfAttackTimer = 1500; 
+            this.wolfComboCount = 0;
+            this.wolfPassiveReady = false;
         }
     }
 
@@ -1226,6 +1237,10 @@ class Fighter extends Entity {
     update(dt) {
         if (this.dead) return;
 
+        if (this.heroName === 'Wolf') {
+            this.wolfAttackTimer += dt;
+        }
+
         if (this.grappledBy) {
             this.x = this.grappledBy.x + this.grappledBy.facing * 40;
             this.y = this.grappledBy.y;
@@ -1266,9 +1281,8 @@ class Fighter extends Entity {
             if (this.gensanSwitchCD > 0) this.gensanSwitchCD -= dt;
             if (this.gensanShadowCD > 0) this.gensanShadowCD -= dt;
 
-            // Extra key places the shadow for Gensan
             if (canAct && keysPressed[this.controls.extra] && this.gensanShadowCD <= 0) {
-                this.gensanShadowCD = 3000; // 3 seconds CD
+                this.gensanShadowCD = 3000; 
                 let shadow = new SwordShadow(this, this.x, this.y);
                 this.gensanShadows.push(shadow);
                 game.minions.push(shadow);
@@ -1356,7 +1370,7 @@ class Fighter extends Entity {
         let currentSpeed = this.baseSpeed;
         let currentJump = this.baseJump;
 
-        if (this.buffs.msBoost > 0) currentSpeed *= 1.2;
+        if (this.buffs.msBoost > 0) currentSpeed *= (this.heroName === 'Wolf' ? 1.3 : 1.2);
 
         if (this.buffs.dizzy > 0) {
             this.buffs.dizzy -= dt;
@@ -1381,6 +1395,15 @@ class Fighter extends Entity {
             if (!(this.heroName === 'Duke' && this.isMounted && this.runTimer > 0 && this.runTimer <= 3000)) currentSpeed *= 0.6;
             if (Math.floor(this.buffs.poison/1000) !== Math.floor((this.buffs.poison+dt)/1000)) this.takeDamage(2, null, true);
             if(Math.random()<0.1) game.particles.push(new Particle(this.x+this.w/2, this.y, "#00ff00", 0, -2, 300));
+        }
+        if (this.buffs.bleed > 0) {
+            this.buffs.bleed -= dt;
+            this.buffs.bleedTick += dt;
+            if (this.buffs.bleedTick >= 1000) {
+                this.takeDamage(5, null, true); // 0.5 WRD per sec
+                this.buffs.bleedTick = 0;
+                game.particles.push(new Particle(this.x+this.w/2, this.y+this.h/2, "#8B0000", (Math.random()-0.5)*5, (Math.random()-0.5)*5, 300, 4));
+            }
         }
         if (this.buffs.battleCry > 0) {
             this.buffs.battleCry -= dt;
@@ -1535,6 +1558,35 @@ class Fighter extends Entity {
                         this.superCooldown = 3000;
                     }
                 }
+            } else if (this.heroName === 'Wolf') {
+                if (Math.random() < 0.5) game.particles.push(new Particle(this.x + Math.random()*this.w, this.y + this.h, "#ccc", (Math.random()-0.5)*2, -Math.random()*5, 200, 3));
+                if (this.superWindupTimer <= 0) {
+                    this.superCooldown = this.superCooldownMax;
+                    let enemy = game.getEnemyOf(this);
+
+                    if (enemy && enemy.invincible <= 0 && !enemy.dead) {
+                        let frontX = enemy.facing === 1 ? enemy.x + enemy.w + 10 : enemy.x - this.w - 10;
+                        
+                        this.x = frontX;
+                        this.y = enemy.y - 20; 
+                        this.facing = enemy.facing === 1 ? -1 : 1; 
+
+                        if (this.x < 0) this.x = 0;
+                        if (this.x > CANVAS_W - this.w) this.x = CANVAS_W - this.w;
+
+                        enemy.takeDamage(150, this); 
+                        if (enemy.buffs) enemy.buffs.slow = 2500; 
+
+                        for(let i=0; i<30; i++) game.particles.push(new Particle(this.x+this.w/2, this.y+this.h/2, "#8B0000", (Math.random()-0.5)*20, (Math.random()-0.5)*20, 400, 6));
+                        
+                        for(let i=-20; i<=20; i+=2) {
+                            game.particles.push(new Particle(this.x+this.w/2 + i*2, this.y+this.h/2 + i*2, "#8B0000", 0, 0, 400, 6));
+                            game.particles.push(new Particle(this.x+this.w/2 - i*2, this.y+this.h/2 + i*2, "#8B0000", 0, 0, 400, 6));
+                        }
+                    } else {
+                        this.superCooldown = 3000;
+                    }
+                }
             }
         }
 
@@ -1545,7 +1597,7 @@ class Fighter extends Entity {
             if (keys[this.controls.left]) { targetVx = -currentSpeed; this.facing = -1; }
             else if (keys[this.controls.right]) { targetVx = currentSpeed; this.facing = 1; }
 
-            if (this.attackState === 'windup' && (this.heroName === 'Euclid' || this.heroName === 'Kae' || this.heroName === 'Ugo' || this.heroName === 'Volt' || this.heroName === 'Gensan')) targetVx = 0;
+            if (this.attackState === 'windup' && (this.heroName === 'Euclid' || this.heroName === 'Kae' || this.heroName === 'Ugo' || this.heroName === 'Volt' || this.heroName === 'Gensan' || this.heroName === 'Wolf')) targetVx = 0;
 
             if (this.heroName === 'Duke' && this.isMounted) {
                 if ((keys[this.controls.left] || keys[this.controls.right]) && this.attackState === 'idle') this.runTimer += dt;
@@ -1565,7 +1617,7 @@ class Fighter extends Entity {
 
         let friction = 0.25;
         if (this.currentPlatform && this.currentPlatform.type === 'center') friction = 0.03;
-        if (!canAct || ((this.heroName === 'Euclid' || this.heroName === 'Kae' || this.heroName === 'Ugo' || this.heroName === 'Volt' || this.heroName === 'Gensan') && this.attackState === 'windup') || hasPuppet) friction = 0.1;
+        if (!canAct || ((this.heroName === 'Euclid' || this.heroName === 'Kae' || this.heroName === 'Ugo' || this.heroName === 'Volt' || this.heroName === 'Gensan' || this.heroName === 'Wolf') && this.attackState === 'windup') || hasPuppet) friction = 0.1;
 
         this.vx += (targetVx - this.vx) * friction;
 
@@ -1591,6 +1643,7 @@ class Fighter extends Entity {
                         if (this.heroName === 'Kila') activeTime = 150;
                         if (this.heroName === 'Volt') activeTime = this.overdriveTimer > 0 ? 25 : 50;
                         if (this.heroName === 'Gensan') activeTime = 150;
+                        if (this.heroName === 'Wolf') activeTime = 100;
 
                         this.attackState = 'active';
                         this.stateTimer = activeTime;
@@ -1628,7 +1681,29 @@ class Fighter extends Entity {
                                 this.hp = Math.min(this.maxHp, this.hp + 5);
                                 for(let i=0; i<5; i++) game.particles.push(new Particle(this.x + Math.random()*this.w, this.y + Math.random()*this.h, "#ff0000", 0, -2, 300, 3));
                             }
+
+                            if (this.heroName === 'Wolf') {
+                                if (this.wolfPassiveReady) {
+                                    t.takeDamage(10, this); 
+                                }
+                                for(let i=0; i<8; i++) game.particles.push(new Particle(t.x+t.w/2, t.y+t.h/2, "#fff", (Math.random()-0.5)*15, (Math.random()-0.5)*15, 300, 4));
+                            }
                         });
+
+                        if (this.heroName === 'Wolf') {
+                            if (this.wolfPassiveReady) {
+                                this.buffs.msBoost = 2000;
+                                this.wolfPassiveReady = false;
+                            }
+                            this.wolfComboCount += targetsHit.length; 
+                            if (this.wolfComboCount >= 5) {
+                                targetsHit.forEach(t => {
+                                    if (t.buffs) t.buffs.bleed = 4000;
+                                });
+                                this.wolfComboCount = 0;
+                                for(let i=0; i<15; i++) game.particles.push(new Particle(this.x+this.w/2, this.y+this.h/2, "#8B0000", (Math.random()-0.5)*20, (Math.random()-0.5)*20, 500, 5));
+                            }
+                        }
 
                         if (this.heroName === 'Kae') {
                             this.kaeComboCount++;
@@ -1675,6 +1750,7 @@ class Fighter extends Entity {
                     if (this.heroName === 'Kila') recTime = 200;
                     if (this.heroName === 'Volt') recTime = this.overdriveTimer > 0 ? 75 : 150;
                     if (this.heroName === 'Gensan') recTime = 150;
+                    if (this.heroName === 'Wolf') recTime = 100;
 
                     this.attackState = 'recovery';
                     this.stateTimer = recTime;
@@ -1818,6 +1894,7 @@ class Fighter extends Entity {
         if (this.heroName === 'Lique') range = 55;
         if (this.heroName === 'Kae') range = 45;
         if (this.heroName === 'Gensan') range = this.gensanCombo === 3 ? 65 : 50;
+        if (this.heroName === 'Wolf') range = 45;
 
         if (this.heroName === 'Macu') {
             range = 110;
@@ -1842,6 +1919,7 @@ class Fighter extends Entity {
         if (this.heroName === 'Lique') return 18;
         if (this.heroName === 'Kae') return this.kaeAwakened ? 35 : 25;
         if (this.heroName === 'Gensan') return this.gensanCombo === 3 ? 35 : 22;
+        if (this.heroName === 'Wolf') return 20;
         return 13;
     }
 
@@ -1872,6 +1950,12 @@ class Fighter extends Entity {
         if (this.heroName === 'Volt') this.stateTimer = this.overdriveTimer > 0 ? 25 : 50;
         if (this.heroName === 'Gensan') this.stateTimer = 100;
         if (this.heroName === 'Noae') this.stateTimer = 150;
+        if (this.heroName === 'Wolf') {
+            this.stateTimer = 50;
+            this.wolfPassiveReady = this.wolfAttackTimer >= 1500;
+            this.wolfAttackTimer = 0;
+            this.vx = this.facing * 10; 
+        }
 
         this.maxStateTimer = this.stateTimer;
         this.hasHit = false;
@@ -2067,6 +2151,13 @@ class Fighter extends Entity {
             return;
         }
 
+        if (this.heroName === 'Wolf') {
+            if (this.superCooldown <= 0 && this.superWindupTimer <= 0) {
+                this.superWindupTimer = 350;
+            }
+            return;
+        }
+
         if (this.heroName === 'Ugo') {
             this.superCooldown = this.superCooldownMax;
             let activePuppet = game.minions.find(m => m.type === 'puppet' && m.owner === this && !m.dead);
@@ -2232,11 +2323,14 @@ class Fighter extends Entity {
         }
 
         if (this.superWindupTimer > 0) {
-            if (this.heroName === 'Euclid' || this.heroName === 'Kae') {
+            if (this.heroName === 'Euclid' || this.heroName === 'Kae' || this.heroName === 'Wolf') {
                 let prog = this.superWindupTimer > 0 ? this.superWindupTimer / (this.heroName === 'Euclid' ? 1000 : 300) : 1 - (this.stateTimer / 1000);
                 ctx.save();
                 ctx.rotate(Date.now() * 0.003);
-                ctx.strokeStyle = this.heroName === 'Euclid' ? `rgba(138, 43, 226, ${Math.min(1, Math.max(0.2, prog*2))})` : `rgba(0, 255, 255, ${Math.min(1, Math.max(0.2, prog*2))})`;
+                let spellColor = this.heroName === 'Euclid' ? `rgba(138, 43, 226, ${Math.min(1, Math.max(0.2, prog*2))})` : `rgba(0, 255, 255, ${Math.min(1, Math.max(0.2, prog*2))})`;
+                if (this.heroName === 'Wolf') spellColor = `rgba(139, 0, 0, ${Math.min(1, Math.max(0.2, prog*2))})`;
+                
+                ctx.strokeStyle = spellColor;
                 ctx.lineWidth = 2;
                 ctx.strokeRect(-40, -40, 80, 80);
                 ctx.rotate(Math.PI / 4);
@@ -2340,12 +2434,24 @@ class Fighter extends Entity {
                     ctx.beginPath(); ctx.arc(-hw + 8 + i*8, -10, 3, 0, Math.PI*2); ctx.fill();
                 }
             }
+        } else if (this.heroName === 'Wolf') {
+            ctx.fillStyle = "#404040"; ctx.fillRect(-hw - 2, -2, this.w + 4, h + 4);
+            ctx.fillStyle = this.color; ctx.fillRect(-hw, 0, this.w, h);
+            ctx.fillStyle = "#fff"; ctx.fillRect(-hw, 10, this.w, 15); 
+            ctx.fillStyle = "#8B0000"; ctx.fillRect(hw - 10, 12, 4, 4); 
+            
+            if (this.wolfComboCount > 0) {
+                ctx.fillStyle = "#8B0000";
+                for (let i = 0; i < this.wolfComboCount; i++) {
+                    ctx.beginPath(); ctx.arc(-hw + 8 + i * 6, -10, 2, 0, Math.PI * 2); ctx.fill();
+                }
+            }
         } else {
             ctx.fillStyle = "rgba(0,0,0,0.4)"; ctx.fillRect(-hw - 2, -2, this.w + 4, h + 4);
             ctx.fillStyle = this.color; ctx.fillRect(-hw, 0, this.w, h);
         }
 
-        if (this.heroName !== 'Kae' && this.heroName !== 'Ugo') {
+        if (this.heroName !== 'Kae' && this.heroName !== 'Ugo' && this.heroName !== 'Wolf') {
             ctx.fillStyle = "#fff"; ctx.fillRect(hw - 12, 10, 8, 8);
         }
 
@@ -2558,6 +2664,17 @@ class Fighter extends Entity {
             ctx.beginPath(); ctx.moveTo(-15, -15); ctx.quadraticCurveTo(0, -30, 15, -15); ctx.lineTo(15, -10); ctx.quadraticCurveTo(0, -20, -15, -10); ctx.fill();
             ctx.restore();
         }
+        else if (this.heroName === 'Wolf') {
+            ctx.save(); ctx.translate(hw, 25);
+            let thrust = this.attackState === 'active' ? 30 * Math.sin(phaseProg * Math.PI) : 0;
+            ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
+            if (this.attackState === 'active') {
+                ctx.fillRect(0, -10, thrust, 4);
+                ctx.fillRect(0, 0, thrust + 10, 4);
+                ctx.fillRect(0, 10, thrust, 4);
+            }
+            ctx.restore();
+        }
 
         ctx.restore();
 
@@ -2585,7 +2702,7 @@ class Game {
         this.state = 'MENU';
 
         this.p1Choice = 'Noae';
-        this.p2Choice = 'Gensan';
+        this.p2Choice = 'Wolf';
 
         this.setupMenu();
         updateControlsDisplay();
@@ -2774,10 +2891,16 @@ class Game {
             let mineCount = this.minions.filter(m => m.type === 'landmine' && m.owner === this.p1).length;
             p1Stat += `[Mines: ${mineCount}/3]`;
         }
+        if (this.p1.heroName === 'Wolf') {
+            p1Stat += `[Marks: ${this.p1.wolfComboCount}/5]`;
+            if (this.p1.wolfAttackTimer >= 1500) p1Stat += " [INSTINCT READY]";
+        }
+
         if (this.p1.buffs.poison > 0) p1Stat += " [POISONED]";
         if (this.p1.buffs.burn > 0) p1Stat += " [BURN]";
         if (this.p1.buffs.dizzy > 0) p1Stat += " [DIZZY]";
         if (this.p1.buffs.slow > 0) p1Stat += " [SLOWED]";
+        if (this.p1.buffs.bleed > 0) p1Stat += " [BLEEDING]";
         document.getElementById('p1-status').innerText = p1Stat;
 
         document.getElementById('p2-hp').style.width = `${Math.max(0, (this.p2.hp / this.p2.maxHp) * 100)}%`;
@@ -2841,10 +2964,16 @@ class Game {
             let mineCount = this.minions.filter(m => m.type === 'landmine' && m.owner === this.p2).length;
             p2Stat += `[Mines: ${mineCount}/3]`;
         }
+        if (this.p2.heroName === 'Wolf') {
+            p2Stat += `[Marks: ${this.p2.wolfComboCount}/5]`;
+            if (this.p2.wolfAttackTimer >= 1500) p2Stat += " [INSTINCT READY]";
+        }
+
         if (this.p2.buffs.poison > 0) p2Stat += " [POISONED]";
         if (this.p2.buffs.burn > 0) p2Stat += " [BURN]";
         if (this.p2.buffs.dizzy > 0) p2Stat += " [DIZZY]";
         if (this.p2.buffs.slow > 0) p2Stat += " [SLOWED]";
+        if (this.p2.buffs.bleed > 0) p2Stat += " [BLEEDING]";
         document.getElementById('p2-status').innerText = p2Stat;
 
         let promptsHTML = '';
@@ -2938,6 +3067,7 @@ class Game {
             if (p2.heroName === 'Kae') attackRange = 55;
             if (p2.heroName === 'Euclid' && p2.euclidWeapon === 'magic') attackRange = 400;
             if (p2.heroName === 'Noae') attackRange = 300;
+            if (p2.heroName === 'Wolf') attackRange = 60;
 
             if (p2.heroName === 'Kadaxi') {
                 if (p2.grapplePhase === 1) {
@@ -2992,6 +3122,13 @@ class Game {
                 if (dist < 300 && p2.superCooldown <= 0) {
                     scores.superSkill += 150;
                 }
+            }
+
+            if (p2.heroName === 'Wolf') {
+                if (dist < 200 && p2.superCooldown <= 0) {
+                    scores.superSkill += 300;
+                }
+                scores.moveForward += 50; // aggressive chaser
             }
 
             if (p2.heroName === 'Ugo') {
@@ -3084,7 +3221,7 @@ class Game {
             let superRange = (p2.heroName === 'Duke' && !p2.isMounted) ? 600 : attackRange + 100;
             if (p2.heroName === 'Kadaxi') superRange = 200;
 
-            if (skillReady && dist <= superRange && Math.abs(dy) < 60 && p2.heroName !== 'Kae' && p2.heroName !== 'Ugo' && p2.heroName !== 'Kila' && p2.heroName !== 'Volt' && p2.heroName !== 'Gensan') {
+            if (skillReady && dist <= superRange && Math.abs(dy) < 60 && p2.heroName !== 'Kae' && p2.heroName !== 'Ugo' && p2.heroName !== 'Kila' && p2.heroName !== 'Volt' && p2.heroName !== 'Gensan' && p2.heroName !== 'Wolf') {
                 scores.superSkill += 100;
                 if (tacticalState === 'aggressive') scores.superSkill += 50;
             }
