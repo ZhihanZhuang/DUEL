@@ -1,5 +1,5 @@
 /**
- * Otokojuku: Legends Duel
+ * Dantao: Legends Duel
  * Fighter Class
  */
 
@@ -1612,4 +1612,5 @@ class Fighter extends Entity {
         ctx.fillStyle = "red"; ctx.fillRect(this.x, this.y - 12, this.w, 5);
         ctx.fillStyle = "#4caf50"; ctx.fillRect(this.x, this.y - 12, this.w * (this.hp / this.maxHp), 5);
     }
+
 }
