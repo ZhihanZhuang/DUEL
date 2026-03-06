@@ -134,7 +134,7 @@ const HEROES = {
     },
     Euclid: {
         name: "Euclid", desc: "Necromantic Geometric Mage",
-        color: "#8A2BE2", maxHp: 700, speed: 4.5, jump: 14, width: 40, height: 70, superCD: 20000,
+        color: "#8A2BE2", maxHp: 700, speed: 4.5, jump: 14, width: 40, height: 70, superCD: 50000,
         ui: { hp: "70 WRD", atk: "1.2 WRD (Sword) / 10.3 WRD (Homing Burst)", passive: "Press [Switch] for Melee/Ranged (2s Invincible Channel). Magic takes 0.5s to cast (Uninterruptible), homes in, or heals skeletons if out of range.", super: "<span class='skill-tag'>Necromantic Summoning</span> 1s cast to summon 5 slow but deadly melee skeletons. Skeletons deal 6 WRD damage and explode on death (2.3 WRD)." }
     },
     Lique: {
