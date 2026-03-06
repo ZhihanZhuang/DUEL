@@ -11,6 +11,7 @@ const DEFAULT_BINDS = {
 };
 
 let currentBinds = JSON.parse(localStorage.getItem('otokojuku_binds')) || JSON.parse(JSON.stringify(DEFAULT_BINDS));
+window.currentBinds = currentBinds; // 【第一处新增】将按键配置暴露给全局
 
 function saveBinds() {
     localStorage.setItem('otokojuku_binds', JSON.stringify(currentBinds));
@@ -173,8 +174,12 @@ const HEROES = {
     }
 };
 
-const keys = {};
-const keysPressed = {};
+window.HEROES = HEROES; // 【第二处新增】将英雄数据暴露给联机大厅
+
+window.keys = {}; // 【修改这里】
+window.keysPressed = {}; // 【修改这里】
+const keys = window.keys; // 【新增】保留原有的局部引用
+const keysPressed = window.keysPressed; // 【新增】保留原有的局部引用
 
 function checkAABB(r1, r2) {
     if (!r1 || !r2) return false;
@@ -1830,7 +1835,7 @@ class Fighter extends Entity {
         if (this.heroName === 'Euclid') return 12;
         if (this.heroName === 'Lique') return 18;
         if (this.heroName === 'Kae') return this.kaeAwakened ? 35 : 25;
-        if (this.heroName === 'Gensan') return this.gensanCombo === 3 ? 55 : 35;
+        if (this.heroName === 'Gensan') return this.gensanCombo === 3 ? 35 : 22;
         return 13;
     }
 
@@ -3194,7 +3199,10 @@ class Game {
     }
 }
 
+window.Game = Game; // 【第三处新增】暴露游戏核心引擎供网络模块调用
+
 const game = new Game();
+window.game = game; // 【新增】暴露当前游戏实例
 
 window.addEventListener('resize', () => {
     CANVAS_W = window.innerWidth; CANVAS_H = window.innerHeight;
