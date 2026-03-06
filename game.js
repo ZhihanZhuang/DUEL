@@ -134,8 +134,8 @@ const HEROES = {
     },
     Euclid: {
         name: "Euclid", desc: "Necromantic Geometric Mage",
-        color: "#8A2BE2", maxHp: 700, speed: 4.5, jump: 14, width: 40, height: 70, superCD: 10000,
-        ui: { hp: "70 WRD", atk: "1.2 WRD (Sword) / 10.3 WRD (Homing Burst)", passive: "Press [Switch] for Melee/Ranged (2s Invincible Channel). Magic takes 1s to cast, homes in, or heals skeletons if out of range.", super: "<span class='skill-tag'>Necromantic Summoning</span> 3s cast to summon 8 slow but deadly melee skeletons. Skeletons deal 6 WRD damage and explode on death (2.3 WRD)." }
+        color: "#8A2BE2", maxHp: 700, speed: 4.5, jump: 14, width: 40, height: 70, superCD: 20000,
+        ui: { hp: "70 WRD", atk: "1.2 WRD (Sword) / 10.3 WRD (Homing Burst)", passive: "Press [Switch] for Melee/Ranged (2s Invincible Channel). Magic takes 0.5s to cast (Uninterruptible), homes in, or heals skeletons if out of range.", super: "<span class='skill-tag'>Necromantic Summoning</span> 1s cast to summon 5 slow but deadly melee skeletons. Skeletons deal 6 WRD damage and explode on death (2.3 WRD)." }
     },
     Lique: {
         name: "Lique", desc: "Berserker with Hatchets",
@@ -1178,13 +1178,19 @@ class Fighter extends Entity {
             for(let i=0; i<30; i++) game.particles.push(new Particle(this.x+this.w/2, this.y+this.h/2, "#000000", (Math.random()-0.5)*15, (Math.random()-0.5)*15, 1000, 8));
         }
 
-        if (this.heroName === 'Euclid' || this.heroName === 'Kae' || this.heroName === 'Ugo' || this.heroName === 'Kila' || this.heroName === 'Volt' || this.heroName === 'Gensan') {
+        if (this.heroName === 'Kae' || this.heroName === 'Ugo' || this.heroName === 'Kila' || this.heroName === 'Volt' || this.heroName === 'Gensan') {
             if (this.attackState === 'windup') {
                 this.attackState = 'idle';
                 this.superWindupTimer = 0;
                 this.stateTimer = 0;
                 this.ugoSummoning = false;
             }
+        } else if (this.heroName === 'Euclid') {
+             if (this.attackState === 'windup' && this.euclidWeapon === 'sword') {
+                 this.attackState = 'idle';
+                 this.superWindupTimer = 0;
+                 this.stateTimer = 0;
+             }
         }
 
         if (!isDoT && !noKnockback && !this.grappledBy) {
@@ -1483,7 +1489,7 @@ class Fighter extends Entity {
                     this.superCooldown = this.superCooldownMax;
                     let currentSkeletons = game.minions.filter(m => m.type === 'skeleton' && m.owner === this);
                     currentSkeletons.forEach(s => s.dead = true);
-                    for (let i = 0; i < 8; i++) {
+                    for (let i = 0; i < 5; i++) {
                         let randomX = 50 + Math.random() * (CANVAS_W - 100);
                         game.minions.push(new Skeleton(this, randomX, GROUND_Y - 60));
                         for(let j=0; j<10; j++) game.particles.push(new Particle(randomX + 17, GROUND_Y - 30, "#8A2BE2", (Math.random()-0.5)*8, (Math.random()-0.5)*8, 400));
@@ -1858,7 +1864,7 @@ class Fighter extends Entity {
         if (this.heroName === 'Duke' && this.isMounted) this.stateTimer = 50;
         if (this.heroName === 'Hason') this.stateTimer = 50;
         if (this.heroName === 'Kadaxi') this.stateTimer = 100;
-        if (this.heroName === 'Euclid') this.stateTimer = (this.euclidWeapon === 'sword') ? 50 : 1000;
+        if (this.heroName === 'Euclid') this.stateTimer = (this.euclidWeapon === 'sword') ? 50 : 500;
         if (this.heroName === 'Lique') this.stateTimer = this.buffs.bloodFrenzy > 0 ? 10 : 20;
         if (this.heroName === 'Kae') this.stateTimer = this.kaeAwakened ? 25 : 50;
         if (this.heroName === 'Ugo') this.stateTimer = 150;
@@ -2056,7 +2062,7 @@ class Fighter extends Entity {
 
         if (this.heroName === 'Euclid') {
             if (this.superCooldown <= 0 && this.superWindupTimer <= 0) {
-                this.superWindupTimer = 3000;
+                this.superWindupTimer = 1000;
             }
             return;
         }
@@ -2227,7 +2233,7 @@ class Fighter extends Entity {
 
         if (this.superWindupTimer > 0) {
             if (this.heroName === 'Euclid' || this.heroName === 'Kae') {
-                let prog = this.superWindupTimer > 0 ? this.superWindupTimer / (this.heroName === 'Euclid' ? 3000 : 300) : 1 - (this.stateTimer / 1000);
+                let prog = this.superWindupTimer > 0 ? this.superWindupTimer / (this.heroName === 'Euclid' ? 1000 : 300) : 1 - (this.stateTimer / 1000);
                 ctx.save();
                 ctx.rotate(Date.now() * 0.003);
                 ctx.strokeStyle = this.heroName === 'Euclid' ? `rgba(138, 43, 226, ${Math.min(1, Math.max(0.2, prog*2))})` : `rgba(0, 255, 255, ${Math.min(1, Math.max(0.2, prog*2))})`;
@@ -2739,7 +2745,7 @@ class Game {
         if (this.p1.heroName === 'Lique' && this.p1.buffs.bloodFrenzy > 0) p1Stat += " [BLOOD FRENZY]";
         if (this.p1.heroName === 'Euclid') {
             let skelCount = this.minions.filter(m => m.type === 'skeleton' && m.owner === this.p1).length;
-            p1Stat += `Wep: ${this.p1.euclidWeapon.toUpperCase()} [Skulls: ${skelCount}/8]`;
+            p1Stat += `Wep: ${this.p1.euclidWeapon.toUpperCase()} [Skulls: ${skelCount}/5]`;
             if (this.p1.euclidSwitchTimer > 0) p1Stat += ` (SWITCHING)`;
             else if (this.p1.superWindupTimer > 0) p1Stat += ` (SUMMONING)`;
             else if (this.p1.attackState === 'windup' && this.p1.euclidWeapon === 'magic') p1Stat += ` (CASTING)`;
@@ -2806,7 +2812,7 @@ class Game {
         if (this.p2.heroName === 'Lique' && this.p2.buffs.bloodFrenzy > 0) p2Stat += " [BLOOD FRENZY]";
         if (this.p2.heroName === 'Euclid') {
             let skelCount = this.minions.filter(m => m.type === 'skeleton' && m.owner === this.p2).length;
-            p2Stat += `Wep: ${this.p2.euclidWeapon.toUpperCase()} [Skulls: ${skelCount}/8]`;
+            p2Stat += `Wep: ${this.p2.euclidWeapon.toUpperCase()} [Skulls: ${skelCount}/5]`;
             if (this.p2.euclidSwitchTimer > 0) p2Stat += ` (SWITCHING)`;
             else if (this.p2.superWindupTimer > 0) p2Stat += ` (SUMMONING)`;
             else if (this.p2.attackState === 'windup' && this.p2.euclidWeapon === 'magic') p2Stat += ` (CASTING)`;
