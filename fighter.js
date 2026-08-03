@@ -1,5 +1,5 @@
 /**
- * Dantao: Legends Duel
+ * Otokojuku: Legends Duel
  * Fighter Class
  */
 
@@ -25,6 +25,8 @@ class Fighter extends Entity {
         this.flipCooldown = 0;
         this.timeSinceLastDamage = 0;
         this.flightDisabled = false;
+        this.lastAttacker = null;
+        this.lastAttackerTimer = 0;
 
         this.hasonAmmo = 6; this.hasonReloadTimer = 0; this.hasonSuperCharges = 0; this.hasonSuperWindow = 0;
         this.williSuperCharges = 0; this.williSuperWindow = 0; this.williDashCooldown = 0;
@@ -74,6 +76,11 @@ class Fighter extends Entity {
 
     takeDamage(amt, attacker, isDoT = false, noKnockback = false) {
         if (this.dead || this.invincible > 0) return;
+
+        if (attacker && attacker !== this && attacker.heroName) {
+            this.lastAttacker = attacker;
+            this.lastAttackerTimer = 2500;
+        }
 
         if (!isDoT) {
             if (this.heroName === 'Kadaxi' && this.grapplePhase === 1) this.breakGrapple();
@@ -144,7 +151,7 @@ class Fighter extends Entity {
         if (this.hp <= 0) {
             this.hp = 0; this.dead = true;
             if (this.heroName === 'Kadaxi') this.breakGrapple();
-            game.endGame(this.isP1 ? "Player 2" : "Player 1");
+            game.handleFighterDefeat(this, attacker);
         }
     }
 
@@ -159,6 +166,11 @@ class Fighter extends Entity {
 
     update(dt) {
         if (this.dead) return;
+
+        if (this.lastAttackerTimer > 0) {
+            this.lastAttackerTimer -= dt;
+            if (this.lastAttackerTimer <= 0) this.lastAttacker = null;
+        }
 
         if (this.heroName === 'Wolf') {
             this.wolfAttackTimer += dt;
@@ -561,6 +573,7 @@ class Fighter extends Entity {
                     } else {
                         let activeTime = 150;
                         if (this.heroName === 'Lique') activeTime = this.buffs.bloodFrenzy > 0 ? 50 : 100;
+                        if (this.heroName === 'Willi') activeTime = Math.round(150 / Math.max(0.5, Math.min(3, this.aiAttackTempo || 1)));
                         if (this.heroName === 'Kae') activeTime = 100;
                         if (this.heroName === 'Ugo') activeTime = 100;
                         if (this.heroName === 'Kila') activeTime = 150;
@@ -579,12 +592,12 @@ class Fighter extends Entity {
 
                 if (!this.hasHit && this.isMeleeAttack()) {
                     let hitBox = this.getMeleeHitbox();
-                    let enemy = game.getEnemyOf(this);
-
                     let targetsHit = [];
-                    if (enemy && !enemy.dead && !enemy.untargetable && checkAABB(hitBox, enemy)) {
-                        enemy.takeDamage(this.getMeleeDamage(), this);
-                        targetsHit.push(enemy);
+                    for (const enemy of game.getOpponentsOf(this)) {
+                        if (!enemy.untargetable && checkAABB(hitBox, enemy)) {
+                            enemy.takeDamage(this.getMeleeDamage(), this);
+                            targetsHit.push(enemy);
+                        }
                     }
                     for (let m of game.minions) {
                         if (m && m.owner !== this && !m.dead && !m.untargetable && checkAABB(hitBox, m)) {
@@ -666,6 +679,7 @@ class Fighter extends Entity {
                 if (this.stateTimer <= 0) {
                     let recTime = 250;
                     if (this.heroName === 'Hason') recTime = 100;
+                    if (this.heroName === 'Willi') recTime = Math.round(250 / Math.max(0.5, Math.min(3, this.aiAttackTempo || 1)));
                     if (this.heroName === 'Kadaxi') recTime = 200;
                     if (this.heroName === 'Lique') recTime = this.buffs.bloodFrenzy > 0 ? 90 : 180;
                     if (this.heroName === 'Kae') recTime = this.kaeAwakened ? 100 : 200;
@@ -864,6 +878,7 @@ class Fighter extends Entity {
 
         if (this.heroName === 'Duke' && this.isMounted) this.stateTimer = 50;
         if (this.heroName === 'Hason') this.stateTimer = 50;
+        if (this.heroName === 'Willi') this.stateTimer = Math.round(100 / Math.max(0.5, Math.min(3, this.aiAttackTempo || 1)));
         if (this.heroName === 'Kadaxi') this.stateTimer = 100;
         if (this.heroName === 'Euclid') this.stateTimer = (this.euclidWeapon === 'sword') ? 50 : 500;
         if (this.heroName === 'Lique') this.stateTimer = this.buffs.bloodFrenzy > 0 ? 10 : 20;
@@ -1612,5 +1627,4 @@ class Fighter extends Entity {
         ctx.fillStyle = "red"; ctx.fillRect(this.x, this.y - 12, this.w, 5);
         ctx.fillStyle = "#4caf50"; ctx.fillRect(this.x, this.y - 12, this.w * (this.hp / this.maxHp), 5);
     }
-
 }

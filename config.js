@@ -1,5 +1,5 @@
 /**
- * dantao: Legends Duel
+ * Otokojuku: Legends Duel
  * Config & Data
  */
 
@@ -9,11 +9,11 @@ const DEFAULT_BINDS = {
     p2: { left: 'ArrowLeft', right: 'ArrowRight', jump: 'ArrowUp', down: 'ArrowDown', attack: 'Numpad9', super: 'NumpadEnter', switch: 'Numpad8', extra: 'Numpad7' }
 };
 
-var currentBinds = JSON.parse(localStorage.getItem('dantao_binds')) || JSON.parse(JSON.stringify(DEFAULT_BINDS));
+var currentBinds = JSON.parse(localStorage.getItem('otokojuku_binds')) || JSON.parse(JSON.stringify(DEFAULT_BINDS));
 window.currentBinds = currentBinds;
 
 function saveBinds() {
-    localStorage.setItem('dantao_binds', JSON.stringify(currentBinds));
+    localStorage.setItem('otokojuku_binds', JSON.stringify(currentBinds));
     updateControlsDisplay();
 }
 
@@ -96,11 +96,111 @@ var CANVAS_H = window.innerHeight;
 const GRAVITY = 0.6;
 var GROUND_Y = CANVAS_H - 100;
 
-var PLATFORMS = [
-    { x: CANVAS_W / 2 - 200, y: GROUND_Y - 180, w: 400, h: 20, type: 'center' },
-    { x: Math.max(50, CANVAS_W / 4 - 150), y: GROUND_Y - 350, w: 250, h: 20, type: 'side' },
-    { x: Math.min(CANVAS_W - 300, CANVAS_W * (3/4) - 100), y: GROUND_Y - 350, w: 250, h: 20, type: 'side' }
-];
+var ARENAS = {
+    dojo: {
+        name: 'Moonlit Dojo', worldScale: 1,
+        theme: {
+            sky: '#0d0818', horizon: '#241438', ground: '#1a1028', groundLine: '#3d5a3d',
+            groundDetail: '#2d4a2d', center: '#6eb5d4', centerEdge: '#4a8aaa',
+            side: '#6b4423', sideEdge: '#4a2f18', accent: '#d9c26c'
+        },
+        platforms: [
+            { x: 0.50, elevation: 180, w: 400, type: 'center' },
+            { x: 0.22, elevation: 350, w: 250, type: 'side' },
+            { x: 0.78, elevation: 350, w: 250, type: 'side' }
+        ]
+    },
+    cliff: {
+        name: 'Storm Cliffs', worldScale: 1,
+        theme: {
+            sky: '#101820', horizon: '#263847', ground: '#20242b', groundLine: '#b8d5df',
+            groundDetail: '#53636b', center: '#8ea4b0', centerEdge: '#5d737e',
+            side: '#59636a', sideEdge: '#343d43', accent: '#d7eef5'
+        },
+        platforms: [
+            { x: 0.18, elevation: 165, w: 270, type: 'side' },
+            { x: 0.43, elevation: 320, w: 230, type: 'center' },
+            { x: 0.69, elevation: 165, w: 290, type: 'side' },
+            { x: 0.86, elevation: 350, w: 210, type: 'center' }
+        ]
+    },
+    foundry: {
+        name: 'Iron Foundry', worldScale: 1,
+        theme: {
+            sky: '#171717', horizon: '#302b29', ground: '#24201f', groundLine: '#d68a45',
+            groundDetail: '#62554d', center: '#8f9699', centerEdge: '#555d61',
+            side: '#995b35', sideEdge: '#59331f', accent: '#ffd166'
+        },
+        platforms: [
+            { x: 0.23, elevation: 150, w: 290, type: 'side' },
+            { x: 0.50, elevation: 300, w: 330, type: 'center' },
+            { x: 0.77, elevation: 150, w: 290, type: 'side' },
+            { x: 0.13, elevation: 425, w: 180, type: 'center' },
+            { x: 0.87, elevation: 425, w: 180, type: 'center' }
+        ]
+    },
+    citadel: {
+        name: 'Sun Citadel', worldScale: 1,
+        theme: {
+            sky: '#18212a', horizon: '#374451', ground: '#28241d', groundLine: '#d7b35c',
+            groundDetail: '#625a48', center: '#d7c68c', centerEdge: '#a28c4e',
+            side: '#9d6b53', sideEdge: '#633f31', accent: '#f4e3a1'
+        },
+        platforms: [
+            { x: 0.50, elevation: 145, w: 430, type: 'center' },
+            { x: 0.25, elevation: 285, w: 235, type: 'side' },
+            { x: 0.75, elevation: 285, w: 235, type: 'side' },
+            { x: 0.50, elevation: 425, w: 260, type: 'center' }
+        ]
+    },
+    grand_arena: {
+        name: 'Grand Warfield', worldScale: 2.35, minWorldWidth: 2600, survivalOnly: true,
+        theme: {
+            sky: '#10171d', horizon: '#26333a', ground: '#1c211d', groundLine: '#748f5d',
+            groundDetail: '#3e4b38', center: '#b3a36c', centerEdge: '#776b43',
+            side: '#66757d', sideEdge: '#3d494f', accent: '#d9c26c'
+        },
+        platforms: [
+            { x: 0.10, elevation: 155, w: 280, type: 'side' },
+            { x: 0.31, elevation: 155, w: 310, type: 'center' },
+            { x: 0.55, elevation: 155, w: 310, type: 'side' },
+            { x: 0.82, elevation: 155, w: 300, type: 'center' },
+            { x: 0.20, elevation: 310, w: 260, type: 'center' },
+            { x: 0.43, elevation: 315, w: 330, type: 'side' },
+            { x: 0.69, elevation: 310, w: 290, type: 'center' },
+            { x: 0.91, elevation: 325, w: 230, type: 'side' },
+            { x: 0.35, elevation: 465, w: 240, type: 'center' },
+            { x: 0.61, elevation: 470, w: 270, type: 'center' }
+        ]
+    }
+};
+
+function buildArenaLayout(arenaId, viewportWidth, viewportHeight) {
+    const resolvedId = Object.prototype.hasOwnProperty.call(ARENAS, arenaId) ? arenaId : 'dojo';
+    const arena = ARENAS[resolvedId];
+    const worldWidth = Math.max(
+        viewportWidth,
+        arena.minWorldWidth || 0,
+        Math.round(viewportWidth * (arena.worldScale || 1))
+    );
+    const groundY = viewportHeight - 100;
+    const platforms = arena.platforms.map(platform => {
+        const width = Math.min(platform.w, Math.max(150, worldWidth - 40));
+        return {
+            x: Math.max(20, Math.min(worldWidth - width - 20, worldWidth * platform.x - width / 2)),
+            y: groundY - platform.elevation,
+            w: width,
+            h: 20,
+            type: platform.type
+        };
+    });
+    return { id: resolvedId, arena, worldWidth, worldHeight: viewportHeight, groundY, platforms };
+}
+
+var PLATFORMS = buildArenaLayout('dojo', CANVAS_W, CANVAS_H).platforms;
+
+window.ARENAS = ARENAS;
+window.buildArenaLayout = buildArenaLayout;
 
 var HEROES = {
     Hason: {
@@ -195,5 +295,4 @@ window.keysPressed = keysPressed;
 function checkAABB(r1, r2) {
     if (!r1 || !r2) return false;
     return r1.x < r2.x + r2.w && r1.x + r1.w > r2.x && r1.y < r2.y + r2.h && r1.y + r1.h > r2.y;
-
 }

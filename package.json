@@ -1,10 +1,14 @@
 {
-  "name": "untitled2",
-  "version": "1.0.0",
-  "description": "",
+  "name": "otokojuku-duel",
+  "version": "2.0.0",
+  "description": "Otokojuku: Legends Duel — fighting game with AI, online play, and retro UI",
   "main": "game.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "server": "node backend/server.js",
+    "start:backend": "node backend/server.js",
+    "install:backend": "npm install --prefix backend",
+    "postinstall": "npm install --prefix backend",
+    "test": "node --test tests/*.test.js"
   },
   "private": true
 }

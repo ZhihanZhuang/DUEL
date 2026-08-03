@@ -1,5 +1,5 @@
 /**
- * Dantao: Legends Duel
+ * Otokojuku: Legends Duel
  * Main Engine Core
  */
 
@@ -12,6 +12,18 @@ class Game {
 
         this.p1Choice = 'Noae';
         this.p2Choice = 'Wolf';
+        this.gameMode = 'duel';
+        this.fighters = [];
+        this.aiFighters = [];
+        this.selectedArena = localStorage.getItem('otokojuku_duel_arena') || 'dojo';
+        if (!ARENAS[this.selectedArena] || ARENAS[this.selectedArena].survivalOnly) this.selectedArena = 'dojo';
+        this.activeArenaId = this.selectedArena;
+        this.activeArena = ARENAS[this.activeArenaId];
+        this.camera = { x: 0 };
+        this.animationFrameId = null;
+        this.loopGeneration = 0;
+        this.endGameTimer = null;
+        this.lastPromptsHTML = '';
 
         this.setupMenu();
         updateControlsDisplay();
@@ -66,12 +78,27 @@ class Game {
             p1Roster.children[Object.keys(HEROES).indexOf(this.p1Choice)].onmouseover();
         }
 
-        document.getElementById('btn-sp').onclick = () => this.startGame(true);
+        this.setupArenaMenu();
+
+        document.getElementById('btn-sp').onclick = () => this.showComputerModes(true);
+        document.getElementById('btn-sp-duel').onclick = () => this.startGame(true, 'duel');
+        document.getElementById('btn-sp-survival').onclick = () => this.startGame(true, 'survival');
+        document.getElementById('btn-sp-back').onclick = () => this.showComputerModes(false);
         document.getElementById('btn-mp').onclick = () => this.startGame(false);
 
         document.getElementById('btn-restart').onclick = () => {
+            this.stopLoop();
+            if (this.endGameTimer) clearTimeout(this.endGameTimer);
+            this.endGameTimer = null;
             document.getElementById('game-over-screen').classList.add('hidden');
             document.getElementById('menu-screen').classList.remove('hidden');
+            document.getElementById('spectator-banner')?.classList.add('hidden');
+            document.getElementById('battle-royale-hud')?.classList.add('hidden');
+            document.getElementById('hud-p2')?.classList.remove('hidden');
+            document.getElementById('game-ui')?.classList.remove('survival-mode');
+            this.releaseAIControls();
+            this.isSpectator = false;
+            this.isOnline = false;
             this.state = 'MENU';
         };
 
@@ -89,17 +116,191 @@ class Game {
         };
     }
 
-    startGame(isSinglePlayer) {
+    setupArenaMenu() {
+        const container = document.getElementById('arena-options');
+        if (!container) return;
+        container.innerHTML = '';
+        Object.entries(ARENAS).filter(([, arena]) => !arena.survivalOnly).forEach(([id, arena]) => {
+            const button = document.createElement('button');
+            button.className = `arena-option ${id === this.selectedArena ? 'selected' : ''}`;
+            button.innerText = arena.name;
+            button.setAttribute('aria-pressed', id === this.selectedArena ? 'true' : 'false');
+            button.style.setProperty('--arena-sky', arena.theme.sky);
+            button.style.setProperty('--arena-horizon', arena.theme.horizon);
+            button.style.setProperty('--arena-platform', arena.theme.side);
+            button.style.setProperty('--arena-accent', arena.theme.accent);
+            button.onclick = () => {
+                this.selectedArena = id;
+                localStorage.setItem('otokojuku_duel_arena', id);
+                container.querySelectorAll('.arena-option').forEach(option => {
+                    const selected = option === button;
+                    option.classList.toggle('selected', selected);
+                    option.setAttribute('aria-pressed', selected ? 'true' : 'false');
+                });
+                if (this.state === 'MENU') this.configureArena(id, false);
+            };
+            container.appendChild(button);
+        });
+    }
+
+    showComputerModes(show) {
+        document.getElementById('menu-screen').classList.toggle('hidden', show);
+        document.getElementById('computer-mode-screen').classList.toggle('hidden', !show);
+        document.getElementById('btn-sp')?.setAttribute('aria-expanded', show ? 'true' : 'false');
+    }
+
+    configureArena(arenaId, preserveFighters = true) {
+        const oldWorldWidth = CANVAS_W || window.innerWidth;
+        const layout = buildArenaLayout(arenaId, window.innerWidth, window.innerHeight);
+        CANVAS_W = layout.worldWidth;
+        CANVAS_H = layout.worldHeight;
+        GROUND_Y = layout.groundY;
+        PLATFORMS = layout.platforms;
+        this.activeArenaId = layout.id;
+        this.activeArena = layout.arena;
+        this.canvas.width = window.innerWidth;
+        this.canvas.height = window.innerHeight;
+
+        if (preserveFighters && this.fighters?.length) {
+            const widthRatio = oldWorldWidth > 0 ? CANVAS_W / oldWorldWidth : 1;
+            this.fighters.forEach(fighter => {
+                fighter.x = Math.max(0, Math.min(CANVAS_W - fighter.w, fighter.x * widthRatio));
+                fighter.y = Math.min(fighter.y, GROUND_Y - fighter.h);
+                fighter.currentPlatform = null;
+                if (fighter.aiBrain) {
+                    fighter.aiBrain.navGoal = null;
+                    fighter.aiBrain.navStep = null;
+                    fighter.aiBrain.anchorPlatform = null;
+                }
+            });
+            this.minions?.forEach(minion => {
+                minion.x = Math.max(0, Math.min(CANVAS_W - minion.w, minion.x * widthRatio));
+                minion.y = Math.min(minion.y, GROUND_Y - minion.h);
+            });
+        }
+
+        this.camera.x = Math.max(0, Math.min(this.camera.x || 0, Math.max(0, CANVAS_W - this.canvas.width)));
+        const arenaNameplate = document.getElementById('arena-nameplate');
+        if (arenaNameplate) arenaNameplate.innerText = layout.arena.name;
+    }
+
+    updateCamera(dt) {
+        const maxCameraX = Math.max(0, CANVAS_W - this.canvas.width);
+        if (!this.isBattleRoyale || maxCameraX <= 0) {
+            this.camera.x = 0;
+            this.canvas.dataset.cameraX = '0';
+            this.canvas.dataset.worldWidth = String(CANVAS_W);
+            return;
+        }
+
+        const alive = this.getFighters().filter(fighter => !fighter.dead);
+        const target = !this.p1?.dead
+            ? this.p1
+            : alive.reduce((closest, fighter) => {
+                if (!closest) return fighter;
+                const viewCenter = this.camera.x + this.canvas.width / 2;
+                const fighterCenter = fighter.x + fighter.w / 2;
+                const closestCenter = closest.x + closest.w / 2;
+                return Math.abs(fighterCenter - viewCenter) < Math.abs(closestCenter - viewCenter) ? fighter : closest;
+            }, null);
+        if (!target) return;
+
+        const lookAhead = Math.max(-150, Math.min(150, (target.vx || 0) * 18));
+        const desiredX = Math.max(0, Math.min(maxCameraX, target.x + target.w / 2 + lookAhead - this.canvas.width / 2));
+        const blend = Math.min(1, Math.max(0.08, dt / 180));
+        this.camera.x += (desiredX - this.camera.x) * blend;
+        this.canvas.dataset.cameraX = String(Math.round(this.camera.x));
+        this.canvas.dataset.worldWidth = String(CANVAS_W);
+    }
+
+    stopLoop() {
+        this.loopGeneration++;
+        if (this.animationFrameId !== null) cancelAnimationFrame(this.animationFrameId);
+        this.animationFrameId = null;
+    }
+
+    scheduleNextFrame(generation) {
+        if (this.state !== 'PLAYING' || generation !== this.loopGeneration) return;
+        this.animationFrameId = requestAnimationFrame(timestamp => this.loop(timestamp, generation));
+    }
+
+    handleLoopError(error) {
+        console.error('Match stopped after an unrecoverable game-loop error:', error);
+        this.releaseAIControls();
+        this.stopLoop();
+        this.state = 'GAMEOVER';
+        document.getElementById('game-ui').classList.add('hidden');
+        document.getElementById('game-over-screen').classList.remove('hidden');
+        document.getElementById('winner-text').innerText = 'Match Interrupted';
+    }
+
+    makeAIControls(index) {
+        const prefix = `AI_${index}_`;
+        return {
+            left: `${prefix}LEFT`, right: `${prefix}RIGHT`, jump: `${prefix}JUMP`, down: `${prefix}DOWN`,
+            attack: `${prefix}ATTACK`, super: `${prefix}SUPER`, switch: `${prefix}SWITCH`, extra: `${prefix}EXTRA`
+        };
+    }
+
+    releaseAIControls() {
+        for (const fighter of this.aiFighters || []) {
+            if (!fighter?.controls) continue;
+            Object.values(fighter.controls).forEach(code => {
+                keys[code] = false;
+                delete keysPressed[code];
+            });
+        }
+    }
+
+    startGame(isSinglePlayer, singlePlayerMode = 'duel') {
+        this.stopLoop();
+        if (this.endGameTimer) clearTimeout(this.endGameTimer);
+        this.endGameTimer = null;
+        this.releaseAIControls();
         document.getElementById('menu-screen').classList.add('hidden');
+        document.getElementById('computer-mode-screen')?.classList.add('hidden');
         document.getElementById('game-ui').classList.remove('hidden');
 
         this.isSinglePlayer = isSinglePlayer;
+        this.gameMode = isSinglePlayer ? singlePlayerMode : 'duel';
+        this.isBattleRoyale = this.gameMode === 'survival';
+        this.configureArena(this.isBattleRoyale ? 'grand_arena' : this.selectedArena, false);
 
         let p2StartX = CANVAS_W - 150;
 
         this.p1 = new Fighter('p1', this.p1Choice, 100, currentBinds.p1, true);
-        this.p2 = new Fighter('p2', this.p2Choice, p2StartX, currentBinds.p2, false);
-        this.p2.facing = -1;
+        this.p1.displayName = 'Player';
+
+        if (this.isBattleRoyale) {
+            const heroPool = Object.keys(HEROES).filter(key => key !== this.p1Choice && key !== this.p2Choice);
+            for (let i = heroPool.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [heroPool[i], heroPool[j]] = [heroPool[j], heroPool[i]];
+            }
+            const cpuChoices = [this.p2Choice, ...heroPool].slice(0, 5);
+            this.aiFighters = cpuChoices.map((hero, index) => {
+                const fighter = new Fighter(`cpu${index + 1}`, hero, 0, this.makeAIControls(index + 1), false);
+                fighter.displayName = `CPU ${index + 1}`;
+                fighter.isCPU = true;
+                return fighter;
+            });
+            this.fighters = [this.p1, ...this.aiFighters];
+            this.fighters.forEach((fighter, index) => {
+                fighter.x = Math.max(10, Math.min(CANVAS_W - fighter.w - 10, (CANVAS_W / 7) * (index + 1) - fighter.w / 2));
+                fighter.facing = index < this.fighters.length / 2 ? 1 : -1;
+                fighter.maxHp = Math.round(fighter.maxHp * 1.35);
+                fighter.hp = fighter.maxHp;
+                fighter.superCooldown = Math.min(fighter.superCooldownMax, 4500 + Math.random() * 2500);
+            });
+            this.p2 = this.aiFighters[0];
+        } else {
+            this.p2 = new Fighter('p2', this.p2Choice, p2StartX, currentBinds.p2, false);
+            this.p2.displayName = isSinglePlayer ? 'CPU' : 'Player 2';
+            this.p2.isCPU = isSinglePlayer;
+            this.p2.facing = -1;
+            this.fighters = [this.p1, this.p2];
+            this.aiFighters = isSinglePlayer ? [this.p2] : [];
+        }
 
         this.projectiles = [];
         this.particles = [];
@@ -108,23 +309,54 @@ class Game {
         this.hurricane = null;
         this.hitstop = 0;
         this.aiTimer = 0;
+        this.aiDifficulty = this.aiDifficulty || localStorage.getItem('otokojuku_ai_difficulty') || 'normal';
+        this.aiProfile = null;
 
-        document.getElementById('p1-name').innerText = `Player 1: ${HEROES[this.p1Choice].name}`;
+        document.getElementById('p1-name').innerText = `${this.isBattleRoyale ? 'YOU' : 'Player 1'}: ${HEROES[this.p1Choice].name}`;
         document.getElementById('p2-name').innerText = `Player 2: ${HEROES[this.p2Choice].name}${isSinglePlayer ? ' [CPU]' : ''}`;
+
+        document.getElementById('hud-p2')?.classList.toggle('hidden', this.isBattleRoyale);
+        document.getElementById('battle-royale-hud')?.classList.toggle('hidden', !this.isBattleRoyale);
+        document.getElementById('game-ui')?.classList.toggle('survival-mode', this.isBattleRoyale);
+        if (this.isBattleRoyale) this.buildBattleRoyaleHUD();
+        const arenaNameplate = document.getElementById('arena-nameplate');
+        if (arenaNameplate) arenaNameplate.innerText = this.activeArena.name;
 
         document.getElementById('p1-horse-container').classList.toggle('hidden', this.p1Choice !== 'Duke' && this.p1Choice !== 'Volt');
         document.getElementById('p2-horse-container').classList.toggle('hidden', this.p2Choice !== 'Duke' && this.p2Choice !== 'Volt');
 
         this.state = 'PLAYING';
         this.lastTime = performance.now();
-        requestAnimationFrame(t => this.loop(t));
+        this.updateCamera(1000);
+        const generation = this.loopGeneration;
+        this.animationFrameId = requestAnimationFrame(t => this.loop(t, generation));
     }
 
-    getEnemyOf(fighter) { return fighter === this.p1 ? this.p2 : this.p1; }
+    getFighters() {
+        if (this.fighters?.length) return this.fighters;
+        return [this.p1, this.p2].filter(Boolean);
+    }
+
+    getOpponentsOf(fighter) {
+        return this.getFighters().filter(candidate => candidate && candidate !== fighter && !candidate.dead);
+    }
+
+    getEnemyOf(fighter) {
+        if (fighter?.aiTarget && !fighter.aiTarget.dead && fighter.aiTarget !== fighter) return fighter.aiTarget;
+        const opponents = this.getOpponentsOf(fighter);
+        if (!opponents.length) return null;
+        const sx = fighter.x + fighter.w / 2;
+        const sy = fighter.y + fighter.h / 2;
+        return opponents.reduce((closest, candidate) => {
+            const candidateDist = Math.hypot(candidate.x + candidate.w / 2 - sx, candidate.y + candidate.h / 2 - sy);
+            const closestDist = Math.hypot(closest.x + closest.w / 2 - sx, closest.y + closest.h / 2 - sy);
+            return candidateDist < closestDist ? candidate : closest;
+        });
+    }
 
     createExplosion(x, y, radius, damage, owner, friendlyFire = true, stunDuration = 0) {
         for(let i=0; i<30; i++) this.particles.push(new Particle(x, y, i%2===0 ? "#ff5500" : "#555", (Math.random()-0.5)*15, (Math.random()-0.5)*15, 600));
-        let targets = [this.p1, this.p2, ...this.minions];
+        let targets = [...this.getFighters(), ...this.minions];
         for (let t of targets) {
             if (!t || t.untargetable) continue;
             if (!friendlyFire && (t === owner || t.owner === owner)) continue;
@@ -139,6 +371,7 @@ class Game {
     }
 
     updateUI() {
+        if (!this.p1 || !this.p2) return;
         document.getElementById('p1-hp').style.width = `${Math.max(0, (this.p1.hp / this.p1.maxHp) * 100)}%`;
         if (this.p1.heroName === 'Duke') {
             document.getElementById('p1-horse-hp').style.width = `${Math.max(0, (this.p1.horseHp / this.p1.maxHorseHp) * 100)}%`;
@@ -286,42 +519,117 @@ class Game {
         document.getElementById('p2-status').innerText = p2Stat;
 
         let promptsHTML = '';
-        if (this.p1.grapplePhase === 1) promptsHTML += `<div class="prompt-text" style="left:${this.p1.x}px; top:${this.p1.y - 40}px">Press ${formatKey(this.p1.controls.super)} to THROW!</div>`;
-        if (this.p2.grapplePhase === 1) promptsHTML += `<div class="prompt-text" style="left:${this.p2.x}px; top:${this.p2.y - 40}px">Press ${formatKey(this.p2.controls.super)} to THROW!</div>`;
-        document.getElementById('dynamic-prompts').innerHTML = promptsHTML;
+        if (this.p1.grapplePhase === 1) promptsHTML += `<div class="prompt-text" style="left:${this.p1.x - this.camera.x}px; top:${this.p1.y - 40}px">Press ${formatKey(this.p1.controls.super)} to THROW!</div>`;
+        if (this.p2.grapplePhase === 1) promptsHTML += `<div class="prompt-text" style="left:${this.p2.x - this.camera.x}px; top:${this.p2.y - 40}px">Press ${formatKey(this.p2.controls.super)} to THROW!</div>`;
+        if (promptsHTML !== this.lastPromptsHTML) {
+            document.getElementById('dynamic-prompts').innerHTML = promptsHTML;
+            this.lastPromptsHTML = promptsHTML;
+        }
+        if (this.isBattleRoyale) this.updateBattleRoyaleHUD();
+    }
+
+    buildBattleRoyaleHUD() {
+        const list = document.getElementById('battle-royale-list');
+        if (!list) return;
+        list.innerHTML = '';
+        this.getFighters().forEach(fighter => {
+            const row = document.createElement('div');
+            row.className = 'survivor-row';
+            row.dataset.fighterId = fighter.id;
+            row.innerHTML = `
+                <div class="survivor-label"><span>${fighter.displayName}</span><span>${HEROES[fighter.heroName].name}</span></div>
+                <div class="survivor-bar"><div style="background:${fighter.color}"></div></div>
+            `;
+            list.appendChild(row);
+        });
+        this.updateBattleRoyaleHUD();
+    }
+
+    updateBattleRoyaleHUD() {
+        const aliveCount = this.getFighters().filter(fighter => !fighter.dead).length;
+        const count = document.getElementById('survivor-count');
+        if (count) count.innerText = `${aliveCount} / ${this.getFighters().length}`;
+        this.getFighters().forEach(fighter => {
+            const row = document.querySelector(`.survivor-row[data-fighter-id="${fighter.id}"]`);
+            if (!row) return;
+            row.classList.toggle('eliminated', fighter.dead);
+            const bar = row.querySelector('.survivor-bar > div');
+            if (bar) bar.style.width = `${Math.max(0, fighter.hp / fighter.maxHp * 100)}%`;
+        });
+    }
+
+    handleFighterDefeat(fighter, attacker) {
+        fighter.aiTarget = null;
+        if (fighter.controls && fighter.isCPU) {
+            Object.values(fighter.controls).forEach(code => { keys[code] = false; delete keysPressed[code]; });
+        }
+
+        const alive = this.getFighters().filter(candidate => !candidate.dead);
+        if (this.isBattleRoyale) {
+            this.updateBattleRoyaleHUD();
+            if (alive.length <= 1) {
+                const winner = alive[0];
+                const winnerText = winner
+                    ? `${winner.displayName} (${HEROES[winner.heroName].name})`
+                    : 'No Survivor';
+                this.endGame(winnerText);
+            }
+            return;
+        }
+
+        const winner = alive[0] || (attacker && !attacker.dead ? attacker : null);
+        const winnerText = winner === this.p1 ? 'Player 1' : 'Player 2';
+        this.endGame(winnerText);
     }
 
     endGame(winnerText) {
         if (this.state === 'GAMEOVER') return;
         this.state = 'GAMEOVER';
-        setTimeout(() => {
+        this.stopLoop();
+        if (this.endGameTimer) clearTimeout(this.endGameTimer);
+        this.endGameTimer = setTimeout(() => {
             document.getElementById('game-ui').classList.add('hidden');
             document.getElementById('game-over-screen').classList.remove('hidden');
             document.getElementById('winner-text').innerText = `${winnerText} Wins!`;
+            this.endGameTimer = null;
         }, 1500);
     }
 
-    loop(timestamp) {
-        if (this.state !== 'PLAYING' && this.state !== 'GAMEOVER') return;
+    loop(timestamp, generation) {
+        if (this.state !== 'PLAYING' || generation !== this.loopGeneration) return;
 
-        let dt = timestamp - this.lastTime;
-        this.lastTime = timestamp;
-        if (dt > 100) dt = 16;
+        try {
+            let dt = timestamp - this.lastTime;
+            this.lastTime = timestamp;
+            if (!Number.isFinite(dt) || dt < 0 || dt > 100) dt = 16;
 
-        if (this.hitstop > 0) {
-            this.hitstop -= dt; this.draw();
+            if (this.hitstop > 0) {
+                this.hitstop -= dt;
+                this.draw();
+                for (let k in keysPressed) delete keysPressed[k];
+                this.scheduleNextFrame(generation);
+                return;
+            }
+
+            if (this.isSinglePlayer && this.aiFighters.some(fighter => !fighter.dead)) {
+                if (typeof runAI === 'function') runAI(this, dt);
+                else this.updateAI(dt);
+            }
+            if (this.isSpectator) {
+                this.updateUI();
+                this.draw();
+                this.scheduleNextFrame(generation);
+                return;
+            }
+
+            this.update(dt);
+            this.draw();
+
             for (let k in keysPressed) delete keysPressed[k];
-            requestAnimationFrame(t => this.loop(t));
-            return;
+            this.scheduleNextFrame(generation);
+        } catch (error) {
+            this.handleLoopError(error);
         }
-
-        if (this.state === 'PLAYING' && this.isSinglePlayer && !this.p1.dead && !this.p2.dead) this.updateAI(dt);
-
-        this.update(dt);
-        this.draw();
-
-        for (let k in keysPressed) delete keysPressed[k];
-        requestAnimationFrame(t => this.loop(t));
     }
 
     updateAI(dt) {
@@ -600,7 +908,7 @@ class Game {
     }
 
     update(dt) {
-        this.p1.update(dt); this.p2.update(dt);
+        this.getFighters().forEach(fighter => fighter.update(dt));
         if (this.hurricane && !this.hurricane.dead) this.hurricane.update(dt);
 
         this.minions.forEach(m => m.update(dt));
@@ -613,40 +921,89 @@ class Game {
         this.particles = this.particles.filter(p => !p.dead);
         this.hazards = this.hazards.filter(h => !h.dead);
 
+        if (this.particles.length > 1000) this.particles.splice(0, this.particles.length - 1000);
+        if (this.projectiles.length > 420) this.projectiles.splice(0, this.projectiles.length - 420);
+        if (this.hazards.length > 120) this.hazards.splice(0, this.hazards.length - 120);
+        if (this.minions.length > 120) this.minions.splice(0, this.minions.length - 120);
+
         if (this.state === 'PLAYING') {
-            if (!this.p1.dead && !this.p2.dead && checkAABB(this.p1, this.p2) && !this.p1.grappledBy && !this.p2.grappledBy && this.p1.grapplePhase !== 1 && this.p2.grapplePhase !== 1) {
-                let overlapX = (Math.min(this.p1.x + this.p1.w, this.p2.x + this.p2.w) - Math.max(this.p1.x, this.p2.x)) / 2;
-                let c1 = this.p1.x + this.p1.w/2; let c2 = this.p2.x + this.p2.w/2;
-                if (c1 < c2) { this.p1.x -= overlapX; this.p2.x += overlapX; } else { this.p1.x += overlapX; this.p2.x -= overlapX; }
+            const activeFighters = this.getFighters().filter(fighter => !fighter.dead);
+            for (let i = 0; i < activeFighters.length; i++) {
+                for (let j = i + 1; j < activeFighters.length; j++) {
+                    const first = activeFighters[i];
+                    const second = activeFighters[j];
+                    if (!checkAABB(first, second) || first.grappledBy || second.grappledBy || first.grapplePhase === 1 || second.grapplePhase === 1) continue;
+                    const overlapX = (Math.min(first.x + first.w, second.x + second.w) - Math.max(first.x, second.x)) / 2;
+                    const firstCenter = first.x + first.w / 2;
+                    const secondCenter = second.x + second.w / 2;
+                    if (firstCenter < secondCenter) { first.x -= overlapX; second.x += overlapX; }
+                    else { first.x += overlapX; second.x -= overlapX; }
+                }
             }
+            this.updateCamera(dt);
             this.updateUI();
         }
     }
 
-    draw() {
-        this.ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
+    drawArenaBackground() {
+        const theme = this.activeArena?.theme || ARENAS.dojo.theme;
+        this.ctx.fillStyle = theme.sky;
+        this.ctx.fillRect(0, 0, CANVAS_W, GROUND_Y);
+        this.ctx.fillStyle = theme.horizon;
+        for (let x = 0; x < CANVAS_W; x += 180) {
+            const height = 70 + ((x / 180) % 4) * 24;
+            this.ctx.fillRect(x, GROUND_Y - height, 112, height);
+            this.ctx.fillRect(x + 34, GROUND_Y - height - 24, 44, 24);
+        }
 
-        this.ctx.fillStyle = "#111820"; this.ctx.fillRect(0, GROUND_Y, CANVAS_W, CANVAS_H - GROUND_Y);
-        this.ctx.fillStyle = "#4caf50"; this.ctx.fillRect(0, GROUND_Y, CANVAS_W, 5);
+        this.ctx.fillStyle = theme.ground;
+        this.ctx.fillRect(0, GROUND_Y, CANVAS_W, CANVAS_H - GROUND_Y);
+        this.ctx.fillStyle = theme.groundLine;
+        this.ctx.fillRect(0, GROUND_Y, CANVAS_W, 8);
+        this.ctx.fillStyle = theme.groundDetail;
+        for (let gx = 0; gx < CANVAS_W; gx += 16) this.ctx.fillRect(gx, GROUND_Y + 8, 8, 4);
 
         for (let plat of PLATFORMS) {
-            if (plat.type === 'center') {
-                this.ctx.fillStyle = "#add8e6"; this.ctx.fillRect(plat.x, plat.y, plat.w, plat.h);
-                this.ctx.fillStyle = "#87cefa"; this.ctx.fillRect(plat.x, plat.y + plat.h, plat.w, 10);
-            } else {
-                this.ctx.fillStyle = "#5c4033"; this.ctx.fillRect(plat.x, plat.y, plat.w, plat.h);
-                this.ctx.fillStyle = "#3e2723"; this.ctx.fillRect(plat.x, plat.y + plat.h, plat.w, 10);
-            }
+            const isCenter = plat.type === 'center';
+            this.ctx.fillStyle = isCenter ? theme.center : theme.side;
+            this.ctx.fillRect(plat.x, plat.y, plat.w, plat.h);
+            this.ctx.fillStyle = isCenter ? theme.centerEdge : theme.sideEdge;
+            this.ctx.fillRect(plat.x, plat.y + plat.h, plat.w, 8);
+            this.ctx.strokeStyle = '#080a0c';
+            this.ctx.lineWidth = 2;
+            this.ctx.strokeRect(plat.x, plat.y, plat.w, plat.h);
         }
+    }
+
+    draw() {
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        this.ctx.save();
+        this.ctx.translate(-Math.round(this.camera.x), 0);
+        this.drawArenaBackground();
 
         if (this.hurricane && !this.hurricane.dead) this.hurricane.draw(this.ctx);
         this.hazards.forEach(h => h.draw(this.ctx));
         this.minions.forEach(m => m.draw(this.ctx));
-        if (!this.p1.dead) this.p1.draw(this.ctx);
-        if (!this.p2.dead) this.p2.draw(this.ctx);
+        this.getFighters().forEach(fighter => {
+            if (fighter.dead) return;
+            fighter.draw(this.ctx);
+            if (this.isBattleRoyale) {
+                this.ctx.save();
+                this.ctx.font = '10px monospace';
+                this.ctx.textAlign = 'center';
+                this.ctx.fillStyle = fighter === this.p1 ? '#6bcb77' : '#ffffff';
+                this.ctx.strokeStyle = '#000000';
+                this.ctx.lineWidth = 3;
+                const label = fighter === this.p1 ? 'YOU' : fighter.displayName;
+                this.ctx.strokeText(label, fighter.x + fighter.w / 2, fighter.y - 16);
+                this.ctx.fillText(label, fighter.x + fighter.w / 2, fighter.y - 16);
+                this.ctx.restore();
+            }
+        });
 
         this.projectiles.forEach(p => p.draw(this.ctx));
         this.particles.forEach(p => p.draw(this.ctx));
+        this.ctx.restore();
     }
 }
 
@@ -656,14 +1013,7 @@ var game = new Game();
 window.game = game;
 
 window.addEventListener('resize', () => {
-    CANVAS_W = window.innerWidth; CANVAS_H = window.innerHeight;
-    game.canvas.width = CANVAS_W; game.canvas.height = CANVAS_H;
-    GROUND_Y = CANVAS_H - 100;
-
-    PLATFORMS = [
-        { x: CANVAS_W / 2 - 200, y: GROUND_Y - 180, w: 400, h: 20, type: 'center' },
-        { x: Math.max(50, CANVAS_W / 4 - 150), y: GROUND_Y - 350, w: 250, h: 20, type: 'side' },
-        { x: Math.min(CANVAS_W - 300, CANVAS_W * (3/4) - 100), y: GROUND_Y - 350, w: 250, h: 20, type: 'side' }
-    ];
+    const arenaId = game.isBattleRoyale ? 'grand_arena' : game.selectedArena;
+    game.configureArena(arenaId, game.state === 'PLAYING');
 });
 window.dispatchEvent(new Event('resize'));

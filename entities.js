@@ -1,5 +1,5 @@
 /**
- * Dantao: Legends Duel
+ * Otokojuku: Legends Duel
  * Entities & Minions
  */
 
@@ -150,8 +150,10 @@ class LandMine extends Entity {
         if (this.life <= 0) this.dead = true;
         this.blinkTimer += dt;
 
-        let enemy = game.getEnemyOf(this.owner);
-        if (enemy && !enemy.dead && Math.hypot((enemy.x+enemy.w/2) - (this.x+this.w/2), (enemy.y+enemy.h/2) - (this.y+this.h/2)) < 50) {
+        const enemy = game.getOpponentsOf(this.owner).find(candidate =>
+            Math.hypot((candidate.x + candidate.w / 2) - (this.x + this.w / 2), (candidate.y + candidate.h / 2) - (this.y + this.h / 2)) < 50
+        );
+        if (enemy) {
             this.explode();
         }
     }
@@ -213,7 +215,7 @@ class Minecart extends Entity {
             this.hitTargets.clear();
         }
 
-        let targets = [game.p1, game.p2, ...game.minions].filter(t => t && t !== this && t !== this.owner && !t.dead);
+        let targets = [...game.getFighters(), ...game.minions].filter(t => t && t !== this && t !== this.owner && t.owner !== this.owner && !t.dead);
         for(let t of targets) {
             if (checkAABB(this, t)) {
                 if (t instanceof LandMine) {
@@ -269,7 +271,7 @@ class Hazard extends Entity {
             this.dead = true;
             return;
         }
-        let targets = [game.p1, game.p2, ...game.minions].filter(t => t && !t.untargetable && t !== this.owner && t.owner !== this.owner && !t.dead && !(t.invincible > 0));
+        let targets = [...game.getFighters(), ...game.minions].filter(t => t && !t.untargetable && t !== this.owner && t.owner !== this.owner && !t.dead && !(t.invincible > 0));
         for (let t of targets) {
             if (checkAABB(this, t) && !this.hitTargets.has(t)) {
                 t.takeDamage(this.damage, this.owner);
@@ -391,7 +393,7 @@ class Projectile extends Entity {
         }
 
         if (!this.dead && this.type !== "dynamite") {
-            let targets = [game.getEnemyOf(this.owner), ...game.minions.filter(m => m && m.owner !== this.owner)];
+            let targets = [...game.getOpponentsOf(this.owner), ...game.minions.filter(m => m && m.owner !== this.owner)];
             for (let t of targets) {
                 if (!t || t.untargetable) continue;
 
@@ -794,9 +796,10 @@ class Puppet extends Entity {
 
                 let px = this.facing === 1 ? this.x + this.w : this.x - 40;
                 let hitBox = { x: px, y: this.y + 10, w: 40, h: 40 };
-                let enemy = game.getEnemyOf(this.owner);
                 let targetsHit = [];
-                if (enemy && !enemy.dead && !enemy.untargetable && checkAABB(hitBox, enemy)) targetsHit.push(enemy);
+                for (const enemy of game.getOpponentsOf(this.owner)) {
+                    if (!enemy.untargetable && checkAABB(hitBox, enemy)) targetsHit.push(enemy);
+                }
                 for (let m of game.minions) {
                     if (m && m.owner !== this.owner && !m.dead && !m.untargetable && checkAABB(hitBox, m)) targetsHit.push(m);
                 }
@@ -865,8 +868,9 @@ class Hurricane extends Entity {
         this.tickTimer += dt;
         if (this.tickTimer >= 200) {
             this.tickTimer = 0;
-            let enemy = game.getEnemyOf(this.owner);
-            if (enemy && checkAABB(this, enemy)) enemy.takeDamage(0.6, this.owner, true);
+            for (const enemy of game.getOpponentsOf(this.owner)) {
+                if (checkAABB(this, enemy)) enemy.takeDamage(0.6, this.owner, true);
+            }
             for (let m of game.minions) {
                 if (m && m.owner !== this.owner && !m.dead && !m.untargetable && checkAABB(this, m)) m.takeDamage(0.6, this.owner, true);
             }
@@ -874,7 +878,7 @@ class Hurricane extends Entity {
         this.stunTickTimer += dt;
         if (this.stunTickTimer >= 1000) {
             this.stunTickTimer = 0;
-            let targets = [game.getEnemyOf(this.owner), ...game.minions.filter(m => m && m.owner !== this.owner && !m.untargetable)];
+            let targets = [...game.getOpponentsOf(this.owner), ...game.minions.filter(m => m && m.owner !== this.owner && !m.untargetable)];
             for (let t of targets) {
                 if (t && !t.dead && checkAABB(this, t)) { t.buffs = t.buffs || {}; t.buffs.dizzy = 500; }
             }
@@ -886,5 +890,4 @@ class Hurricane extends Entity {
         ctx.beginPath(); ctx.moveTo(this.x, this.y); ctx.lineTo(this.x + this.w, this.y); ctx.lineTo(this.x + this.w/2 + 20, this.y + this.h); ctx.lineTo(this.x + this.w/2 - 20, this.y + this.h); ctx.fill();
         ctx.globalAlpha = 1.0;
     }
-
 }
