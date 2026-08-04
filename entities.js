@@ -607,10 +607,10 @@ class Projectile extends Entity {
                     } else {
                         if (this.type === "tracking_bird") {
                             this.dead = true;
-                            game.createExplosion(this.x + this.w/2, this.y + this.h/2, 180, 70, this.owner, false, 4500);
+                            game.createExplosion(this.x + this.w/2, this.y + this.h/2, 180, 70, this.owner, false, 2500);
                             return;
                         }
-                        let noKnockback = (this.type === "bullet" || this.type === "homing_bullet" || this.type === "ki_blast" || this.type === "magic_burst" || this.type === "paper_plane" || this.type === "blue_paper_plane" || this.type === "fire_bolt" || this.type === "water_bolt" || this.type === "tidal_wave" || this.type === "volt_laser" || this.type === "pickaxe");
+                        let noKnockback = (this.type === "bullet" || this.type === "homing_bullet" || this.type === "ki_blast" || this.type === "magic_burst" || this.type === "paper_plane" || this.type === "blue_paper_plane" || this.type === "fire_bolt" || this.type === "water_bolt" || this.type === "tidal_wave" || this.type === "volt_laser" || this.type === "pickaxe" || this.type === "chiq_blade");
                         t.takeDamage(this.damage, this.owner, false, noKnockback);
                         if (this.damage > 0 && this.owner?.heroName === 'Archor' && typeof this.owner.onArchorHit === 'function') this.owner.onArchorHit(t);
 
@@ -646,6 +646,10 @@ class Projectile extends Entity {
                             if (this.type === "phantom_round" && t.heroName && !this.phantomDizzyApplied) {
                                 t.buffs.dizzy = Math.max(t.buffs.dizzy || 0, 1000);
                                 this.phantomDizzyApplied = true;
+                            }
+                            if (this.type === "chiq_blade") {
+                                t.buffs.slow = Math.max(t.buffs.slow || 0, this.chiqNu ? 7000 : 3500);
+                                t.buffs.bleed = Math.max(t.buffs.bleed || 0, 6000);
                             }
                         }
 
@@ -804,6 +808,22 @@ class Projectile extends Entity {
             ctx.fillStyle = '#fff06a';
             ctx.beginPath(); ctx.moveTo(18, 0); ctx.lineTo(9, -5); ctx.lineTo(9, 5); ctx.fill();
             ctx.restore();
+        } else if (this.type === "chiq_blade") {
+            ctx.save();
+            ctx.translate(this.x + this.w/2, this.y + this.h/2);
+            ctx.rotate(Math.atan2(this.vy, this.vx));
+            ctx.fillStyle = this.chiqNu ? 'rgba(255, 48, 48, 0.34)' : 'rgba(77, 184, 255, 0.30)';
+            ctx.shadowBlur = 16;
+            ctx.shadowColor = this.chiqNu ? '#ff3030' : '#4db8ff';
+            ctx.beginPath();
+            ctx.moveTo(this.w/2, 0);
+            ctx.quadraticCurveTo(0, -this.h, -this.w/2, 0);
+            ctx.quadraticCurveTo(0, this.h, this.w/2, 0);
+            ctx.fill();
+            ctx.strokeStyle = this.chiqNu ? '#ffe0e0' : '#dff7ff';
+            ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.moveTo(-this.w/2, 0); ctx.lineTo(this.w/2, 0); ctx.stroke();
+            ctx.restore();
         } else {
             ctx.fillRect(this.x, this.y, this.w, this.h);
         }
@@ -876,6 +896,76 @@ class GravityWell extends Entity {
         ctx.strokeStyle = `rgba(216, 75, 120, ${0.65 * progress})`;
         ctx.lineWidth = 2;
         ctx.beginPath(); ctx.arc(0, 0, 100, 0, Math.PI * 2); ctx.stroke();
+        ctx.restore();
+    }
+}
+
+class ChiqPath extends Entity {
+    constructor(owner, startX, startY, endX, endY, nuMode = false) {
+        super(Math.min(startX, endX), Math.min(startY, endY) - 18, Math.abs(endX - startX), Math.abs(endY - startY) + 36);
+        this.owner = owner;
+        this.type = 'chiq_path';
+        this.startX = startX;
+        this.startY = startY;
+        this.endX = endX;
+        this.endY = endY;
+        this.nuMode = nuMode;
+        this.life = 5000;
+        this.maxLife = 5000;
+        this.healTimer = 0;
+        this.untargetable = true;
+    }
+
+    distanceToPath(target) {
+        const px = target.x + target.w/2;
+        const py = target.y + target.h;
+        const dx = this.endX - this.startX;
+        const dy = this.endY - this.startY;
+        const lengthSquared = dx*dx + dy*dy;
+        const projection = lengthSquared > 0
+            ? Math.max(0, Math.min(1, ((px-this.startX)*dx + (py-this.startY)*dy) / lengthSquared))
+            : 0;
+        return Math.hypot(px - (this.startX + dx*projection), py - (this.startY + dy*projection));
+    }
+
+    update(dt) {
+        if (this.dead) return;
+        this.life = Math.max(0, this.life - dt);
+        const targets = game.getOpponentsOf(this.owner).filter(target => target && !target.dead && !(target.invincible > 0));
+        let touchingEnemy = false;
+        for (const target of targets) {
+            if (this.distanceToPath(target) > 24) continue;
+            touchingEnemy = true;
+            if (!target.buffs) target.buffs = {};
+            if (this.nuMode) target.buffs.gravitySlow = Math.max(target.buffs.gravitySlow || 0, 650);
+            else target.buffs.slow = Math.max(target.buffs.slow || 0, 650);
+            target.buffs.bleed = Math.max(target.buffs.bleed || 0, 1500);
+        }
+
+        this.healTimer += dt;
+        const healTicks = Math.floor(this.healTimer / 500);
+        if (healTicks > 0) {
+            this.healTimer %= 500;
+            if (touchingEnemy && this.owner && !this.owner.dead) {
+                const healing = (this.nuMode ? 6 : 3) * healTicks;
+                this.owner.hp = Math.min(this.owner.maxHp, this.owner.hp + healing);
+            }
+        }
+        if (this.life <= 0) this.dead = true;
+    }
+
+    draw(ctx) {
+        const alpha = Math.max(0, this.life / this.maxLife);
+        const color = this.nuMode ? `rgba(255, 48, 48, ${0.55*alpha})` : `rgba(77, 184, 255, ${0.52*alpha})`;
+        ctx.save();
+        ctx.strokeStyle = color;
+        ctx.shadowBlur = 14;
+        ctx.shadowColor = this.nuMode ? '#ff3030' : '#4db8ff';
+        ctx.lineWidth = 20;
+        ctx.beginPath(); ctx.moveTo(this.startX, this.startY); ctx.lineTo(this.endX, this.endY); ctx.stroke();
+        ctx.strokeStyle = this.nuMode ? `rgba(255, 210, 210, ${0.8*alpha})` : `rgba(210, 245, 255, ${0.8*alpha})`;
+        ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.moveTo(this.startX, this.startY); ctx.lineTo(this.endX, this.endY); ctx.stroke();
         ctx.restore();
     }
 }

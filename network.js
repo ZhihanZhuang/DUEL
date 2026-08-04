@@ -82,6 +82,7 @@ if (window.Game && !window.Game.prototype.socketSyncPatched) {
         FireDragon,
         Projectile,
         GravityWell,
+        ChiqPath,
         Minion,
         Skeleton,
         Puppet,

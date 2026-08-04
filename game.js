@@ -566,8 +566,12 @@ class Game {
         if (this.p1.heroName === 'Archor') {
             if (this.p1.archorPassiveTimer > 0) p1Stat += `[BLOODHUNT ${(this.p1.archorPassiveTimer/1000).toFixed(1)}s +${((this.p1.archorDamageBonus || 0)/10).toFixed(1)} WRD]`;
             else p1Stat += `[HITS: ${this.p1.archorHitChain || 0}/3]`;
-            if (this.p1.archorSpeedCooldown > 0) p1Stat += ` [SURGE CD ${(this.p1.archorSpeedCooldown/1000).toFixed(1)}s]`;
-            else p1Stat += " [SURGE READY]";
+            if (this.p1.archorSpeedCooldown > 0) p1Stat += ` [CLEANSE CD ${(this.p1.archorSpeedCooldown/1000).toFixed(1)}s]`;
+            else p1Stat += " [CLEANSE READY]";
+        }
+        if (this.p1.heroName === 'Itan') {
+            if (this.p1.buffs.nuMode > 0) p1Stat += `[NU ${(this.p1.buffs.nuMode/1000).toFixed(1)}s] `;
+            if (this.p1.itanSuperWindupTimer > 0) p1Stat += `[CHIQ CAST ${(this.p1.itanSuperWindupTimer/1000).toFixed(1)}s]`;
         }
 
         if (this.p1.buffs.poison > 0) p1Stat += " [POISONED]";
@@ -668,8 +672,12 @@ class Game {
         if (this.p2.heroName === 'Archor') {
             if (this.p2.archorPassiveTimer > 0) p2Stat += `[BLOODHUNT ${(this.p2.archorPassiveTimer/1000).toFixed(1)}s +${((this.p2.archorDamageBonus || 0)/10).toFixed(1)} WRD]`;
             else p2Stat += `[HITS: ${this.p2.archorHitChain || 0}/3]`;
-            if (this.p2.archorSpeedCooldown > 0) p2Stat += ` [SURGE CD ${(this.p2.archorSpeedCooldown/1000).toFixed(1)}s]`;
-            else p2Stat += " [SURGE READY]";
+            if (this.p2.archorSpeedCooldown > 0) p2Stat += ` [CLEANSE CD ${(this.p2.archorSpeedCooldown/1000).toFixed(1)}s]`;
+            else p2Stat += " [CLEANSE READY]";
+        }
+        if (this.p2.heroName === 'Itan') {
+            if (this.p2.buffs.nuMode > 0) p2Stat += `[NU ${(this.p2.buffs.nuMode/1000).toFixed(1)}s] `;
+            if (this.p2.itanSuperWindupTimer > 0) p2Stat += `[CHIQ CAST ${(this.p2.itanSuperWindupTimer/1000).toFixed(1)}s]`;
         }
 
         if (this.p2.buffs.poison > 0) p2Stat += " [POISONED]";

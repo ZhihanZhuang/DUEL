@@ -54,7 +54,7 @@ function loadProjectileContext() {
     };
     vm.createContext(context);
     const source = fs.readFileSync(path.join(__dirname, '..', 'entities.js'), 'utf8');
-    vm.runInContext(`${source}\nwindow.Projectile = Projectile; window.KuroDecoy = KuroDecoy; window.GiantSword = GiantSword; window.GravityWell = GravityWell;`, context, { filename: 'entities.js' });
+    vm.runInContext(`${source}\nwindow.Projectile = Projectile; window.KuroDecoy = KuroDecoy; window.GiantSword = GiantSword; window.GravityWell = GravityWell; window.ChiqPath = ChiqPath;`, context, { filename: 'entities.js' });
     return context;
 }
 
@@ -230,6 +230,12 @@ function loadPhysicsGame(heroName = 'Hunter') {
             this.untargetable = true;
         }
     }
+    class ChiqPath extends Entity {
+        constructor(owner, startX, startY, endX, endY, nuMode) {
+            super(startX, startY, Math.abs(endX-startX), 36);
+            Object.assign(this, { owner, startX, startY, endX, endY, nuMode, type: 'chiq_path', life: 5000 });
+        }
+    }
 
     const platforms = [
         { x: 300, y: 480, w: 400, h: 20, type: 'center' },
@@ -243,6 +249,7 @@ function loadPhysicsGame(heroName = 'Hunter') {
         Projectile,
         KuroDecoy,
         GravityWell,
+        ChiqPath,
         Minion,
         CANVAS_W: 1280,
         CANVAS_H: 760,
@@ -257,7 +264,8 @@ function loadPhysicsGame(heroName = 'Hunter') {
             Sola: { maxHp: 780, speed: 5.8, jump: 15, width: 40, height: 70, color: '#167d8d', superCD: 15000 },
             Nyra: { maxHp: 680, speed: 6.2, jump: 16, width: 36, height: 66, color: '#d84b78', superCD: 24000 },
             Orion: { maxHp: 900, speed: 4.6, jump: 13.5, width: 46, height: 74, color: '#4056a1', superCD: 28000 },
-            Archor: { maxHp: 680, speed: 5.8, jump: 15, width: 38, height: 68, color: '#2f8f62', superCD: 18000 }
+            Archor: { maxHp: 680, speed: 5.8, jump: 15, width: 38, height: 68, color: '#2f8f62', superCD: 18000 },
+            Itan: { maxHp: 820, speed: 5, jump: 14.5, width: 42, height: 72, color: '#9f3347', superCD: 3000 }
         },
         keys: {},
         keysPressed: {},
@@ -398,7 +406,7 @@ test('every hero with a direct super can decide to use it', () => {
     const context = loadAI();
     const directSuperHeroes = [
         'Hason', 'Willi', 'Hunter', 'Macu', 'Artu', 'Duke', 'Kadaxi', 'Euclid',
-        'Lique', 'Kae', 'Kila', 'Volt', 'Gensan', 'Noae', 'Wolf', 'Kuro', 'Sola', 'Nyra', 'Orion', 'Archor'
+        'Lique', 'Kae', 'Kila', 'Volt', 'Gensan', 'Noae', 'Wolf', 'Kuro', 'Sola', 'Nyra', 'Orion', 'Archor', 'Itan'
     ];
 
     for (const heroName of directSuperHeroes) {
@@ -432,7 +440,7 @@ test('weapon, puppet, stance, shadow, and mine utility skills are reachable', ()
         { hero: 'Kila', action: 'switch', setup: ai => { ai.superCooldown = 5000; ai.kilaSwitchCD = 0; ai.kilaElement = 'water'; } },
         { hero: 'Gensan', action: 'extra', setup: ai => { ai.superCooldown = 5000; ai.gensanShadowCD = 0; } },
         { hero: 'Noae', action: 'switch', setup: ai => { ai.superCooldown = 5000; } },
-        { hero: 'Archor', action: 'switch', setup: ai => { ai.superCooldown = 5000; ai.archorSpeedCooldown = 0; } }
+        { hero: 'Archor', action: 'switch', setup: ai => { ai.superCooldown = 5000; ai.archorSpeedCooldown = 0; ai.buffs.slow = 1000; } }
     ];
 
     for (const testCase of cases) {
@@ -729,6 +737,114 @@ test('absolute cloak defeats AI last-attacker tracking while Kuro moves', () => 
     assert.equal(context.keysPressed[ai.controls.attack], undefined);
 });
 
+test('Itan has a wide Naginata swing and an invincible 2s Chiq cast', () => {
+    const simulation = loadPhysicsGame('Itan');
+    const { ai, target, context } = simulation;
+    ai.isCPU = false;
+    ai.attackState = 'idle';
+    ai.stateTimer = 0;
+    ai.superCooldown = 0;
+
+    const hitbox = ai.getMeleeHitbox();
+    assert.equal(hitbox.w, 132);
+    assert.equal(hitbox.h, 92);
+    assert.equal(ai.getMeleeDamage(), 32);
+
+    ai.performSuper();
+    assert.equal(ai.itanSuperWindupTimer, 2000);
+    assert.equal(ai.invincible, 2000);
+    assert.equal(ai.superCooldown, 3000);
+    assert.equal(context.game.projectiles.length, 0);
+
+    ai.update(1000);
+    assert.equal(context.game.projectiles.length, 0, 'Chiq released before the 2s cast completed');
+    const hpBeforeHit = ai.hp;
+    ai.takeDamage(10, target);
+    assert.equal(ai.hp, hpBeforeHit, 'Itan took damage during the invincible Chiq windup');
+    assert.equal(ai.itanSuperWindupTimer, 1000);
+    ai.update(1000);
+    const blades = context.game.projectiles.filter(projectile => projectile.type === 'chiq_blade');
+    assert.equal(blades.length, 3);
+    assert.ok(blades.every(blade => blade.damage === 50));
+    assert.ok(blades.every(blade => Math.hypot(blade.vx, blade.vy) > 31));
+    assert.equal(context.game.minions.filter(minion => minion.type === 'chiq_path').length, 3);
+});
+
+test('Itan Nu mode doubles attack cadence and empowers red Chiq', () => {
+    const simulation = loadPhysicsGame('Itan');
+    const { ai, context } = simulation;
+    ai.isCPU = false;
+    ai.attackState = 'idle';
+    ai.stateTimer = 0;
+
+    context.keysPressed[ai.controls.switch] = true;
+    ai.update(16);
+    delete context.keysPressed[ai.controls.switch];
+    assert.equal(ai.buffs.nuMode, 8000);
+
+    ai.performAttack();
+    assert.equal(ai.stateTimer, 90, 'Nu mode did not double regular attack windup speed');
+    ai.attackState = 'idle';
+    ai.releaseItanChiq();
+    const blades = context.game.projectiles.filter(projectile => projectile.type === 'chiq_blade');
+    assert.equal(blades.length, 3);
+    assert.ok(blades.every(blade => blade.damage === 100 && blade.chiqNu && blade.color === '#ff3030'));
+    assert.ok(context.game.minions.filter(minion => minion.type === 'chiq_path').every(path => path.nuMode));
+});
+
+test('Itan Chiq applies heavy slow and bleed but can be deflected', () => {
+    const context = loadProjectileContext();
+    const owner = { id: 'itan', heroName: 'Itan' };
+    const target = {
+        x: 100, y: 100, w: 40, h: 70, vx: 0, vy: 0, hp: 200,
+        dead: false, invincible: 0, buffs: {}, attackState: 'idle',
+        isMeleeAttack: () => false,
+        takeDamage(amount) { this.hp -= amount; }
+    };
+    context.game.opponents = [target];
+    const blade = new context.window.Projectile(100, 100, 42, 12, 0, 0, 50, owner, '#bffcff', 'chiq_blade');
+    blade.update(16);
+    assert.equal(target.hp, 150);
+    assert.equal(target.buffs.slow, 3500);
+    assert.equal(target.buffs.bleed, 6000);
+
+    const sola = {
+        x: 100, y: 100, w: 40, h: 70, vx: 0, vy: 0, hp: 200, facing: -1,
+        heroName: 'Sola', dead: false, invincible: 0, buffs: {}, attackState: 'active', solaFocus: 0,
+        isMeleeAttack: () => true,
+        takeDamage(amount) { this.hp -= amount; }
+    };
+    context.game.opponents = [sola];
+    const blockedBlade = new context.window.Projectile(100, 100, 42, 12, 0, 0, 50, owner, '#bffcff', 'chiq_blade');
+    blockedBlade.update(16);
+    assert.equal(sola.hp, 200);
+    assert.equal(blockedBlade.owner, sola);
+    assert.equal(sola.solaFocus, 1);
+});
+
+test('Chiq paths last five seconds, control enemies, and heal Itan with Nu doubling', () => {
+    const context = loadProjectileContext();
+    const owner = { id: 'itan', heroName: 'Itan', hp: 100, maxHp: 200, dead: false };
+    const target = { x: 180, y: 100, w: 40, h: 70, dead: false, invincible: 0, buffs: {} };
+    context.game.opponents = [target];
+
+    const path = new context.window.ChiqPath(owner, 100, 170, 500, 170, false);
+    path.update(500);
+    assert.equal(path.life, 4500);
+    assert.equal(target.buffs.slow, 650);
+    assert.equal(target.buffs.bleed, 1500);
+    assert.equal(owner.hp, 103);
+    path.update(4500);
+    assert.equal(path.dead, true);
+
+    owner.hp = 100;
+    target.buffs = {};
+    const nuPath = new context.window.ChiqPath(owner, 100, 170, 500, 170, true);
+    nuPath.update(500);
+    assert.equal(target.buffs.gravitySlow, 650);
+    assert.equal(owner.hp, 106);
+});
+
 test('Hoin activates Bloodhunt after three continuous hits and loses it after 3.5s', () => {
     const simulation = loadPhysicsGame('Archor');
     const { ai, target, context } = simulation;
@@ -775,17 +891,26 @@ test('Hoin activates Bloodhunt after three continuous hits and loses it after 3.
     assert.equal(ai.archorDamageBonus, 0, 'temporary Bloodhunt damage remained after expiry');
 });
 
-test('Archor speed switch and tracking bird super expose their full kit', () => {
+test('Hoin switch cleanses debuffs and tracking bird super exposes the full kit', () => {
     const simulation = loadPhysicsGame('Archor');
     const { ai, context } = simulation;
     ai.isCPU = false;
     ai.attackState = 'idle';
     ai.stateTimer = 0;
 
+    ai.stunTimer = 500;
+    ai.buffs.poison = 1000;
+    ai.buffs.dizzy = 1000;
+    ai.buffs.slow = 1000;
+    ai.buffs.gravitySlow = 1000;
+    ai.buffs.burn = 1000;
+    ai.buffs.bleed = 1000;
     context.keysPressed[ai.controls.switch] = true;
     ai.update(16);
     delete context.keysPressed[ai.controls.switch];
-    assert.equal(ai.buffs.msBoost, 4000);
+    assert.equal(ai.stunTimer, 0);
+    ['poison', 'dizzy', 'slow', 'gravitySlow', 'burn', 'bleed'].forEach(name => assert.equal(ai.buffs[name], 0));
+    assert.equal(ai.buffs.msBoost, 0);
     assert.equal(ai.archorSpeedCooldown, 8000);
 
     ai.superCooldown = 0;
@@ -798,7 +923,7 @@ test('Archor speed switch and tracking bird super expose their full kit', () => 
     assert.equal(ai.superCooldown, ai.superCooldownMax);
 });
 
-test('tracking bird impact creates wide 7 WRD AoE with 4.5s dizzy', () => {
+test('tracking bird impact creates wide 7 WRD AoE with 2.5s dizzy', () => {
     const context = loadProjectileContext();
     const owner = { id: 'archor', heroName: 'Archor' };
     const target = {
@@ -818,7 +943,7 @@ test('tracking bird impact creates wide 7 WRD AoE with 4.5s dizzy', () => {
     assert.equal(explosion[2], 180);
     assert.equal(explosion[3], 70);
     assert.equal(explosion[5], false);
-    assert.equal(explosion[6], 4500);
+    assert.equal(explosion[6], 2500);
 });
 
 test('Hoin bird tracks for two seconds and then keeps an unguided course', () => {

@@ -53,7 +53,8 @@ const HERO_TACTICS = {
     Sola:    { role: 'sentinel', aggression: 1.02, caution: 0.82, burst: 1.18, kite: 0.12, setup: 0.18, highGround: 0.45, retreatHp: 0.27, retreatFireChance: 0.12 },
     Nyra:    { role: 'skirmisher', aggression: 0.74, caution: 1.12, burst: 1.30, kite: 1.28, setup: 0.42, highGround: 1.05, retreatHp: 0.38, retreatFireChance: 0.48 },
     Orion:   { role: 'gravity', aggression: 1.12, caution: 0.55, burst: 1.25, kite: 0.08, setup: 0.95, highGround: 0.38, retreatHp: 0.24, retreatFireChance: 0.10 },
-    Archor:  { role: 'rapid_archer', aggression: 0.82, caution: 1.18, burst: 1.45, kite: 1.38, setup: 0.20, highGround: 1.28, retreatHp: 0.38, retreatFireChance: 0.62 }
+    Archor:  { role: 'rapid_archer', aggression: 0.82, caution: 1.18, burst: 1.45, kite: 1.38, setup: 0.20, highGround: 1.28, retreatHp: 0.38, retreatFireChance: 0.62 },
+    Itan:    { role: 'polearm', aggression: 0.92, caution: 0.68, burst: 1.35, kite: 0.18, setup: 0.45, highGround: 0.55, retreatHp: 0.28, retreatFireChance: 0.12 }
 };
 
 function getHeroTactic(ai) {
@@ -428,6 +429,7 @@ function getCombatProfile(ai, source = ai) {
         case 'Nyra': range = 390; preferred = 255; break;
         case 'Orion': range = 116; preferred = 76; break;
         case 'Archor': range = 620; preferred = 390; break;
+        case 'Itan': range = 155; preferred = 105; break;
     }
     return { range, preferred, ranged: !ai.isMeleeAttack(), tactics };
 }
@@ -438,6 +440,12 @@ function healthRatio(fighter) {
 
 function isVulnerableTarget(target) {
     return !!target && ((target.buffs?.dizzy || 0) > 0 || (target.stunTimer || 0) > 180 || !!target.grappledBy);
+}
+
+function hasCleanseableDebuff(fighter) {
+    return !!fighter && ((fighter.stunTimer || 0) > 0
+        || ['poison', 'dizzy', 'slow', 'gravitySlow', 'burn', 'bleed'].some(name => (fighter.buffs?.[name] || 0) > 0)
+        || !!fighter.grappledBy || !!fighter.solaForceHeld);
 }
 
 function hasSetupOpportunity(game, ai) {
@@ -621,7 +629,7 @@ function chooseDefensiveAction(game, ai, target, threat) {
             if (ai.nyraShiftCooldown <= 0 && game.projectiles.some(projectile => projectile.owner === ai && (projectile.type === 'chakram' || projectile.type === 'chakram_super'))) return 'switch';
             break;
         case 'Archor':
-            if (ai.archorSpeedCooldown <= 0) return 'switch';
+            if (ai.archorSpeedCooldown <= 0 && hasCleanseableDebuff(ai)) return 'switch';
             break;
     }
     return null;
@@ -748,7 +756,11 @@ function chooseHeroAction(game, ai, target, targetEntity, dist, verticalDistance
             break;
         case 'Archor':
             if (superReady && dist < 900) return 'super';
-            if (ai.archorSpeedCooldown <= 0 && (combatState === 'kite' || combatState === 'retreat' || dist < 230)) return 'switch';
+            if (ai.archorSpeedCooldown <= 0 && hasCleanseableDebuff(ai)) return 'switch';
+            break;
+        case 'Itan':
+            if (superReady && dist < 850 && Math.abs(verticalDistance) < 260 && (combatState === 'burst' || combatState === 'pressure' || dist > 170)) return 'super';
+            if (!(ai.buffs?.nuMode > 0) && (combatState === 'pressure' || combatState === 'burst' || dist < 190)) return 'switch';
             break;
     }
     return null;
