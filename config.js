@@ -305,13 +305,18 @@ var HEROES = {
     },
     Archor: {
         name: "Hoin", desc: "Bloodhunt Rapid Archer",
-        color: "#2f8f62", maxHp: 680, speed: 5.8, jump: 15, width: 38, height: 68, superCD: 18000,
-        ui: { hp: "68 WRD", atk: "0.6-3.6 WRD (Rapid Arrows)", passive: "<span class='skill-tag'>Bloodhunt</span> Land 3 continuous fighter hits to activate Bloodhunt for 3.5s. During Bloodhunt, hits heal Hoin for 1 WRD and add 0.2 WRD arrow damage, up to +3 WRD until the effect ends. Press [Switch] to cleanse all debuffs (8s CD).", super: "<span class='skill-tag'>Hunting Roc</span> Fires a bird that tracks for 2s, then continues unguided. On impact it explodes for 7 WRD in a wide area and dizzies affected opponents for 2.5s." }
+        color: "#2f8f62", maxHp: 340, speed: 5.8, jump: 15, width: 38, height: 68, superCD: 18000,
+        ui: { hp: "34 WRD", atk: "0.6-3.6 WRD (Rapid Arrows)", passive: "<span class='skill-tag'>Bloodhunt</span> Land 3 continuous fighter hits to activate Bloodhunt for 3.5s. During Bloodhunt, hits heal Hoin for 1 WRD and add 0.2 WRD arrow damage, up to +3 WRD until the effect ends. Press [Switch] to cleanse all debuffs (8s CD).", super: "<span class='skill-tag'>Hunting Roc</span> Fires a bird that tracks for 2s, then continues unguided. On impact it explodes for 7 WRD in a wide area and dizzies affected opponents for 2.5s." }
     },
     Itan: {
         name: "Itan", desc: "Naginata Chiq Warrior",
         color: "#9f3347", maxHp: 820, speed: 5.0, jump: 14.5, width: 42, height: 72, superCD: 3000,
         ui: { hp: "82 WRD", atk: "3.2 WRD (Wide Naginata Swing)", passive: "Wide sweeping melee attacks control a large area. Press [Switch] for 8s Nu mode: red outline, faster attacks and movement, and empowered red Chiq.", super: "<span class='skill-tag'>Threefold Chiq</span> Invincibly swings for 2s, then releases three fast, blockable blue blades. Each deals 5 WRD, slows, bleeds, and leaves a 5s path that controls enemies and heals Itan. Nu Chiq is red with double damage, slowdown, and path healing. 3s CD." }
+    },
+    D2F1: {
+        name: "D2F-1", desc: "Autonomous Drone Consciousness",
+        color: "#35d5e8", maxHp: 520, speed: 7.2, jump: 16, width: 40, height: 66, superCD: 20000,
+        ui: { hp: "52 WRD", atk: "0.5 WRD (Electromagnetic Ball)", passive: "Fast ranged chassis. Press [Switch] to deploy 3 autonomous laser drones (10s CD). Drones evade incoming projectiles and maintain firing distance; their 2s beams cycle every 2.5s and inflict continuous burn damage.", super: "<span class='skill-tag'>Orbital Drop Unit</span> Deploys 4 laser drones and marks an enemy for 1s, slowing them while the target reticle blinks. A giant melee robot then drops onto the mark, dealing 8.5 WRD and 0.75s dizzy on landing before fighting for D2F-1. 20s CD." }
     }
 };
 

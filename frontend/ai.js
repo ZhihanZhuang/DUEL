@@ -54,7 +54,8 @@ const HERO_TACTICS = {
     Nyra:    { role: 'skirmisher', aggression: 0.74, caution: 1.12, burst: 1.30, kite: 1.28, setup: 0.42, highGround: 1.05, retreatHp: 0.38, retreatFireChance: 0.48 },
     Orion:   { role: 'gravity', aggression: 1.12, caution: 0.55, burst: 1.25, kite: 0.08, setup: 0.95, highGround: 0.38, retreatHp: 0.24, retreatFireChance: 0.10 },
     Archor:  { role: 'rapid_archer', aggression: 0.82, caution: 1.18, burst: 1.45, kite: 1.38, setup: 0.20, highGround: 1.28, retreatHp: 0.38, retreatFireChance: 0.62 },
-    Itan:    { role: 'polearm', aggression: 0.92, caution: 0.68, burst: 1.35, kite: 0.18, setup: 0.45, highGround: 0.55, retreatHp: 0.28, retreatFireChance: 0.12 }
+    Itan:    { role: 'polearm', aggression: 0.92, caution: 0.68, burst: 1.35, kite: 0.18, setup: 0.45, highGround: 0.55, retreatHp: 0.28, retreatFireChance: 0.12 },
+    D2F1:    { role: 'drone_commander', aggression: 0.68, caution: 1.22, burst: 1.28, kite: 1.42, setup: 1.55, highGround: 1.24, retreatHp: 0.40, retreatFireChance: 0.56 }
 };
 
 function getHeroTactic(ai) {
@@ -430,6 +431,7 @@ function getCombatProfile(ai, source = ai) {
         case 'Orion': range = 116; preferred = 76; break;
         case 'Archor': range = 620; preferred = 390; break;
         case 'Itan': range = 155; preferred = 105; break;
+        case 'D2F1': range = 700; preferred = 420; break;
     }
     return { range, preferred, ranged: !ai.isMeleeAttack(), tactics };
 }
@@ -458,6 +460,7 @@ function hasSetupOpportunity(game, ai) {
         case 'Noae': return owned('landmine') < 2;
         case 'Kila': return ai.kilaSwitchCD <= 0 && ai.kilaSwitchTimer <= 0;
         case 'Kuro': return ai.kuroDecoyCooldown <= 0 && owned('kuro_decoy') === 0;
+        case 'D2F1': return ai.d2fDroneCooldown <= 0 && owned('d2f_drone') < 3;
         default: return false;
     }
 }
@@ -631,6 +634,9 @@ function chooseDefensiveAction(game, ai, target, threat) {
         case 'Archor':
             if (ai.archorSpeedCooldown <= 0 && hasCleanseableDebuff(ai)) return 'switch';
             break;
+        case 'D2F1':
+            if (ai.d2fDroneCooldown <= 0 && game.minions.filter(minion => minion && minion.owner === ai && minion.type === 'd2f_drone' && !minion.dead).length < 3) return 'switch';
+            break;
     }
     return null;
 }
@@ -762,6 +768,12 @@ function chooseHeroAction(game, ai, target, targetEntity, dist, verticalDistance
             if (superReady && dist < 850 && Math.abs(verticalDistance) < 260 && (combatState === 'burst' || combatState === 'pressure' || dist > 170)) return 'super';
             if (!(ai.buffs?.nuMode > 0) && (combatState === 'pressure' || combatState === 'burst' || dist < 190)) return 'switch';
             break;
+        case 'D2F1': {
+            const drones = minions.filter(minion => minion && minion.owner === ai && minion.type === 'd2f_drone' && !minion.dead).length;
+            if (superReady && dist < 900 && Math.abs(verticalDistance) < 330) return 'super';
+            if (ai.d2fDroneCooldown <= 0 && (drones < 3 || combatState === 'setup' || combatState === 'pressure')) return 'switch';
+            break;
+        }
     }
     return null;
 }

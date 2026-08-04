@@ -610,7 +610,7 @@ class Projectile extends Entity {
                             game.createExplosion(this.x + this.w/2, this.y + this.h/2, 180, 70, this.owner, false, 2500);
                             return;
                         }
-                        let noKnockback = (this.type === "bullet" || this.type === "homing_bullet" || this.type === "ki_blast" || this.type === "magic_burst" || this.type === "paper_plane" || this.type === "blue_paper_plane" || this.type === "fire_bolt" || this.type === "water_bolt" || this.type === "tidal_wave" || this.type === "volt_laser" || this.type === "pickaxe" || this.type === "chiq_blade");
+                        let noKnockback = (this.type === "bullet" || this.type === "homing_bullet" || this.type === "ki_blast" || this.type === "magic_burst" || this.type === "paper_plane" || this.type === "blue_paper_plane" || this.type === "fire_bolt" || this.type === "water_bolt" || this.type === "tidal_wave" || this.type === "volt_laser" || this.type === "pickaxe" || this.type === "chiq_blade" || this.type === "em_ball");
                         t.takeDamage(this.damage, this.owner, false, noKnockback);
                         if (this.damage > 0 && this.owner?.heroName === 'Archor' && typeof this.owner.onArchorHit === 'function') this.owner.onArchorHit(t);
 
@@ -745,6 +745,18 @@ class Projectile extends Entity {
             ctx.fill();
             ctx.restore();
             if (this.type === "blue_paper_plane" && Math.random() < 0.5) game.particles.push(new Particle(this.x+this.w/2, this.y+this.h/2, "#88ccff", 0, 0, 150, 3));
+        } else if (this.type === "em_ball") {
+            ctx.save();
+            ctx.translate(this.x + this.w/2, this.y + this.h/2);
+            ctx.fillStyle = '#dffcff';
+            ctx.shadowBlur = 16;
+            ctx.shadowColor = '#35d5e8';
+            ctx.beginPath(); ctx.arc(0, 0, this.w/2, 0, Math.PI*2); ctx.fill();
+            ctx.strokeStyle = '#35d5e8';
+            ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.arc(0, 0, this.w/2 + 4 + Math.sin(Date.now()*0.02)*2, 0, Math.PI*2); ctx.stroke();
+            ctx.restore();
+            game.particles.push(new Particle(this.x + this.w/2, this.y + this.h/2, '#35d5e8', 0, 0, 120, 3));
         } else if (this.type === "fire_bolt" || this.type === "water_bolt") {
             ctx.fillStyle = this.color;
             ctx.beginPath(); ctx.arc(this.x+this.w/2, this.y+this.h/2, this.w/2, 0, Math.PI*2); ctx.fill();
@@ -967,6 +979,420 @@ class ChiqPath extends Entity {
         ctx.lineWidth = 3;
         ctx.beginPath(); ctx.moveTo(this.startX, this.startY); ctx.lineTo(this.endX, this.endY); ctx.stroke();
         ctx.restore();
+    }
+}
+
+class D2FDrone extends Entity {
+    constructor(owner, x, y, formationSlot = 0) {
+        super(x, y, 34, 24);
+        this.owner = owner;
+        this.type = 'd2f_drone';
+        this.hp = 65;
+        this.maxHp = 65;
+        this.life = 18000;
+        this.maxLife = 18000;
+        this.formationSlot = formationSlot;
+        this.cycleTimer = (formationSlot * 140) % 2500;
+        this.laserTickTimer = 0;
+        this.laserActive = false;
+        this.laserTargetId = null;
+        this.laserEndX = x;
+        this.laserEndY = y;
+        this.evading = false;
+        this.buffs = { dizzy: 0, slow: 0, burn: 0 };
+        this.invincible = 0;
+    }
+
+    takeDamage(amount) {
+        if (this.dead || this.invincible > 0) return;
+        this.hp -= Math.max(0, amount || 0);
+        if (this.hp <= 0) {
+            this.dead = true;
+            for (let i = 0; i < 12; i++) game.particles.push(new Particle(this.x + this.w/2, this.y + this.h/2, i % 2 ? '#35d5e8' : '#ffb347', (Math.random()-0.5)*10, (Math.random()-0.5)*10, 360, 4));
+        }
+    }
+
+    getTargets() {
+        return [
+            ...(typeof game.getOpponentsOf === 'function' ? game.getOpponentsOf(this.owner) : []),
+            ...game.minions.filter(minion => minion && minion !== this && minion.owner !== this.owner && !minion.untargetable)
+        ].filter(target => target && !target.dead && !(target.invincible > 0));
+    }
+
+    getTarget() {
+        const targets = this.getTargets();
+        if (!targets.length) return null;
+        const cx = this.x + this.w/2;
+        const cy = this.y + this.h/2;
+        return targets.reduce((closest, candidate) => {
+            const candidateDistance = Math.hypot(candidate.x + candidate.w/2 - cx, candidate.y + candidate.h/2 - cy);
+            const closestDistance = Math.hypot(closest.x + closest.w/2 - cx, closest.y + closest.h/2 - cy);
+            return candidateDistance < closestDistance ? candidate : closest;
+        });
+    }
+
+    findProjectileThreat() {
+        let best = null;
+        let bestTime = Infinity;
+        const cx = this.x + this.w/2;
+        const cy = this.y + this.h/2;
+        for (const projectile of game.projectiles) {
+            if (!projectile || projectile.dead || projectile.owner === this.owner || projectile.owner?.owner === this.owner) continue;
+            const speedSquared = (projectile.vx || 0) ** 2 + (projectile.vy || 0) ** 2;
+            if (speedSquared < 1) continue;
+            const rx = cx - (projectile.x + projectile.w/2);
+            const ry = cy - (projectile.y + projectile.h/2);
+            const frames = (rx * (projectile.vx || 0) + ry * (projectile.vy || 0)) / speedSquared;
+            if (frames < 0 || frames > 24) continue;
+            const missX = rx - (projectile.vx || 0) * frames;
+            const missY = ry - (projectile.vy || 0) * frames;
+            if (Math.hypot(missX, missY) > 62 || frames >= bestTime) continue;
+            best = { projectile, missX, missY };
+            bestTime = frames;
+        }
+        return best;
+    }
+
+    beamTouches(target, startX, startY, endX, endY) {
+        const px = target.x + target.w/2;
+        const py = target.y + target.h/2;
+        const dx = endX - startX;
+        const dy = endY - startY;
+        const lengthSquared = dx*dx + dy*dy;
+        const projection = lengthSquared > 0
+            ? Math.max(0, Math.min(1, ((px-startX)*dx + (py-startY)*dy) / lengthSquared))
+            : 0;
+        const closestX = startX + dx*projection;
+        const closestY = startY + dy*projection;
+        return Math.hypot(px - closestX, py - closestY) <= Math.max(target.w, target.h) * 0.48 + 7;
+    }
+
+    update(dt) {
+        if (this.dead) return;
+        this.life = Math.max(0, this.life - dt);
+        if (this.life <= 0 || !this.owner || this.owner.dead) { this.dead = true; return; }
+        if (this.buffs.dizzy > 0) {
+            this.buffs.dizzy = Math.max(0, this.buffs.dizzy - dt);
+            this.laserActive = false;
+            return;
+        }
+
+        const target = this.getTarget();
+        const frameScale = Math.min(2, Math.max(0.25, dt / 16.67));
+        const threat = this.findProjectileThreat();
+        this.evading = !!threat;
+
+        let desiredVx = 0;
+        let desiredVy = 0;
+        if (threat) {
+            const projectile = threat.projectile;
+            const perpendicularX = -(projectile.vy || 0);
+            const perpendicularY = projectile.vx || 0;
+            const direction = perpendicularY === 0 ? (this.y > GROUND_Y * 0.45 ? -1 : 1) : (threat.missY >= 0 ? 1 : -1);
+            const magnitude = Math.max(1, Math.hypot(perpendicularX, perpendicularY));
+            desiredVx = perpendicularX / magnitude * direction * 8;
+            desiredVy = perpendicularY / magnitude * direction * 10;
+        } else if (target) {
+            const cx = this.x + this.w/2;
+            const cy = this.y + this.h/2;
+            const tx = target.x + target.w/2;
+            const ty = target.y + target.h/2;
+            const dx = tx - cx;
+            const dy = ty - cy;
+            const distance = Math.hypot(dx, dy);
+            const side = dx >= 0 ? -1 : 1;
+            const desiredX = tx + side * (315 + (this.formationSlot % 3 - 1) * 34);
+            const desiredY = Math.max(75, Math.min(GROUND_Y - 115, ty - 100 + (this.formationSlot % 4 - 1.5) * 32));
+            if (distance < 275) desiredVx = -dx / Math.max(1, distance) * 7.5;
+            else if (distance > 360) desiredVx = Math.max(-7.5, Math.min(7.5, (desiredX - cx) * 0.045));
+            else desiredVx = Math.max(-4, Math.min(4, (desiredX - cx) * 0.025));
+            desiredVy = Math.max(-7, Math.min(7, (desiredY - cy) * 0.055));
+        } else if (this.owner) {
+            desiredVx = Math.max(-5, Math.min(5, this.owner.x + this.owner.w/2 - (this.x + this.w/2))) * 0.08;
+            desiredVy = Math.max(-5, Math.min(5, this.owner.y - 80 - this.y)) * 0.08;
+        }
+
+        this.vx += (desiredVx - this.vx) * 0.22 * frameScale;
+        this.vy += (desiredVy - this.vy) * 0.22 * frameScale;
+        this.x += this.vx * frameScale;
+        this.y += this.vy * frameScale;
+        this.x = Math.max(8, Math.min(CANVAS_W - this.w - 8, this.x));
+        this.y = Math.max(45, Math.min(GROUND_Y - this.h - 28, this.y));
+
+        this.cycleTimer = (this.cycleTimer + dt) % 2500;
+        this.laserActive = !!target && this.cycleTimer < 2000
+            && Math.hypot(target.x + target.w/2 - (this.x + this.w/2), target.y + target.h/2 - (this.y + this.h/2)) <= 620;
+        if (this.laserActive) {
+            const startX = this.x + this.w/2;
+            const startY = this.y + this.h/2;
+            this.laserTargetId = target.id || null;
+            this.laserEndX = target.x + target.w/2;
+            this.laserEndY = target.y + target.h/2;
+            this.laserTickTimer += dt;
+            const ticks = Math.floor(this.laserTickTimer / 250);
+            if (ticks > 0) this.laserTickTimer %= 250;
+            for (const enemy of this.getTargets()) {
+                if (!this.beamTouches(enemy, startX, startY, this.laserEndX, this.laserEndY)) continue;
+                for (let tick = 0; tick < ticks && !enemy.dead; tick++) enemy.takeDamage(2, this.owner, true, true);
+                if (ticks > 0) {
+                    enemy.buffs = enemy.buffs || {};
+                    enemy.buffs.burn = Math.max(enemy.buffs.burn || 0, 900);
+                }
+            }
+        } else {
+            this.laserTickTimer = 0;
+            this.laserTargetId = null;
+        }
+    }
+
+    draw(ctx) {
+        if (this.laserActive) {
+            ctx.save();
+            ctx.strokeStyle = 'rgba(255, 78, 44, 0.25)';
+            ctx.lineWidth = 10;
+            ctx.beginPath(); ctx.moveTo(this.x + this.w/2, this.y + this.h/2); ctx.lineTo(this.laserEndX, this.laserEndY); ctx.stroke();
+            ctx.strokeStyle = '#ffec9a';
+            ctx.shadowBlur = 14;
+            ctx.shadowColor = '#ff5335';
+            ctx.lineWidth = 3;
+            ctx.beginPath(); ctx.moveTo(this.x + this.w/2, this.y + this.h/2); ctx.lineTo(this.laserEndX, this.laserEndY); ctx.stroke();
+            ctx.restore();
+        }
+
+        ctx.save();
+        ctx.translate(this.x + this.w/2, this.y + this.h/2);
+        const tilt = Math.max(-0.22, Math.min(0.22, this.vx * 0.025));
+        ctx.rotate(tilt);
+        ctx.fillStyle = '#17252b';
+        ctx.fillRect(-13, -8, 26, 16);
+        ctx.fillStyle = '#35d5e8';
+        ctx.fillRect(-8, -5, 16, 10);
+        ctx.fillStyle = '#dffcff';
+        ctx.fillRect(8, -2, 8, 4);
+        ctx.strokeStyle = '#8cf4ff';
+        ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.moveTo(-16, -8); ctx.lineTo(-24, -13); ctx.moveTo(16, -8); ctx.lineTo(24, -13); ctx.stroke();
+        ctx.fillStyle = this.evading ? '#ffdf58' : '#35d5e8';
+        ctx.fillRect(-23, -15, 8, 3);
+        ctx.fillRect(15, -15, 8, 3);
+        ctx.restore();
+
+        ctx.fillStyle = '#27151a'; ctx.fillRect(this.x, this.y - 9, this.w, 3);
+        ctx.fillStyle = '#35d5e8'; ctx.fillRect(this.x, this.y - 9, this.w * Math.max(0, this.hp / this.maxHp), 3);
+    }
+}
+
+class D2FTargetBeacon extends Entity {
+    constructor(owner, target) {
+        super(target.x - 12, target.y - 18, target.w + 24, target.h + 36);
+        this.owner = owner;
+        this.type = 'd2f_target_beacon';
+        this.targetId = target.id;
+        this.life = 1000;
+        this.maxLife = 1000;
+        this.untargetable = true;
+        this.robotSpawned = false;
+    }
+
+    getTarget() {
+        if (typeof game.getFighters === 'function') {
+            const fighter = game.getFighters().find(candidate => candidate && candidate.id === this.targetId);
+            if (fighter) return fighter;
+        }
+        return (typeof game.getOpponentsOf === 'function' ? game.getOpponentsOf(this.owner) : [])
+            .find(candidate => candidate && candidate.id === this.targetId) || null;
+    }
+
+    update(dt) {
+        if (this.dead) return;
+        const target = this.getTarget();
+        if (!target || target.dead || !this.owner || this.owner.dead) { this.dead = true; return; }
+        this.x = target.x - 12;
+        this.y = target.y - 18;
+        this.w = target.w + 24;
+        this.h = target.h + 36;
+        target.buffs = target.buffs || {};
+        target.buffs.slow = Math.max(target.buffs.slow || 0, 280);
+        this.life = Math.max(0, this.life - dt);
+        if (this.life <= 0 && !this.robotSpawned) {
+            this.robotSpawned = true;
+            game.minions.push(new D2FGiantRobot(this.owner, target));
+            this.dead = true;
+        }
+    }
+
+    draw(ctx) {
+        if (Math.floor(this.life / 100) % 2 !== 0) return;
+        const cx = this.x + this.w/2;
+        const cy = this.y + this.h/2;
+        const radius = Math.max(this.w, this.h) * 0.62;
+        ctx.save();
+        ctx.strokeStyle = '#ff334f';
+        ctx.shadowBlur = 14;
+        ctx.shadowColor = '#ff334f';
+        ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.arc(cx, cy, radius, 0, Math.PI*2); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(cx-radius-10, cy); ctx.lineTo(cx-radius/2, cy); ctx.moveTo(cx+radius/2, cy); ctx.lineTo(cx+radius+10, cy); ctx.moveTo(cx, cy-radius-10); ctx.lineTo(cx, cy-radius/2); ctx.moveTo(cx, cy+radius/2); ctx.lineTo(cx, cy+radius+10); ctx.stroke();
+        ctx.restore();
+    }
+}
+
+class D2FGiantRobot extends Entity {
+    constructor(owner, target) {
+        const spawnX = Math.max(0, Math.min(CANVAS_W - 88, target.x + target.w/2 - 44));
+        super(spawnX, Math.max(-112, target.y - 330), 88, 112);
+        this.owner = owner;
+        this.type = 'd2f_giant_robot';
+        this.hp = 300;
+        this.maxHp = 300;
+        this.life = 14000;
+        this.maxLife = 14000;
+        this.targetId = target.id;
+        this.dropping = true;
+        this.landingImpactDone = false;
+        this.isGrounded = false;
+        this.attackCooldown = 0;
+        this.facing = target.x >= spawnX ? 1 : -1;
+        this.vy = 5;
+        this.buffs = { dizzy: 0, slow: 0, burn: 0 };
+        this.invincible = 0;
+    }
+
+    takeDamage(amount) {
+        if (this.dead || this.invincible > 0) return;
+        this.hp -= Math.max(0, amount || 0);
+        if (this.hp <= 0) {
+            this.dead = true;
+            for (let i = 0; i < 22; i++) game.particles.push(new Particle(this.x + this.w/2, this.y + this.h/2, i % 2 ? '#35d5e8' : '#ffb347', (Math.random()-0.5)*14, (Math.random()-0.5)*14, 500, 6));
+        }
+    }
+
+    getTarget() {
+        const fighters = typeof game.getOpponentsOf === 'function' ? game.getOpponentsOf(this.owner) : [];
+        const preferred = fighters.find(candidate => candidate && candidate.id === this.targetId && !candidate.dead);
+        if (preferred) return preferred;
+        const targets = [
+            ...fighters,
+            ...game.minions.filter(minion => minion && minion !== this && minion.owner !== this.owner && !minion.untargetable)
+        ].filter(target => target && !target.dead && !(target.invincible > 0));
+        if (!targets.length) return null;
+        const cx = this.x + this.w/2;
+        const cy = this.y + this.h/2;
+        return targets.reduce((closest, candidate) => Math.hypot(candidate.x+candidate.w/2-cx, candidate.y+candidate.h/2-cy) < Math.hypot(closest.x+closest.w/2-cx, closest.y+closest.h/2-cy) ? candidate : closest);
+    }
+
+    impact() {
+        if (this.landingImpactDone) return;
+        this.landingImpactDone = true;
+        const hitbox = { x: this.x - 35, y: this.y + this.h - 68, w: this.w + 70, h: 78 };
+        const targets = [
+            ...(typeof game.getOpponentsOf === 'function' ? game.getOpponentsOf(this.owner) : []),
+            ...game.minions.filter(minion => minion && minion !== this && minion.owner !== this.owner && !minion.untargetable)
+        ];
+        for (const target of targets) {
+            if (!target || target.dead || target.invincible > 0 || !checkAABB(hitbox, target)) continue;
+            target.takeDamage(85, this.owner);
+            target.buffs = target.buffs || {};
+            target.buffs.dizzy = Math.max(target.buffs.dizzy || 0, 750);
+        }
+        for (let i = 0; i < 34; i++) game.particles.push(new Particle(this.x + this.w/2, this.y + this.h, i % 2 ? '#35d5e8' : '#dffcff', (Math.random()-0.5)*18, -Math.random()*12, 520, 6));
+    }
+
+    update(dt) {
+        if (this.dead) return;
+        this.life = Math.max(0, this.life - dt);
+        if (this.life <= 0 || !this.owner || this.owner.dead) { this.dead = true; return; }
+        if (this.attackCooldown > 0) this.attackCooldown = Math.max(0, this.attackCooldown - dt);
+        if (this.buffs.dizzy > 0) {
+            this.buffs.dizzy = Math.max(0, this.buffs.dizzy - dt);
+            return;
+        }
+
+        const frameScale = Math.min(2, Math.max(0.25, dt / 16.67));
+        const target = this.getTarget();
+        if (this.dropping) {
+            if (target) this.x += Math.max(-4, Math.min(4, target.x + target.w/2 - (this.x + this.w/2))) * frameScale;
+            const previousBottom = this.y + this.h;
+            this.vy += GRAVITY * 1.6 * frameScale;
+            this.y += this.vy * frameScale;
+            let landingY = GROUND_Y;
+            for (const platform of PLATFORMS) {
+                const crosses = previousBottom <= platform.y && this.y + this.h >= platform.y;
+                const overlaps = this.x + this.w > platform.x && this.x < platform.x + platform.w;
+                if (crosses && overlaps) landingY = Math.min(landingY, platform.y);
+            }
+            if (this.y + this.h >= landingY) {
+                this.y = landingY - this.h;
+                this.vy = 0;
+                this.dropping = false;
+                this.isGrounded = true;
+                this.impact();
+            }
+            return;
+        }
+
+        this.isGrounded = false;
+        const previousBottom = this.y + this.h;
+        this.vy += GRAVITY * frameScale;
+        if (target) {
+            const dx = target.x + target.w/2 - (this.x + this.w/2);
+            const dy = target.y + target.h/2 - (this.y + this.h/2);
+            this.facing = dx >= 0 ? 1 : -1;
+            this.vx += (this.facing * (Math.abs(dx) > 62 ? 4.4 : 0) - this.vx) * 0.24 * frameScale;
+            if (this.vy >= 0 && Math.abs(this.vy) < 0.8 && (dy < -55 || (Math.abs(dx) > 120 && Math.abs(dx) < 260))) this.vy = -13;
+            if (Math.abs(dx) < 82 && Math.abs(dy) < 95 && this.attackCooldown <= 0) {
+                target.takeDamage(28, this.owner);
+                this.attackCooldown = 850;
+                for (let i = 0; i < 10; i++) game.particles.push(new Particle(target.x + target.w/2, target.y + target.h/2, '#35d5e8', this.facing*(2+Math.random()*5), (Math.random()-0.5)*7, 260, 4));
+            }
+        } else {
+            this.vx *= 0.82;
+        }
+
+        this.x += this.vx * frameScale;
+        this.y += this.vy * frameScale;
+        let landingY = GROUND_Y;
+        if (this.vy >= 0) {
+            for (const platform of PLATFORMS) {
+                const crosses = previousBottom <= platform.y && this.y + this.h >= platform.y;
+                const overlaps = this.x + this.w > platform.x && this.x < platform.x + platform.w;
+                if (crosses && overlaps) landingY = Math.min(landingY, platform.y);
+            }
+        }
+        if (this.y + this.h >= landingY) {
+            this.y = landingY - this.h;
+            this.vy = 0;
+            this.isGrounded = true;
+        }
+        this.x = Math.max(0, Math.min(CANVAS_W - this.w, this.x));
+    }
+
+    draw(ctx) {
+        ctx.save();
+        ctx.translate(this.x + this.w/2, this.y + this.h/2);
+        if (this.facing < 0) ctx.scale(-1, 1);
+        ctx.fillStyle = '#121b20';
+        ctx.fillRect(-34, -38, 68, 68);
+        ctx.fillStyle = '#2c454d';
+        ctx.fillRect(-28, -32, 56, 48);
+        ctx.fillStyle = '#35d5e8';
+        ctx.shadowBlur = 12;
+        ctx.shadowColor = '#35d5e8';
+        ctx.fillRect(8, -22, 12, 8);
+        ctx.fillRect(-9, -10, 18, 18);
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = '#17252b';
+        ctx.fillRect(-47, -28, 14, 54);
+        ctx.fillRect(33, -28, 14, 54);
+        ctx.fillRect(-27, 30, 19, 26);
+        ctx.fillRect(8, 30, 19, 26);
+        if (!this.dropping && this.attackCooldown > 620) {
+            ctx.fillStyle = '#dffcff';
+            ctx.fillRect(42, -12, 34, 22);
+        }
+        ctx.restore();
+        ctx.fillStyle = '#27151a'; ctx.fillRect(this.x, this.y - 12, this.w, 5);
+        ctx.fillStyle = '#35d5e8'; ctx.fillRect(this.x, this.y - 12, this.w * Math.max(0, this.hp / this.maxHp), 5);
     }
 }
 

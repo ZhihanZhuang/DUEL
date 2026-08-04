@@ -573,6 +573,12 @@ class Game {
             if (this.p1.buffs.nuMode > 0) p1Stat += `[NU ${(this.p1.buffs.nuMode/1000).toFixed(1)}s] `;
             if (this.p1.itanSuperWindupTimer > 0) p1Stat += `[CHIQ CAST ${(this.p1.itanSuperWindupTimer/1000).toFixed(1)}s]`;
         }
+        if (this.p1.heroName === 'D2F1') {
+            const drones = this.minions.filter(minion => minion && minion.owner === this.p1 && minion.type === 'd2f_drone' && !minion.dead).length;
+            p1Stat += `[DRONES: ${drones}]`;
+            if (this.p1.d2fDroneCooldown > 0) p1Stat += ` [DEPLOY CD ${(this.p1.d2fDroneCooldown/1000).toFixed(1)}s]`;
+            else p1Stat += ' [DEPLOY READY]';
+        }
 
         if (this.p1.buffs.poison > 0) p1Stat += " [POISONED]";
         if (this.p1.buffs.burn > 0) p1Stat += " [BURN]";
@@ -678,6 +684,12 @@ class Game {
         if (this.p2.heroName === 'Itan') {
             if (this.p2.buffs.nuMode > 0) p2Stat += `[NU ${(this.p2.buffs.nuMode/1000).toFixed(1)}s] `;
             if (this.p2.itanSuperWindupTimer > 0) p2Stat += `[CHIQ CAST ${(this.p2.itanSuperWindupTimer/1000).toFixed(1)}s]`;
+        }
+        if (this.p2.heroName === 'D2F1') {
+            const drones = this.minions.filter(minion => minion && minion.owner === this.p2 && minion.type === 'd2f_drone' && !minion.dead).length;
+            p2Stat += `[DRONES: ${drones}]`;
+            if (this.p2.d2fDroneCooldown > 0) p2Stat += ` [DEPLOY CD ${(this.p2.d2fDroneCooldown/1000).toFixed(1)}s]`;
+            else p2Stat += ' [DEPLOY READY]';
         }
 
         if (this.p2.buffs.poison > 0) p2Stat += " [POISONED]";

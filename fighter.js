@@ -125,6 +125,11 @@ class Fighter extends Entity {
             this.itanSuperWindupTimer = 0;
             this.itanSuperWindupMax = 2000;
         }
+
+        if (this.heroName === 'D2F1') {
+            this.d2fDroneCooldown = 0;
+            this.d2fDroneSerial = 0;
+        }
     }
 
     takeDamage(amt, attacker, isDoT = false, noKnockback = false) {
@@ -412,6 +417,7 @@ class Fighter extends Entity {
             if (this.archorSpeedCooldown > 0) this.archorSpeedCooldown = Math.max(0, this.archorSpeedCooldown - dt);
             if (keysPressed[this.controls.switch] && this.archorSpeedCooldown <= 0) this.cleanseHoinDebuffs();
         }
+        if (this.heroName === 'D2F1' && this.d2fDroneCooldown > 0) this.d2fDroneCooldown = Math.max(0, this.d2fDroneCooldown - dt);
 
         if (this.heroName === 'Sola' && this.solaForceActive) this.updateSolaForce(dt);
 
@@ -1021,6 +1027,7 @@ class Fighter extends Entity {
                     if (this.heroName === 'Orion') recTime = 300;
                     if (this.heroName === 'Archor') recTime = 55;
                     if (this.heroName === 'Itan') recTime = this.buffs.nuMode > 0 ? 125 : 250;
+                    if (this.heroName === 'D2F1') recTime = 110;
 
                     this.attackState = 'recovery';
                     this.stateTimer = recTime;
@@ -1153,6 +1160,9 @@ class Fighter extends Entity {
                 } else if (this.heroName === 'Itan' && this.buffs.nuMode <= 0) {
                     this.buffs.nuMode = 8000;
                     for (let i = 0; i < 18; i++) game.particles.push(new Particle(this.x + this.w/2, this.y + this.h/2, '#ff3030', (Math.random()-0.5)*13, (Math.random()-0.5)*13, 420, 4));
+                } else if (this.heroName === 'D2F1' && this.attackState === 'idle' && this.d2fDroneCooldown <= 0) {
+                    this.spawnD2FDrones(3);
+                    this.d2fDroneCooldown = 10000;
                 }
             }
             if (keysPressed[this.controls.attack] && this.attackState === 'idle') {
@@ -1215,7 +1225,7 @@ class Fighter extends Entity {
     }
 
     isMeleeAttack() {
-        if (this.heroName === 'Hason' || this.heroName === 'Willi' || this.heroName === 'Ugo' || this.heroName === 'Kila' || this.heroName === 'Volt' || this.heroName === 'Noae' || this.heroName === 'Kuro' || this.heroName === 'Nyra' || this.heroName === 'Archor') return false;
+        if (this.heroName === 'Hason' || this.heroName === 'Willi' || this.heroName === 'Ugo' || this.heroName === 'Kila' || this.heroName === 'Volt' || this.heroName === 'Noae' || this.heroName === 'Kuro' || this.heroName === 'Nyra' || this.heroName === 'Archor' || this.heroName === 'D2F1') return false;
         if (this.heroName === 'Euclid' && this.euclidWeapon === 'magic') return false;
         if (this.heroName === 'Hunter' && this.hunterWeapon === 'musket') return false;
         if (this.heroName === 'Kadaxi' && this.comboCount === 3) return false;
@@ -1307,6 +1317,7 @@ class Fighter extends Entity {
         if (this.heroName === 'Orion') this.stateTimer = 170;
         if (this.heroName === 'Archor') this.stateTimer = 20;
         if (this.heroName === 'Itan') this.stateTimer = this.buffs.nuMode > 0 ? 90 : 180;
+        if (this.heroName === 'D2F1') this.stateTimer = 60;
         if (this.heroName === 'Wolf') {
             this.stateTimer = 50;
             this.wolfPassiveReady = this.wolfAttackTimer >= 1500;
@@ -1323,7 +1334,7 @@ class Fighter extends Entity {
     executeActiveAttack() {
         let target = game.getEnemyOf(this);
 
-        if (this.heroName === 'Hason' || this.heroName === 'Willi' || this.heroName === 'Euclid' || this.heroName === 'Ugo' || this.heroName === 'Kila' || this.heroName === 'Volt' || this.heroName === 'Noae' || this.heroName === 'Nyra' || this.heroName === 'Archor') {
+        if (this.heroName === 'Hason' || this.heroName === 'Willi' || this.heroName === 'Euclid' || this.heroName === 'Ugo' || this.heroName === 'Kila' || this.heroName === 'Volt' || this.heroName === 'Noae' || this.heroName === 'Nyra' || this.heroName === 'Archor' || this.heroName === 'D2F1') {
             let minDist = target ? Math.hypot(target.x - this.x, target.y - this.y) : 9999;
             for (let m of game.minions) {
                 if (m && m.owner !== this && !m.dead) {
@@ -1441,6 +1452,35 @@ class Fighter extends Entity {
             const damage = 6 + Math.min(this.archorDamageBonusMax, this.archorDamageBonus);
             game.projectiles.push(new Projectile(px, py - 3, 36, 4, Math.cos(aimAngle)*speed, Math.sin(aimAngle)*speed, damage, this, "#ffffa8", "archor_arrow"));
         }
+        else if (this.heroName === 'D2F1') {
+            const speed = 24;
+            game.projectiles.push(new Projectile(px, py - 5, 16, 16, Math.cos(aimAngle)*speed, Math.sin(aimAngle)*speed, 5, this, '#35d5e8', 'em_ball'));
+            for (let i = 0; i < 5; i++) game.particles.push(new Particle(px, py, '#dffcff', Math.cos(aimAngle)*(2+Math.random()*3), Math.sin(aimAngle)*(2+Math.random()*3), 160, 3));
+        }
+    }
+
+    spawnD2FDrones(count) {
+        if (this.heroName !== 'D2F1' || count <= 0) return [];
+        const active = game.minions.filter(minion => minion && minion.owner === this && minion.type === 'd2f_drone' && !minion.dead);
+        const excess = Math.max(0, active.length + count - 10);
+        active.sort((first, second) => (first.life || 0) - (second.life || 0));
+        for (let index = 0; index < excess; index++) active[index].dead = true;
+
+        const deployed = [];
+        for (let index = 0; index < count; index++) {
+            const slot = this.d2fDroneSerial++;
+            const angle = (slot % 7) / 7 * Math.PI * 2;
+            const drone = new D2FDrone(
+                this,
+                Math.max(8, Math.min(CANVAS_W - 42, this.x + this.w/2 + Math.cos(angle)*58 - 17)),
+                Math.max(45, this.y - 55 + Math.sin(angle)*38),
+                slot
+            );
+            deployed.push(drone);
+            game.minions.push(drone);
+        }
+        for (let i = 0; i < count * 5; i++) game.particles.push(new Particle(this.x + this.w/2, this.y + 12, '#35d5e8', (Math.random()-0.5)*12, (Math.random()-0.5)*12, 380, 4));
+        return deployed;
     }
 
     cleanseHoinDebuffs() {
@@ -1511,6 +1551,22 @@ class Fighter extends Entity {
     }
 
     performSuper() {
+        if (this.heroName === 'D2F1') {
+            if (this.superCooldown <= 0) {
+                const opponents = typeof game.getOpponentsOf === 'function'
+                    ? game.getOpponentsOf(this).filter(target => target && !target.dead && !target.untargetable)
+                    : [];
+                const preferred = this.aiTarget && opponents.includes(this.aiTarget) ? this.aiTarget : null;
+                const target = preferred || game.getEnemyOf(this) || opponents[0];
+                if (!target || target.dead) return;
+                this.superCooldown = this.superCooldownMax;
+                this.spawnD2FDrones(4);
+                game.minions.push(new D2FTargetBeacon(this, target));
+                for (let i = 0; i < 28; i++) game.particles.push(new Particle(target.x + target.w/2, target.y + target.h/2, i % 2 ? '#ff334f' : '#35d5e8', (Math.random()-0.5)*14, (Math.random()-0.5)*14, 500, 5));
+            }
+            return;
+        }
+
         if (this.heroName === 'Itan') {
             if (this.superCooldown <= 0 && this.itanSuperWindupTimer <= 0) {
                 this.superCooldown = this.superCooldownMax;
@@ -2043,6 +2099,20 @@ class Fighter extends Entity {
             ctx.fillRect(-hw, 28, this.w, 9);
             ctx.fillStyle = "#d6aa45";
             ctx.fillRect(-hw + 4, 39, this.w - 8, 4);
+        } else if (this.heroName === 'D2F1') {
+            ctx.fillStyle = '#111b20';
+            ctx.fillRect(-hw - 3, -3, this.w + 6, h + 6);
+            ctx.fillStyle = this.color;
+            ctx.fillRect(-hw, 0, this.w, h);
+            ctx.fillStyle = '#20353c';
+            ctx.fillRect(-hw + 4, 6, this.w - 8, 17);
+            ctx.fillRect(-hw, 39, this.w, 9);
+            ctx.fillStyle = '#dffcff';
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = '#35d5e8';
+            ctx.fillRect(hw - 12, 11, 8, 5);
+            ctx.fillRect(-5, 28, 10, 10);
+            ctx.shadowBlur = 0;
         } else if (this.heroName === 'Wolf') {
             ctx.fillStyle = "#404040"; ctx.fillRect(-hw - 2, -2, this.w + 4, h + 4);
             ctx.fillStyle = this.color; ctx.fillRect(-hw, 0, this.w, h);
@@ -2237,6 +2307,21 @@ class Fighter extends Entity {
             ctx.beginPath(); ctx.moveTo(0, -138); ctx.lineTo(-10, -101); ctx.lineTo(0, -94); ctx.lineTo(10, -101); ctx.fill();
             ctx.fillStyle = "#d6aa45";
             ctx.fillRect(-7, -103, 14, 5);
+            ctx.restore();
+        }
+        else if (this.heroName === 'D2F1') {
+            ctx.save();
+            ctx.translate(hw - 3, 27);
+            const recoil = this.attackState === 'active' ? -7 * Math.sin(phaseProg * Math.PI) : 0;
+            ctx.fillStyle = '#17252b';
+            ctx.fillRect(recoil, -8, 34, 16);
+            ctx.fillStyle = '#2c5963';
+            ctx.fillRect(17 + recoil, -5, 24, 10);
+            ctx.fillStyle = '#dffcff';
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = '#35d5e8';
+            ctx.fillRect(38 + recoil, -3, 8, 6);
+            ctx.shadowBlur = 0;
             ctx.restore();
         }
         else if (this.heroName === 'Volt') {

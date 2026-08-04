@@ -38,6 +38,7 @@ function loadProjectileContext() {
         CANVAS_H: 760,
         GROUND_Y: 660,
         GRAVITY: 0.6,
+        PLATFORMS: [],
         checkAABB(first, second) {
             return first.x < second.x + second.w && first.x + first.w > second.x
                 && first.y < second.y + second.h && first.y + first.h > second.y;
@@ -46,15 +47,17 @@ function loadProjectileContext() {
     context.game = {
         hurricane: null,
         minions: [],
+        projectiles: [],
         particles: [],
         opponents: [],
         getEnemyOf: () => null,
         getOpponentsOf() { return this.opponents; },
+        getFighters() { return this.opponents; },
         createExplosion() {}
     };
     vm.createContext(context);
     const source = fs.readFileSync(path.join(__dirname, '..', 'entities.js'), 'utf8');
-    vm.runInContext(`${source}\nwindow.Projectile = Projectile; window.KuroDecoy = KuroDecoy; window.GiantSword = GiantSword; window.GravityWell = GravityWell; window.ChiqPath = ChiqPath;`, context, { filename: 'entities.js' });
+    vm.runInContext(`${source}\nwindow.Projectile = Projectile; window.KuroDecoy = KuroDecoy; window.GiantSword = GiantSword; window.GravityWell = GravityWell; window.ChiqPath = ChiqPath; window.D2FDrone = D2FDrone; window.D2FTargetBeacon = D2FTargetBeacon; window.D2FGiantRobot = D2FGiantRobot;`, context, { filename: 'entities.js' });
     return context;
 }
 
@@ -131,8 +134,9 @@ function makeFighter(heroName, id = 'cpu') {
         nyraShiftCooldown: 0,
         orionCharges: 0,
         orionPulseCooldown: 0,
+        d2fDroneCooldown: 0,
         isMeleeAttack() {
-            return !['Hason', 'Willi', 'Ugo', 'Kila', 'Volt', 'Noae', 'Kuro', 'Nyra'].includes(this.heroName)
+            return !['Hason', 'Willi', 'Ugo', 'Kila', 'Volt', 'Noae', 'Kuro', 'Nyra', 'Archor', 'D2F1'].includes(this.heroName)
                 && !(this.heroName === 'Hunter' && this.hunterWeapon === 'musket')
                 && !(this.heroName === 'Euclid' && this.euclidWeapon === 'magic');
         }
@@ -236,6 +240,19 @@ function loadPhysicsGame(heroName = 'Hunter') {
             Object.assign(this, { owner, startX, startY, endX, endY, nuMode, type: 'chiq_path', life: 5000 });
         }
     }
+    class D2FDrone extends Entity {
+        constructor(owner, x, y, formationSlot) {
+            super(x, y, 34, 24);
+            Object.assign(this, { owner, formationSlot, type: 'd2f_drone', hp: 65, maxHp: 65, life: 18000, buffs: {} });
+        }
+    }
+    class D2FTargetBeacon extends Entity {
+        constructor(owner, target) {
+            super(target.x - 12, target.y - 18, target.w + 24, target.h + 36);
+            Object.assign(this, { owner, targetId: target.id, type: 'd2f_target_beacon', life: 1000, untargetable: true });
+        }
+    }
+    class D2FGiantRobot extends Entity {}
 
     const platforms = [
         { x: 300, y: 480, w: 400, h: 20, type: 'center' },
@@ -250,6 +267,9 @@ function loadPhysicsGame(heroName = 'Hunter') {
         KuroDecoy,
         GravityWell,
         ChiqPath,
+        D2FDrone,
+        D2FTargetBeacon,
+        D2FGiantRobot,
         Minion,
         CANVAS_W: 1280,
         CANVAS_H: 760,
@@ -264,8 +284,9 @@ function loadPhysicsGame(heroName = 'Hunter') {
             Sola: { maxHp: 780, speed: 5.8, jump: 15, width: 40, height: 70, color: '#167d8d', superCD: 15000 },
             Nyra: { maxHp: 680, speed: 6.2, jump: 16, width: 36, height: 66, color: '#d84b78', superCD: 24000 },
             Orion: { maxHp: 900, speed: 4.6, jump: 13.5, width: 46, height: 74, color: '#4056a1', superCD: 28000 },
-            Archor: { maxHp: 680, speed: 5.8, jump: 15, width: 38, height: 68, color: '#2f8f62', superCD: 18000 },
-            Itan: { maxHp: 820, speed: 5, jump: 14.5, width: 42, height: 72, color: '#9f3347', superCD: 3000 }
+            Archor: { maxHp: 340, speed: 5.8, jump: 15, width: 38, height: 68, color: '#2f8f62', superCD: 18000 },
+            Itan: { maxHp: 820, speed: 5, jump: 14.5, width: 42, height: 72, color: '#9f3347', superCD: 3000 },
+            D2F1: { maxHp: 520, speed: 7.2, jump: 16, width: 40, height: 66, color: '#35d5e8', superCD: 20000 }
         },
         keys: {},
         keysPressed: {},
@@ -406,7 +427,7 @@ test('every hero with a direct super can decide to use it', () => {
     const context = loadAI();
     const directSuperHeroes = [
         'Hason', 'Willi', 'Hunter', 'Macu', 'Artu', 'Duke', 'Kadaxi', 'Euclid',
-        'Lique', 'Kae', 'Kila', 'Volt', 'Gensan', 'Noae', 'Wolf', 'Kuro', 'Sola', 'Nyra', 'Orion', 'Archor', 'Itan'
+        'Lique', 'Kae', 'Kila', 'Volt', 'Gensan', 'Noae', 'Wolf', 'Kuro', 'Sola', 'Nyra', 'Orion', 'Archor', 'Itan', 'D2F1'
     ];
 
     for (const heroName of directSuperHeroes) {
@@ -440,7 +461,8 @@ test('weapon, puppet, stance, shadow, and mine utility skills are reachable', ()
         { hero: 'Kila', action: 'switch', setup: ai => { ai.superCooldown = 5000; ai.kilaSwitchCD = 0; ai.kilaElement = 'water'; } },
         { hero: 'Gensan', action: 'extra', setup: ai => { ai.superCooldown = 5000; ai.gensanShadowCD = 0; } },
         { hero: 'Noae', action: 'switch', setup: ai => { ai.superCooldown = 5000; } },
-        { hero: 'Archor', action: 'switch', setup: ai => { ai.superCooldown = 5000; ai.archorSpeedCooldown = 0; ai.buffs.slow = 1000; } }
+        { hero: 'Archor', action: 'switch', setup: ai => { ai.superCooldown = 5000; ai.archorSpeedCooldown = 0; ai.buffs.slow = 1000; } },
+        { hero: 'D2F1', action: 'switch', setup: ai => { ai.superCooldown = 5000; ai.d2fDroneCooldown = 0; } }
     ];
 
     for (const testCase of cases) {
@@ -845,13 +867,128 @@ test('Chiq paths last five seconds, control enemies, and heal Itan with Nu doubl
     assert.equal(owner.hp, 106);
 });
 
+test('Hoin has exactly half of his former HP in the hero roster', () => {
+    const context = {
+        window: { innerWidth: 1280, innerHeight: 760, addEventListener() {} },
+        localStorage: { getItem: () => null, setItem() {} },
+        document: { getElementById: () => null }
+    };
+    vm.createContext(context);
+    const source = fs.readFileSync(path.join(__dirname, '..', 'config.js'), 'utf8');
+    vm.runInContext(source, context, { filename: 'config.js' });
+
+    assert.equal(context.window.HEROES.Archor.maxHp, 340);
+    assert.equal(context.window.HEROES.Archor.ui.hp, '34 WRD');
+});
+
+test('D2F-1 fires 0.5 WRD electromagnetic balls and deploys exact drone groups', () => {
+    const simulation = loadPhysicsGame('D2F1');
+    const { ai, context } = simulation;
+    ai.isCPU = false;
+    ai.attackState = 'idle';
+    ai.stateTimer = 0;
+
+    ai.performAttack();
+    assert.equal(ai.stateTimer, 60);
+    ai.update(60);
+    assert.equal(context.game.projectiles.length, 1);
+    assert.equal(context.game.projectiles[0].type, 'em_ball');
+    assert.equal(context.game.projectiles[0].damage, 5);
+
+    ai.attackState = 'idle';
+    ai.stateTimer = 0;
+    context.keysPressed[ai.controls.switch] = true;
+    ai.update(16);
+    delete context.keysPressed[ai.controls.switch];
+    assert.equal(context.game.minions.filter(minion => minion.type === 'd2f_drone' && !minion.dead).length, 3);
+    assert.equal(ai.d2fDroneCooldown, 10000);
+
+    ai.attackState = 'idle';
+    ai.superCooldown = 0;
+    const beforeSuper = context.game.minions.filter(minion => minion.type === 'd2f_drone' && !minion.dead).length;
+    ai.performSuper();
+    const afterSuper = context.game.minions.filter(minion => minion.type === 'd2f_drone' && !minion.dead).length;
+    assert.equal(afterSuper - beforeSuper, 4);
+    assert.equal(context.game.minions.filter(minion => minion.type === 'd2f_target_beacon').length, 1);
+    assert.equal(ai.superCooldown, 20000);
+});
+
+test('D2F-1 drones predict projectile paths, hold range, and cycle burning lasers', () => {
+    const context = loadProjectileContext();
+    const owner = { id: 'd2f', heroName: 'D2F1', x: 160, y: 560, w: 40, h: 66, dead: false };
+    const target = {
+        id: 'target', heroName: 'Hunter', x: 560, y: 500, w: 45, h: 70,
+        hp: 200, dead: false, invincible: 0, buffs: {},
+        takeDamage(amount) { this.hp -= amount; }
+    };
+    context.game.opponents = [target];
+    context.game.getEnemyOf = () => target;
+    const drone = new context.window.D2FDrone(owner, 300, 500, 0);
+    context.game.minions = [drone];
+    context.game.projectiles = [{
+        x: 120, y: drone.y + drone.h/2 - 3, w: 8, h: 6, vx: 20, vy: 0,
+        owner: target, dead: false
+    }];
+
+    drone.update(16);
+    assert.equal(drone.evading, true);
+    assert.ok(Math.abs(drone.vy) > 0, 'drone did not leave the predicted projectile path');
+
+    context.game.projectiles = [];
+    drone.cycleTimer = 0;
+    drone.laserTickTimer = 0;
+    drone.update(250);
+    assert.equal(drone.laserActive, true);
+    assert.equal(target.hp, 198);
+    assert.equal(target.buffs.burn, 900);
+
+    drone.cycleTimer = 1990;
+    drone.update(9);
+    assert.equal(drone.laserActive, true);
+    drone.update(1);
+    assert.equal(drone.laserActive, false, 'laser exceeded its two-second firing window');
+    drone.cycleTimer = 2490;
+    drone.update(10);
+    assert.equal(drone.laserActive, true, 'laser did not restart on its 2.5-second cycle');
+});
+
+test('D2F-1 target beacon slows before a damaging robot landing and melee follow-up', () => {
+    const context = loadProjectileContext();
+    const owner = { id: 'd2f', heroName: 'D2F1', x: 160, y: 560, w: 40, h: 66, dead: false };
+    const target = {
+        id: 'target', heroName: 'Hunter', x: 560, y: 590, w: 45, h: 70,
+        hp: 300, dead: false, invincible: 0, buffs: {},
+        takeDamage(amount) { this.hp -= amount; }
+    };
+    context.game.opponents = [target];
+    context.game.getEnemyOf = () => target;
+    const beacon = new context.window.D2FTargetBeacon(owner, target);
+    context.game.minions = [beacon];
+
+    beacon.update(500);
+    assert.equal(target.buffs.slow, 280);
+    assert.equal(context.game.minions.filter(minion => minion.type === 'd2f_giant_robot').length, 0);
+    beacon.update(500);
+    const robot = context.game.minions.find(minion => minion.type === 'd2f_giant_robot');
+    assert.ok(robot, 'beacon did not create the giant robot after one second');
+
+    for (let frame = 0; frame < 120 && robot.dropping; frame++) robot.update(16);
+    assert.equal(robot.dropping, false);
+    assert.equal(target.hp, 215);
+    assert.equal(target.buffs.dizzy, 750);
+
+    robot.attackCooldown = 0;
+    robot.update(16);
+    assert.equal(target.hp, 187);
+});
+
 test('Hoin activates Bloodhunt after three continuous hits and loses it after 3.5s', () => {
     const simulation = loadPhysicsGame('Archor');
     const { ai, target, context } = simulation;
     ai.isCPU = false;
     ai.attackState = 'idle';
     ai.stateTimer = 0;
-    ai.hp = 400;
+    ai.hp = 300;
 
     ai.performAttack();
     assert.equal(ai.stateTimer, 20, 'Archor did not use the rapid attack windup');
@@ -863,17 +1000,17 @@ test('Hoin activates Bloodhunt after three continuous hits and loses it after 3.
     assert.equal(context.game.projectiles[0].color, '#ffffa8');
 
     ai.onArchorHit(target);
-    assert.equal(ai.hp, 400, 'Bloodhunt healed before the third continuous hit');
+    assert.equal(ai.hp, 300, 'Bloodhunt healed before the third continuous hit');
     assert.equal(ai.archorHitChain, 1);
     ai.update(1501);
     assert.equal(ai.archorHitChain, 0, 'an interrupted hit chain did not reset');
 
     ai.onArchorHit(target);
     ai.onArchorHit(target);
-    assert.equal(ai.hp, 400, 'Bloodhunt activated before the third hit');
+    assert.equal(ai.hp, 300, 'Bloodhunt activated before the third hit');
     ai.onArchorHit(target);
     assert.equal(ai.archorPassiveTimer, 3500);
-    assert.equal(ai.hp, 410, 'active Bloodhunt did not heal 1 WRD');
+    assert.equal(ai.hp, 310, 'active Bloodhunt did not heal 1 WRD');
     assert.equal(ai.archorDamageBonus, 2);
 
     ai.attackState = 'idle';
