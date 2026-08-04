@@ -100,6 +100,7 @@ test('DRAGON flame breath ticks damage and skyfall applies heavy damage and slow
     harness.context.game.minions = [boss];
 
     boss.flameTimer = 5000;
+    boss.updateFlame(0, player);
     boss.updateFlame(250, player);
     assert.ok(player.hp < 1000);
     assert.ok(player.buffs.burn > 0);
@@ -113,6 +114,26 @@ test('DRAGON flame breath ticks damage and skyfall applies heavy damage and slow
     boss.updateDash(680);
     assert.ok(player.hp <= 895);
     assert.ok(player.buffs.slow >= 3200);
+});
+
+test('DRAGON flame breath tracks moving players gradually and demons have reduced HP', () => {
+    const harness = loadBossHarness();
+    const player = makePlayer('p1', 800, 235);
+    harness.players.push(player);
+    const boss = new harness.DragonBoss(300, harness.context.GROUND_Y);
+    boss.updateFlame(0, player);
+    const initialAngle = boss.flameAngle;
+    player.x = 380;
+    player.y = 40;
+
+    boss.updateFlame(250, player);
+
+    const angularChange = Math.abs(Math.atan2(Math.sin(boss.flameAngle - initialAngle), Math.cos(boss.flameAngle - initialAngle)));
+    assert.ok(angularChange > 0);
+    assert.ok(angularChange <= boss.flameTurnRate * 250 + 0.000001);
+    const demon = new harness.BossFireDemon(boss, 500, 150);
+    assert.equal(demon.hp, 20);
+    assert.equal(demon.maxHp, 20);
 });
 
 test('LIBERTUS summons five knights and releases a telegraphed colossal swing', () => {

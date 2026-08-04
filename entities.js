@@ -1613,8 +1613,8 @@ class BossFireDemon extends Entity {
         super(x, y, 46, 38);
         this.owner = owner;
         this.type = 'boss_fire_demon';
-        this.hp = 35;
-        this.maxHp = 35;
+        this.hp = 20;
+        this.maxHp = 20;
         this.life = 22000;
         this.slot = slot;
         this.shootTimer = 500 + slot * 260;
@@ -1683,6 +1683,7 @@ class DragonBoss extends BossBase {
         this.flameTimer = 0;
         this.flameTickTimer = 0;
         this.flameAngle = Math.PI;
+        this.flameTurnRate = 0.00055;
         this.demonTimer = 0;
         this.dashCooldown = 0;
         this.dashPhase = null;
@@ -1764,8 +1765,10 @@ class DragonBoss extends BossBase {
     updateFlame(dt, target) {
         if (target) {
             const desired = Math.atan2(target.y + target.h / 2 - (this.y + this.h * 0.48), target.x + target.w / 2 - (this.x + this.w / 2));
-            this.flameAngle = desired;
-            this.facing = Math.cos(desired) >= 0 ? 1 : -1;
+            const angleDifference = Math.atan2(Math.sin(desired - this.flameAngle), Math.cos(desired - this.flameAngle));
+            const maxTurn = dt <= 0 ? Math.PI : this.flameTurnRate * dt;
+            this.flameAngle += Math.max(-maxTurn, Math.min(maxTurn, angleDifference));
+            this.facing = Math.cos(this.flameAngle) >= 0 ? 1 : -1;
         }
         this.flameTimer = Math.max(0, this.flameTimer - dt);
         this.flameTickTimer += dt;
