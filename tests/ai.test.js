@@ -243,7 +243,7 @@ function loadPhysicsGame(heroName = 'Hunter') {
     class D2FDrone extends Entity {
         constructor(owner, x, y, formationSlot) {
             super(x, y, 34, 24);
-            Object.assign(this, { owner, formationSlot, type: 'd2f_drone', hp: 65, maxHp: 65, life: 18000, buffs: {} });
+            Object.assign(this, { owner, formationSlot, type: 'd2f_drone', hp: 33, maxHp: 33, life: 18000, buffs: {} });
         }
     }
     class D2FTargetBeacon extends Entity {
@@ -1042,9 +1042,11 @@ test('D2F-1 drones predict projectile paths, hold range, and cycle damage-only l
 
     drone.update(16);
     assert.equal(drone.evading, true);
-    assert.equal(drone.moveSpeedMultiplier, 0.6);
+    assert.equal(drone.hp, 33);
+    assert.equal(drone.maxHp, 33);
+    assert.equal(drone.moveSpeedMultiplier, 0.3);
     assert.ok(Math.abs(drone.vy) > 0, 'drone did not leave the predicted projectile path');
-    assert.ok(Math.abs(drone.vy) < 1.4, 'drone evasion remained at its previous high speed');
+    assert.ok(Math.abs(drone.vy) < 0.7, 'drone evasion remained above half of its previous speed');
 
     context.game.projectiles = [];
     drone.cycleTimer = 0;

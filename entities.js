@@ -992,8 +992,8 @@ class D2FDrone extends Entity {
         super(x, y, 34, 24);
         this.owner = owner;
         this.type = 'd2f_drone';
-        this.hp = 65;
-        this.maxHp = 65;
+        this.hp = 33;
+        this.maxHp = 33;
         this.life = 18000;
         this.maxLife = 18000;
         this.formationSlot = formationSlot;
@@ -1004,7 +1004,7 @@ class D2FDrone extends Entity {
         this.laserEndX = x;
         this.laserEndY = y;
         this.evading = false;
-        this.moveSpeedMultiplier = 0.6;
+        this.moveSpeedMultiplier = 0.3;
         this.buffs = { dizzy: 0, slow: 0, burn: 0 };
         this.invincible = 0;
     }
