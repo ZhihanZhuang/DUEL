@@ -423,6 +423,113 @@ test('CPU predicts an incoming projectile and actively jumps away', () => {
     assert.equal(context.keys[ai.controls.right], true);
 });
 
+test('CPUs prioritize D2F-1 drones beyond their normal engagement range', () => {
+    {
+        const context = loadAI();
+        const ai = makeFighter('Hason', 'cpu_hason');
+        const target = makeFighter('D2F1', 'player_d2f');
+        target.x = 450;
+        ai.superCooldown = 5000;
+        const drone = {
+            type: 'd2f_drone', owner: target, x: 1030, y: 480, w: 34, h: 24,
+            vx: 0, vy: 0, hp: 65, maxHp: 65, dead: false, untargetable: false, laserActive: true
+        };
+        const game = makeGame(ai, target);
+        game.aiDifficulty = 'expert';
+        game.minions.push(drone);
+        readyBrain(ai, target);
+
+        context.window.runAI(game, 16);
+
+        assert.equal(ai.aiCombatTarget, drone);
+        assert.equal(context.keysPressed[ai.controls.attack], true, 'ranged CPU refused to fire beyond its old range limit');
+        assert.equal(context.keys[ai.controls.right], true, 'ranged CPU did not close distance on the drone');
+    }
+
+    {
+        const context = loadAI();
+        const ai = makeFighter('Macu', 'cpu_macu');
+        const target = makeFighter('D2F1', 'player_d2f');
+        target.x = 430;
+        ai.superCooldown = 5000;
+        const drone = {
+            type: 'd2f_drone', owner: target, x: 1000, y: 475, w: 34, h: 24,
+            vx: 0, vy: 0, hp: 65, maxHp: 65, dead: false, untargetable: false, laserActive: false
+        };
+        const game = makeGame(ai, target);
+        game.aiDifficulty = 'expert';
+        game.minions.push(drone);
+        readyBrain(ai, target);
+
+        context.window.runAI(game, 16);
+
+        assert.equal(ai.aiCombatTarget, drone);
+        assert.equal(context.keys[ai.controls.right], true, 'melee CPU did not pursue the distant drone');
+        assert.equal(context.keysPressed[ai.controls.attack], undefined, 'melee CPU attacked before reaching the drone');
+    }
+});
+
+test('battle royale CPUs prioritize hostile drones owned by a fighter other than their current target', () => {
+    const context = loadAI();
+    const ai = makeFighter('Hason', 'cpu_hason');
+    const currentTarget = makeFighter('Macu', 'cpu_macu');
+    const d2fOwner = makeFighter('D2F1', 'player_d2f');
+    currentTarget.x = 420;
+    d2fOwner.x = 610;
+    ai.superCooldown = 5000;
+    const drone = {
+        type: 'd2f_drone', owner: d2fOwner, x: 960, y: 430, w: 34, h: 24,
+        vx: 0, vy: 0, hp: 65, maxHp: 65, dead: false, untargetable: false, laserActive: false
+    };
+    const game = makeGame(ai, currentTarget);
+    game.isBattleRoyale = true;
+    game.fighters = [ai, currentTarget, d2fOwner];
+    game.aiFighters = [ai, currentTarget];
+    game.minions.push(drone);
+    game.aiDifficulty = 'expert';
+    readyBrain(ai, currentTarget);
+
+    context.window.runAI(game, 16);
+
+    assert.equal(ai.aiCombatTarget, drone);
+    assert.equal(context.keysPressed[ai.controls.attack], true);
+});
+
+test('CPU attacks and homing projectiles preserve the selected drone target', () => {
+    const simulation = loadPhysicsGame('D2F1');
+    const { ai, context, target } = simulation;
+    const drone = {
+        type: 'd2f_drone', owner: target, x: 1150, y: 300, w: 34, h: 24,
+        vx: 0, vy: 0, hp: 65, maxHp: 65, dead: false, untargetable: false
+    };
+    context.game.minions.push(drone);
+    ai.isCPU = true;
+    ai.aiCombatTarget = drone;
+    ai.executeActiveAttack();
+
+    const electromagneticBall = context.game.projectiles[0];
+    assert.ok(electromagneticBall.vx > 0, 'CPU projectile aimed back toward the nearer fighter');
+    assert.ok(electromagneticBall.vy < 0, 'CPU projectile ignored the elevated drone');
+
+    const projectileContext = loadProjectileContext();
+    const enemyFighter = {
+        id: 'fighter', x: 500, y: 500, w: 40, h: 70, dead: false, invincible: 0,
+        buffs: {}, takeDamage() {}
+    };
+    const homingDrone = {
+        id: 'drone', type: 'd2f_drone', x: 900, y: 260, w: 34, h: 24,
+        dead: false, untargetable: false, invincible: 0, buffs: {}, takeDamage() {}
+    };
+    const owner = { id: 'cpu', heroName: 'Hunter', isCPU: true, aiCombatTarget: homingDrone };
+    projectileContext.game.opponents = [enemyFighter];
+    projectileContext.game.minions = [homingDrone];
+    projectileContext.game.getEnemyOf = () => enemyFighter;
+    const homingShot = new projectileContext.window.Projectile(400, 500, 12, 12, 25, 0, 20, owner, '#fff', 'homing_bullet');
+    homingShot.update(16);
+
+    assert.ok(homingShot.vy < 0, 'homing projectile retargeted the nearer fighter');
+});
+
 test('every hero with a direct super can decide to use it', () => {
     const context = loadAI();
     const directSuperHeroes = [
@@ -913,12 +1020,12 @@ test('D2F-1 fires 0.5 WRD electromagnetic balls and deploys exact drone groups',
     assert.equal(ai.superCooldown, 20000);
 });
 
-test('D2F-1 drones predict projectile paths, hold range, and cycle burning lasers', () => {
+test('D2F-1 drones predict projectile paths, hold range, and cycle damage-only lasers', () => {
     const context = loadProjectileContext();
     const owner = { id: 'd2f', heroName: 'D2F1', x: 160, y: 560, w: 40, h: 66, dead: false };
     const target = {
         id: 'target', heroName: 'Hunter', x: 560, y: 500, w: 45, h: 70,
-        hp: 200, dead: false, invincible: 0, buffs: {},
+        hp: 200, dead: false, invincible: 0, buffs: { burn: 125, slow: 80, dizzy: 40 },
         takeDamage(amount) { this.hp -= amount; }
     };
     context.game.opponents = [target];
@@ -940,7 +1047,7 @@ test('D2F-1 drones predict projectile paths, hold range, and cycle burning laser
     drone.update(250);
     assert.equal(drone.laserActive, true);
     assert.equal(target.hp, 198);
-    assert.equal(target.buffs.burn, 900);
+    assert.deepEqual(target.buffs, { burn: 125, slow: 80, dizzy: 40 });
 
     drone.cycleTimer = 1990;
     drone.update(9);

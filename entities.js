@@ -536,12 +536,17 @@ class Projectile extends Entity {
                 }
             }
         } else if (this.type === "homing_bullet" || this.type === "magic_burst" || this.type === "volt_laser" || this.type === "tracking_bird") {
-            let target = game.getEnemyOf(this.owner);
+            const prioritizedTarget = this.owner?.isCPU && this.owner.aiCombatTarget && !this.owner.aiCombatTarget.dead && !this.owner.aiCombatTarget.untargetable
+                ? this.owner.aiCombatTarget
+                : null;
+            let target = prioritizedTarget || game.getEnemyOf(this.owner);
             let minDist = target ? Math.hypot(target.x - this.x, target.y - this.y) : 9999;
-            for (let m of game.minions) {
-                if (m && m.owner !== this.owner && !m.dead && !m.untargetable) {
-                    let d = Math.hypot(m.x - this.x, m.y - this.y);
-                    if (d < minDist) { minDist = d; target = m; }
+            if (!prioritizedTarget) {
+                for (let m of game.minions) {
+                    if (m && m.owner !== this.owner && !m.dead && !m.untargetable) {
+                        let d = Math.hypot(m.x - this.x, m.y - this.y);
+                        if (d < minDist) { minDist = d; target = m; }
+                    }
                 }
             }
             if (target && !target.dead && !(target.invincible > 0)) {
@@ -1134,10 +1139,6 @@ class D2FDrone extends Entity {
             for (const enemy of this.getTargets()) {
                 if (!this.beamTouches(enemy, startX, startY, this.laserEndX, this.laserEndY)) continue;
                 for (let tick = 0; tick < ticks && !enemy.dead; tick++) enemy.takeDamage(2, this.owner, true, true);
-                if (ticks > 0) {
-                    enemy.buffs = enemy.buffs || {};
-                    enemy.buffs.burn = Math.max(enemy.buffs.burn || 0, 900);
-                }
             }
         } else {
             this.laserTickTimer = 0;

@@ -224,6 +224,14 @@ function getControlledEntity(game, ai) {
 }
 
 function getTargetEntity(game, ai, target, source) {
+    const drones = game.minions.filter(minion => minion.type === 'd2f_drone' && minion.owner !== ai && !minion.dead && !minion.untargetable);
+    if (drones.length) {
+        return drones.reduce((best, drone) => {
+            const score = distanceBetween(source, drone) - (drone.laserActive ? 240 : 0) + (drone.hp / Math.max(1, drone.maxHp)) * 35;
+            const bestScore = distanceBetween(source, best) - (best.laserActive ? 240 : 0) + (best.hp / Math.max(1, best.maxHp)) * 35;
+            return score < bestScore ? drone : best;
+        });
+    }
     const decoy = game.minions.find(minion => minion.type === 'kuro_decoy' && minion.owner === target && !minion.dead);
     if (decoy && (target.kuroCloaked || distanceBetween(source, decoy) < distanceBetween(source, target) * 0.9)) return decoy;
     const puppet = game.minions.find(minion => minion.type === 'puppet' && minion.owner === target && !minion.dead);
@@ -929,6 +937,14 @@ function decideMovement(game, ai, source, target, targetEntity, brain, profile, 
         brain.jumpHoldTimer = Math.max(brain.jumpHoldTimer || 0, 300);
         brain.intent.holdJump = true;
     }
+
+    const pursuingDrone = targetEntity.type === 'd2f_drone';
+    const droneAbove = centerY(targetEntity) < centerY(source) - 45;
+    if (pursuingDrone && droneAbove && source.isGrounded && dist < (profile.ranged ? profile.range : 280)) {
+        press(ai, 'jump');
+        brain.jumpHoldTimer = Math.max(brain.jumpHoldTimer || 0, 320);
+        brain.intent.holdJump = true;
+    }
 }
 
 function runFighterAI(game, ai, dt, diff) {
@@ -997,6 +1013,7 @@ function runFighterAI(game, ai, dt, diff) {
     brain.decisionTimer = diff.reactionMs * (0.75 + Math.random() * 0.5);
 
     const targetEntity = getTargetEntity(game, ai, target, source);
+    ai.aiCombatTarget = targetEntity;
     const profile = getCombatProfile(ai, source);
     const threat = findImmediateThreat(game, ai, source, targetEntity);
     const combatState = selectCombatState(game, ai, source, target, targetEntity, brain, profile, threat);
@@ -1014,7 +1031,10 @@ function runFighterAI(game, ai, dt, diff) {
     if (Math.abs(dx) > 10) ai.facing = dx > 0 ? 1 : -1;
     if ((brain.actionLock > 0 && !threat) || Math.random() < diff.mistakeChance) return;
 
-    const heroAction = chooseHeroAction(game, ai, target, targetEntity, dist, dy, brain, threat, combatState);
+    const targetingDrone = targetEntity.type === 'd2f_drone';
+    const heroAction = targetingDrone
+        ? chooseDefensiveAction(game, ai, target, threat)
+        : chooseHeroAction(game, ai, target, targetEntity, dist, dy, brain, threat, combatState);
     if (heroAction && Math.random() < diff.skillChance) {
         if (ai.heroName === 'Willi' && heroAction === 'super' && (threat || combatState === 'retreat' || combatState === 'evade')) {
             ai.facing = brain.evadeDirection || (dx > 0 ? -1 : 1);
@@ -1033,7 +1053,9 @@ function runFighterAI(game, ai, dt, diff) {
         return;
     }
 
-    const canAttack = dist <= profile.range && Math.abs(dy) < (profile.ranged ? 115 : 72);
+    const engagementRange = targetingDrone && profile.ranged ? Math.max(profile.range, 780) : profile.range;
+    const verticalTolerance = targetingDrone && profile.ranged ? 220 : (profile.ranged ? 115 : 72);
+    const canAttack = dist <= engagementRange && Math.abs(dy) < verticalTolerance;
     const dukeCanAttack = ai.heroName !== 'Duke' || !ai.isMounted || ai.runTimer >= 3000;
     let attackCommitment = 0.78;
     if (combatState === 'burst') attackCommitment = 1;

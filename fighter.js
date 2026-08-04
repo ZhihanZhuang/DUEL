@@ -1332,9 +1332,12 @@ class Fighter extends Entity {
     }
 
     executeActiveAttack() {
-        let target = game.getEnemyOf(this);
+        const combatTarget = this.isCPU && this.aiCombatTarget && !this.aiCombatTarget.dead && !this.aiCombatTarget.untargetable
+            ? this.aiCombatTarget
+            : null;
+        let target = combatTarget || game.getEnemyOf(this);
 
-        if (this.heroName === 'Hason' || this.heroName === 'Willi' || this.heroName === 'Euclid' || this.heroName === 'Ugo' || this.heroName === 'Kila' || this.heroName === 'Volt' || this.heroName === 'Noae' || this.heroName === 'Nyra' || this.heroName === 'Archor' || this.heroName === 'D2F1') {
+        if (!combatTarget && (this.heroName === 'Hason' || this.heroName === 'Willi' || this.heroName === 'Euclid' || this.heroName === 'Ugo' || this.heroName === 'Kila' || this.heroName === 'Volt' || this.heroName === 'Noae' || this.heroName === 'Nyra' || this.heroName === 'Archor' || this.heroName === 'D2F1')) {
             let minDist = target ? Math.hypot(target.x - this.x, target.y - this.y) : 9999;
             for (let m of game.minions) {
                 if (m && m.owner !== this && !m.dead) {
@@ -1527,7 +1530,10 @@ class Fighter extends Entity {
         const nuMode = this.buffs.nuMode > 0;
         const chiqColor = nuMode ? '#ff3030' : '#4db8ff';
         const bladeDamage = nuMode ? 100 : 50;
-        const target = game.getEnemyOf(this);
+        const combatTarget = this.isCPU && this.aiCombatTarget && !this.aiCombatTarget.dead && !this.aiCombatTarget.untargetable
+            ? this.aiCombatTarget
+            : null;
+        const target = combatTarget || game.getEnemyOf(this);
         const px = this.facing === 1 ? this.x + this.w : this.x - 42;
         const py = this.y + 24;
         const tx = target && !target.dead ? target.x + target.w/2 : px + this.facing * 600;
