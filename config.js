@@ -282,6 +282,11 @@ var HEROES = {
         name: "Wolf King", desc: "High Mobility Assassin",
         color: "#696969", maxHp: 700, speed: 7.5, jump: 16, width: 40, height: 70, superCD: 20000,
         ui: { hp: "70 WRD", atk: "2.0 WRD (Fast Claw)", passive: "Out of combat 1.5s: Next attack grants +30% SPD (2s) and deals +1.0 WRD. <br><span class='skill-tag'>Hunting Mark</span> 5 consecutive hits inflict 4s Bleed (0.5 WRD/s).", super: "<span class='skill-tag'>King's Pounce</span> 0.35s windup. Instantly leaps in front of the enemy for 15.0 WRD + 2.5s 40% Slow." }
+    },
+    Kuro: {
+        name: "Kuro", desc: "Invisible Phantom Marksman",
+        color: "#244d3b", maxHp: 600, speed: 5.2, jump: 14, width: 38, height: 70, superCD: 26000,
+        ui: { hp: "60 WRD", atk: "2 / 5 / 8 WRD (Charged Rifle)", passive: "<span class='skill-tag'>Optical Veil</span> Cloaks after 1.25s without attacking or taking damage. Hold Attack to charge Longshot; full charge pierces minions and slows. Moving leaves visible distortion. Press [Switch] to leave a 1 HP decoy and recloak (8s CD).", super: "<span class='skill-tag'>Phantom Round</span> Loads one 13 WRD execution shot for 7s. It pierces every target; the first fighter hit is dizzied for 1s. Charging exposes a bright scope glint." }
     }
 };
 

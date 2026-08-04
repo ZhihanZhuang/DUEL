@@ -86,6 +86,51 @@ class SwordShadow extends Entity {
     }
 }
 
+class KuroDecoy extends Entity {
+    constructor(owner, x, y) {
+        super(x, y, owner.w, owner.h);
+        this.owner = owner;
+        this.type = "kuro_decoy";
+        this.hp = 1;
+        this.maxHp = 1;
+        this.life = 6000;
+        this.maxLife = this.life;
+        this.facing = owner.facing;
+        this.isGrounded = true;
+        this.attackState = 'idle';
+        this.buffs = {};
+    }
+    takeDamage() {
+        if (this.dead) return;
+        this.hp = 0;
+        this.dead = true;
+        for (let i = 0; i < 14; i++) {
+            game.particles.push(new Particle(this.x + this.w/2, this.y + this.h/2, "#9ad8c0", (Math.random()-0.5)*10, (Math.random()-0.5)*10, 350, 3));
+        }
+    }
+    update(dt) {
+        this.life -= dt;
+        if (this.life <= 0) this.dead = true;
+    }
+    draw(ctx) {
+        ctx.save();
+        ctx.globalAlpha = Math.max(0.18, this.life / this.maxLife * 0.72);
+        ctx.translate(this.x + this.w/2, this.y);
+        if (this.facing === -1) ctx.scale(-1, 1);
+        ctx.fillStyle = "#18352b";
+        ctx.fillRect(-this.w/2, 0, this.w, this.h);
+        ctx.fillStyle = "#d8e8df";
+        ctx.fillRect(-this.w/2 + 6, 9, this.w - 12, 11);
+        ctx.fillStyle = "#17221d";
+        ctx.fillRect(-this.w/2, 25, this.w, 8);
+        ctx.fillStyle = "#26342d";
+        ctx.fillRect(this.w/2 - 4, 25, 62, 5);
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(this.w/2 + 35, 22, 4, 4);
+        ctx.restore();
+    }
+}
+
 class GiantSword extends Entity {
     constructor(owner, x, y) {
         super(x, y, 60, 150);
@@ -346,6 +391,7 @@ class Projectile extends Entity {
         this.vx = vx; this.vy = vy; this.damage = damage; this.owner = owner;
         this.color = color; this.type = type; this.timer = 0;
         this.hitTargets = new Set();
+        this.phantomDizzyApplied = false;
     }
     update(dt) {
         this.x += this.vx; this.y += this.vy;
@@ -438,6 +484,11 @@ class Projectile extends Entity {
                                 t.buffs.dizzy = 1000;
                                 t.vx += (this.vx > 0 ? 1 : -1) * 15;
                             }
+                            if (this.type === "sniper_round_full") t.buffs.slow = Math.max(t.buffs.slow || 0, 2000);
+                            if (this.type === "phantom_round" && t.heroName && !this.phantomDizzyApplied) {
+                                t.buffs.dizzy = Math.max(t.buffs.dizzy || 0, 1000);
+                                this.phantomDizzyApplied = true;
+                            }
                         }
 
                         if (this.type === "bullet" && this.owner.heroName === 'Duke') {
@@ -452,7 +503,9 @@ class Projectile extends Entity {
                     }
 
                     this.hitTargets.add(t);
-                    if (this.type !== "blue_paper_plane" && this.type !== "tidal_wave") {
+                    const piercesMinion = this.type === "sniper_round_full" && !t.heroName;
+                    const piercesEverything = this.type === "phantom_round";
+                    if (this.type !== "blue_paper_plane" && this.type !== "tidal_wave" && !piercesMinion && !piercesEverything) {
                         this.dead = true;
                         break;
                     }
@@ -548,6 +601,15 @@ class Projectile extends Entity {
         } else if (this.type === "bullet" || this.type === "homing_bullet") {
             ctx.fillStyle = this.type === "homing_bullet" ? "#ff5500" : "#fff";
             ctx.fillRect(this.x, this.y, this.w, this.h);
+        } else if (this.type === "sniper_round" || this.type === "sniper_round_full" || this.type === "phantom_round") {
+            ctx.save();
+            ctx.translate(this.x + this.w/2, this.y + this.h/2);
+            ctx.rotate(Math.atan2(this.vy, this.vx));
+            ctx.fillStyle = this.type === "phantom_round" ? "#ffffff" : (this.type === "sniper_round_full" ? "#9ad8c0" : "#d8e8df");
+            ctx.shadowBlur = this.type === "phantom_round" ? 18 : 8;
+            ctx.shadowColor = ctx.fillStyle;
+            ctx.fillRect(-this.w * 1.8, -1.5, this.w * 2.3, 3);
+            ctx.restore();
         } else {
             ctx.fillRect(this.x, this.y, this.w, this.h);
         }

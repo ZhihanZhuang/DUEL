@@ -72,10 +72,32 @@ class Fighter extends Entity {
             this.wolfComboCount = 0;
             this.wolfPassiveReady = false;
         }
+
+        if (this.heroName === 'Kuro') {
+            this.kuroCloakTimer = 0;
+            this.kuroRevealTimer = 0;
+            this.kuroCloaked = false;
+            this.kuroCharge = 0;
+            this.kuroChargeMax = 1200;
+            this.kuroDecoyCooldown = 0;
+            this.kuroEmpoweredShot = false;
+            this.kuroEmpoweredTimer = 0;
+            this.kuroScopeGlintTimer = 0;
+            this.kuroRelocateTimer = 0;
+        }
     }
 
     takeDamage(amt, attacker, isDoT = false, noKnockback = false) {
         if (this.dead || this.invincible > 0) return;
+
+        if (this.heroName === 'Kuro') {
+            this.revealKuro(2000);
+            if (this.attackState === 'charging') {
+                this.attackState = 'idle';
+                this.kuroCharge = 0;
+                this.stateTimer = 0;
+            }
+        }
 
         if (attacker && attacker !== this && attacker.heroName) {
             this.lastAttacker = attacker;
@@ -164,6 +186,44 @@ class Fighter extends Entity {
         }
     }
 
+    revealKuro(duration = 1500) {
+        if (this.heroName !== 'Kuro') return;
+        this.kuroCloaked = false;
+        this.kuroCloakTimer = 0;
+        this.kuroRevealTimer = Math.max(this.kuroRevealTimer || 0, duration);
+    }
+
+    fireKuroLongshot() {
+        if (this.heroName !== 'Kuro' || this.attackState !== 'charging') return;
+
+        const chargeRatio = Math.max(0, Math.min(1, this.kuroCharge / this.kuroChargeMax));
+        const empowered = this.kuroEmpoweredShot && this.kuroEmpoweredTimer > 0;
+        const damage = empowered ? 130 : (chargeRatio >= 0.85 ? 80 : (chargeRatio >= 0.4 ? 50 : 20));
+        const type = empowered ? 'phantom_round' : (chargeRatio >= 0.85 ? 'sniper_round_full' : 'sniper_round');
+        const target = game.getEnemyOf(this);
+        const px = this.facing === 1 ? this.x + this.w : this.x - 22;
+        const py = this.y + 24;
+        const tx = target ? target.x + target.w/2 : px + this.facing * 700;
+        const ty = target ? target.y + target.h/2 : py;
+        const aimAngle = Math.atan2(ty - py, tx - px);
+        const speed = empowered ? 48 : 38;
+
+        game.projectiles.push(new Projectile(px, py, 22, 4, Math.cos(aimAngle) * speed, Math.sin(aimAngle) * speed, damage, this, empowered ? '#ffffff' : '#9ad8c0', type));
+        for (let i = 0; i < 9; i++) {
+            game.particles.push(new Particle(px, py, i % 2 ? '#ffffff' : '#9ad8c0', Math.cos(aimAngle) * (3 + Math.random() * 5), Math.sin(aimAngle) * (3 + Math.random() * 5), 180, 3));
+        }
+
+        this.revealKuro(empowered ? 2000 : 1500);
+        this.kuroRelocateTimer = empowered ? 1800 : 1250;
+        this.kuroEmpoweredShot = false;
+        this.kuroEmpoweredTimer = 0;
+        this.kuroScopeGlintTimer = 0;
+        this.kuroCharge = 0;
+        this.attackState = 'recovery';
+        this.stateTimer = empowered ? 500 : 320;
+        this.maxStateTimer = this.stateTimer;
+    }
+
     update(dt) {
         if (this.dead) return;
 
@@ -186,6 +246,23 @@ class Fighter extends Entity {
 
         if (this.waterStunImmunity > 0) this.waterStunImmunity -= dt;
         if (this.kilaSwitchCD > 0) this.kilaSwitchCD -= dt;
+
+        if (this.heroName === 'Kuro') {
+            if (this.kuroDecoyCooldown > 0) this.kuroDecoyCooldown -= dt;
+            if (this.kuroRelocateTimer > 0) this.kuroRelocateTimer -= dt;
+            if (this.kuroScopeGlintTimer > 0) this.kuroScopeGlintTimer -= dt;
+            if (this.kuroEmpoweredTimer > 0) {
+                this.kuroEmpoweredTimer -= dt;
+                if (this.kuroEmpoweredTimer <= 0) this.kuroEmpoweredShot = false;
+            }
+            if (this.kuroRevealTimer > 0) {
+                this.kuroRevealTimer -= dt;
+                this.kuroCloaked = false;
+            } else {
+                this.kuroCloakTimer += dt;
+                if (this.kuroCloakTimer >= 1250) this.kuroCloaked = true;
+            }
+        }
 
         if (this.invincible > 0) this.invincible -= dt;
         if (this.flipCooldown > 0) this.flipCooldown -= dt;
@@ -304,6 +381,8 @@ class Fighter extends Entity {
 
         let currentSpeed = this.baseSpeed;
         let currentJump = this.baseJump;
+
+        if (this.heroName === 'Kuro' && this.attackState === 'charging') currentSpeed *= 0.55;
 
         if (this.buffs.msBoost > 0) currentSpeed *= (this.heroName === 'Wolf' ? 1.3 : 1.2);
 
@@ -557,7 +636,17 @@ class Fighter extends Entity {
         this.vx += (targetVx - this.vx) * friction;
 
         if (canAct && this.flipActive <= 0) {
-            if (this.attackState === 'windup') {
+            if (this.attackState === 'charging') {
+                if (this.heroName !== 'Kuro') {
+                    this.attackState = 'idle';
+                } else {
+                    this.kuroCharge = Math.min(this.kuroChargeMax, this.kuroCharge + dt);
+                    this.stateTimer = this.kuroCharge;
+                    this.maxStateTimer = this.kuroChargeMax;
+                    if (this.kuroEmpoweredShot) this.kuroScopeGlintTimer = Math.max(this.kuroScopeGlintTimer, 100);
+                    if (!keys[this.controls.attack] || this.kuroCharge >= this.kuroChargeMax) this.fireKuroLongshot();
+                }
+            } else if (this.attackState === 'windup') {
                 this.stateTimer -= dt;
                 if (this.stateTimer <= 0) {
                     if (this.ugoSummoning) {
@@ -755,6 +844,18 @@ class Fighter extends Entity {
                         if (oldestMine) oldestMine.dead = true;
                     }
                     game.minions.push(new LandMine(this, this.x + this.w/2 - 10, this.y + this.h - 10));
+                } else if (this.heroName === 'Kuro' && this.attackState === 'idle' && this.kuroDecoyCooldown <= 0) {
+                    game.minions.forEach(minion => {
+                        if (minion.type === 'kuro_decoy' && minion.owner === this) minion.dead = true;
+                    });
+                    game.minions.push(new KuroDecoy(this, this.x, this.y));
+                    this.kuroDecoyCooldown = 8000;
+                    this.kuroRevealTimer = 0;
+                    this.kuroCloakTimer = 1250;
+                    this.kuroCloaked = true;
+                    for (let i = 0; i < 16; i++) {
+                        game.particles.push(new Particle(this.x + this.w/2, this.y + this.h/2, '#9ad8c0', (Math.random()-0.5)*8, (Math.random()-0.5)*8, 350, 3));
+                    }
                 }
             }
             if (keysPressed[this.controls.attack] && this.attackState === 'idle') {
@@ -815,7 +916,7 @@ class Fighter extends Entity {
     }
 
     isMeleeAttack() {
-        if (this.heroName === 'Hason' || this.heroName === 'Willi' || this.heroName === 'Ugo' || this.heroName === 'Kila' || this.heroName === 'Volt' || this.heroName === 'Noae') return false;
+        if (this.heroName === 'Hason' || this.heroName === 'Willi' || this.heroName === 'Ugo' || this.heroName === 'Kila' || this.heroName === 'Volt' || this.heroName === 'Noae' || this.heroName === 'Kuro') return false;
         if (this.heroName === 'Euclid' && this.euclidWeapon === 'magic') return false;
         if (this.heroName === 'Hunter' && this.hunterWeapon === 'musket') return false;
         if (this.heroName === 'Kadaxi' && this.comboCount === 3) return false;
@@ -871,6 +972,14 @@ class Fighter extends Entity {
                 if (this.energy < 25) return;
                 this.energy -= 25;
             }
+        }
+        if (this.heroName === 'Kuro') {
+            this.attackState = 'charging';
+            this.kuroCharge = 0;
+            this.stateTimer = 0;
+            this.maxStateTimer = this.kuroChargeMax;
+            this.hasHit = false;
+            return;
         }
 
         this.attackState = 'windup';
@@ -1016,6 +1125,20 @@ class Fighter extends Entity {
     }
 
     performSuper() {
+        if (this.heroName === 'Kuro') {
+            if (this.superCooldown <= 0) {
+                this.superCooldown = this.superCooldownMax;
+                this.kuroEmpoweredShot = true;
+                this.kuroEmpoweredTimer = 7000;
+                this.kuroScopeGlintTimer = 500;
+                this.revealKuro(500);
+                for (let i = 0; i < 18; i++) {
+                    game.particles.push(new Particle(this.x + this.w/2, this.y + 18, '#ffffff', (Math.random()-0.5)*7, (Math.random()-0.5)*7, 450, 3));
+                }
+            }
+            return;
+        }
+
         if (this.heroName === 'Gensan') {
             if (this.superCooldown <= 0) {
                 this.superCooldown = this.superCooldownMax;
@@ -1225,7 +1348,9 @@ class Fighter extends Entity {
     }
 
     draw(ctx) {
+        ctx.globalAlpha = 1.0;
         if (this.buffs.shade > 0) ctx.globalAlpha = 0.15;
+        if (this.heroName === 'Kuro' && this.kuroCloaked) ctx.globalAlpha = Math.abs(this.vx) > 1.2 ? 0.22 : 0.08;
         if (this.invincible > 0) ctx.globalAlpha = 0.5;
 
         if (this.buffs.dizzy > 0) {
@@ -1370,6 +1495,17 @@ class Fighter extends Entity {
                     ctx.beginPath(); ctx.arc(-hw + 8 + i*8, -10, 3, 0, Math.PI*2); ctx.fill();
                 }
             }
+        } else if (this.heroName === 'Kuro') {
+            ctx.fillStyle = "#10261d";
+            ctx.fillRect(-hw - 2, -2, this.w + 4, h + 4);
+            ctx.fillStyle = this.color;
+            ctx.fillRect(-hw, 0, this.w, h);
+            ctx.fillStyle = "#d8e8df";
+            ctx.fillRect(-hw + 6, 8, this.w - 12, 13);
+            ctx.fillStyle = "#151d19";
+            ctx.fillRect(-hw + 5, 22, this.w - 10, 8);
+            ctx.fillStyle = "#e8fff5";
+            ctx.fillRect(hw - 11, 12, 6, 3);
         } else if (this.heroName === 'Wolf') {
             ctx.fillStyle = "#404040"; ctx.fillRect(-hw - 2, -2, this.w + 4, h + 4);
             ctx.fillStyle = this.color; ctx.fillRect(-hw, 0, this.w, h);
@@ -1418,6 +1554,17 @@ class Fighter extends Entity {
             ctx.fillStyle = "#800000"; ctx.fillRect(-hw, 20, this.w, 8); ctx.beginPath(); ctx.moveTo(-hw + 5, 25); ctx.lineTo(-hw - 20, 15); ctx.lineTo(-hw - 15, 30); ctx.fill();
             ctx.fillStyle = "#fff"; ctx.fillRect(hw - 10, 12, 6, 4);
         }
+        else if (this.heroName === 'Kuro') {
+            ctx.fillStyle = "#17382b";
+            ctx.beginPath();
+            ctx.moveTo(-hw - 5, 10); ctx.lineTo(0, -16); ctx.lineTo(hw + 5, 10); ctx.lineTo(hw + 2, 28); ctx.lineTo(-hw - 2, 28); ctx.fill();
+            ctx.fillStyle = "#d8e8df";
+            ctx.fillRect(-hw + 6, 8, this.w - 12, 13);
+            ctx.fillStyle = "#e8fff5";
+            ctx.fillRect(hw - 11, 12, 6, 3);
+            ctx.fillStyle = "#0c1712";
+            ctx.fillRect(-hw - 7, 35, this.w + 14, 8);
+        }
         else if (this.heroName === 'Kadaxi') {
             ctx.fillStyle = "#fff"; ctx.fillRect(-hw, 15, this.w, 20);
             ctx.fillStyle = "#000"; ctx.fillRect(-hw, 30, this.w, 8);
@@ -1433,6 +1580,32 @@ class Fighter extends Entity {
             ctx.save(); ctx.translate(hw, 25);
             let recoil = this.attackState === 'active' ? -0.5 * Math.sin(phaseProg * Math.PI) : 0;
             ctx.rotate(recoil); ctx.fillStyle = "#aaa"; ctx.fillRect(0, 0, 22, 6); ctx.fillRect(0, 0, 6, 14); ctx.restore();
+        }
+        else if (this.heroName === 'Kuro') {
+            ctx.save();
+            ctx.translate(hw - 14, 25);
+            const chargeRatio = Math.max(0, Math.min(1, this.kuroCharge / this.kuroChargeMax));
+            const recoil = this.attackState === 'recovery' ? -0.12 * Math.sin(phaseProg * Math.PI) : 0;
+            ctx.rotate(recoil);
+            ctx.fillStyle = "#34261c"; ctx.fillRect(-16, 2, 30, 7);
+            ctx.fillStyle = "#202823"; ctx.fillRect(5, -1, 62, 5);
+            ctx.fillStyle = "#0c100e"; ctx.fillRect(16, -7, 18, 7);
+            ctx.fillStyle = "#355747"; ctx.fillRect(67, 0, 8, 3);
+            if (this.attackState === 'charging') {
+                ctx.fillStyle = "rgba(154, 216, 192, 0.35)";
+                ctx.fillRect(12, -13, 56 * chargeRatio, 3);
+            }
+            if (this.kuroScopeGlintTimer > 0) {
+                const previousAlpha = ctx.globalAlpha;
+                ctx.globalAlpha = 1;
+                ctx.fillStyle = "#ffffff";
+                ctx.shadowBlur = 16;
+                ctx.shadowColor = "#ffffff";
+                ctx.fillRect(27, -8, 5, 5);
+                ctx.shadowBlur = 0;
+                ctx.globalAlpha = previousAlpha;
+            }
+            ctx.restore();
         }
         else if (this.heroName === 'Volt') {
             ctx.save(); ctx.translate(hw, 25);
@@ -1626,5 +1799,6 @@ class Fighter extends Entity {
 
         ctx.fillStyle = "red"; ctx.fillRect(this.x, this.y - 12, this.w, 5);
         ctx.fillStyle = "#4caf50"; ctx.fillRect(this.x, this.y - 12, this.w * (this.hp / this.maxHp), 5);
+        ctx.globalAlpha = 1.0;
     }
 }

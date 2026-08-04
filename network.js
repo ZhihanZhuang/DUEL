@@ -43,6 +43,7 @@ function collectLocalOnlineInputs() {
         right: !!window.keys[binds.right],
         jump: !!window.keys[binds.jump],
         down: !!window.keys[binds.down],
+        attack: !!window.keys[binds.attack],
         pJump: !!window.keysPressed[binds.jump],
         pAttack: !!window.keysPressed[binds.attack],
         pSuper: !!window.keysPressed[binds.super],
@@ -58,6 +59,7 @@ window.applyRemoteOnlineInputs = function(inputs) {
     window.keys[binds.right] = !!inputs.right;
     window.keys[binds.jump] = !!inputs.jump;
     window.keys[binds.down] = !!inputs.down;
+    window.keys[binds.attack] = !!inputs.attack;
     if (inputs.pJump) window.keysPressed[binds.jump] = true;
     if (inputs.pAttack) window.keysPressed[binds.attack] = true;
     if (inputs.pSuper) window.keysPressed[binds.super] = true;
@@ -69,6 +71,7 @@ if (window.Game && !window.Game.prototype.socketSyncPatched) {
     const entityClasses = {
         Particle,
         SwordShadow,
+        KuroDecoy,
         GiantSword,
         LandMine,
         Minecart,

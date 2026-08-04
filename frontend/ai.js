@@ -48,7 +48,8 @@ const HERO_TACTICS = {
     Volt:    { role: 'aerial', aggression: 0.68, caution: 1.05, burst: 1.20, kite: 1.30, setup: 0.20, highGround: 1.45, retreatHp: 0.36, retreatFireChance: 0.22 },
     Gensan:  { role: 'trickster', aggression: 1.02, caution: 0.72, burst: 1.28, kite: 0.25, setup: 1.00, highGround: 0.50, retreatHp: 0.28, retreatFireChance: 0.18 },
     Noae:    { role: 'trapper', aggression: 0.52, caution: 0.92, burst: 0.78, kite: 1.05, setup: 1.60, highGround: 1.05, retreatHp: 0.36, retreatFireChance: 0.30 },
-    Wolf:    { role: 'hunter', aggression: 1.30, caution: 0.35, burst: 1.38, kite: 0.08, setup: 0.08, highGround: 0.45, retreatHp: 0.18, retreatFireChance: 0.10 }
+    Wolf:    { role: 'hunter', aggression: 1.30, caution: 0.35, burst: 1.38, kite: 0.08, setup: 0.08, highGround: 0.45, retreatHp: 0.18, retreatFireChance: 0.10 },
+    Kuro:    { role: 'sniper', aggression: 0.48, caution: 1.42, burst: 1.70, kite: 1.55, setup: 1.25, highGround: 1.65, retreatHp: 0.44, retreatFireChance: 0.18 }
 };
 
 function getHeroTactic(ai) {
@@ -125,10 +126,11 @@ function makeBrain(ai) {
         tacticScores: {},
         targetWasVulnerable: false,
         voltRecovering: false,
+        kuroChargeTimer: 0,
         stuckTimer: 0,
         lastX: ai.x,
         lastY: ai.y,
-        intent: { left: false, right: false, down: false, holdJump: false },
+        intent: { left: false, right: false, down: false, holdJump: false, holdAttack: false },
         profile: new AdaptiveAIProfile()
     };
     return ai.aiBrain;
@@ -147,6 +149,7 @@ function applyHeldInput(ai, brain) {
     keys[ai.controls.right] = !!brain.intent.right;
     keys[ai.controls.down] = !!brain.intent.down;
     keys[ai.controls.jump] = !!brain.intent.holdJump;
+    keys[ai.controls.attack] = !!brain.intent.holdAttack;
 }
 
 function press(ai, action) {
@@ -168,7 +171,22 @@ function pickTarget(game, ai, brain, dt) {
         return ai.aiTarget;
     }
 
-    if (ai.aiTarget && !ai.aiTarget.dead && brain.targetTimer > 0) return ai.aiTarget;
+    const canPerceive = candidate => {
+        if (!candidate?.kuroCloaked) return true;
+        const hasDecoy = game.minions?.some(minion => minion.type === 'kuro_decoy' && minion.owner === candidate && !minion.dead);
+        if (hasDecoy) return true;
+        const distance = distanceBetween(ai, candidate);
+        return distance < 125 || (Math.abs(candidate.vx || 0) > 2.2 && distance < 340);
+    };
+
+    if (ai.aiTarget && !ai.aiTarget.dead && brain.targetTimer > 0 && canPerceive(ai.aiTarget)) return ai.aiTarget;
+
+    const perceivedOpponents = opponents.filter(canPerceive);
+    if (!perceivedOpponents.length) {
+        ai.aiTarget = null;
+        brain.targetTimer = 220;
+        return null;
+    }
 
     const targetLoad = new Map();
     for (const otherAI of game.aiFighters || []) {
@@ -177,7 +195,7 @@ function pickTarget(game, ai, brain, dt) {
         }
     }
 
-    ai.aiTarget = opponents.reduce((best, candidate) => {
+    ai.aiTarget = perceivedOpponents.reduce((best, candidate) => {
         const candidateScore = distanceBetween(ai, candidate)
             + (candidate.hp / candidate.maxHp) * 55
             + (targetLoad.get(candidate) || 0) * 125
@@ -195,6 +213,8 @@ function getControlledEntity(game, ai) {
 }
 
 function getTargetEntity(game, ai, target, source) {
+    const decoy = game.minions.find(minion => minion.type === 'kuro_decoy' && minion.owner === target && !minion.dead);
+    if (decoy && (target.kuroCloaked || distanceBetween(source, decoy) < distanceBetween(source, target) * 0.9)) return decoy;
     const puppet = game.minions.find(minion => minion.type === 'puppet' && minion.owner === target && !minion.dead);
     if (puppet && distanceBetween(source, puppet) < distanceBetween(source, target) * 0.8) return puppet;
     return target;
@@ -394,6 +414,7 @@ function getCombatProfile(ai, source = ai) {
         case 'Gensan': range = 62; preferred = 42; break;
         case 'Noae': range = 330; preferred = 220; break;
         case 'Wolf': range = 62; preferred = 38; break;
+        case 'Kuro': range = 920; preferred = 610; break;
     }
     return { range, preferred, ranged: !ai.isMeleeAttack(), tactics };
 }
@@ -415,6 +436,7 @@ function hasSetupOpportunity(game, ai) {
         case 'Gensan': return (ai.gensanShadows?.length || 0) < 2 && ai.gensanShadowCD <= 0;
         case 'Noae': return owned('landmine') < 2;
         case 'Kila': return ai.kilaSwitchCD <= 0 && ai.kilaSwitchTimer <= 0;
+        case 'Kuro': return ai.kuroDecoyCooldown <= 0 && owned('kuro_decoy') === 0;
         default: return false;
     }
 }
@@ -459,6 +481,11 @@ function selectCombatState(game, ai, source, target, targetEntity, brain, profil
     if (tactics.role === 'trapper' && setupReady) scores.setup += 2.2;
     if (tactics.role === 'puppeteer' && source !== ai) scores.kite += 1.6;
     if (tactics.role === 'aerial' && !brain.voltRecovering) scores.kite += 1.2;
+    if (tactics.role === 'sniper') {
+        if (ai.kuroCloaked) scores.highground += 2.2;
+        if (ai.kuroRelocateTimer > 0) scores.retreat += 10;
+        if (vulnerable) scores.burst += 3.5;
+    }
 
     let selected = Object.entries(scores).reduce((best, entry) => entry[1] > best[1] ? entry : best, ['neutral', -Infinity]);
     const currentScore = scores[brain.combatState] || 0;
@@ -571,6 +598,9 @@ function chooseDefensiveAction(game, ai, target, threat) {
         case 'Gensan':
             if (ai.gensanShadows?.length && ai.gensanSwitchCD <= 0) return 'switch';
             break;
+        case 'Kuro':
+            if (ai.kuroDecoyCooldown <= 0) return 'switch';
+            break;
     }
     return null;
 }
@@ -674,6 +704,12 @@ function chooseHeroAction(game, ai, target, targetEntity, dist, verticalDistance
         case 'Wolf':
             if (superReady && dist > 70 && dist < 650) return 'super';
             break;
+        case 'Kuro': {
+            const decoy = minions.find(minion => minion.type === 'kuro_decoy' && minion.owner === ai && !minion.dead);
+            if (superReady && aligned && dist < 920 && (isVulnerableTarget(target) || target.hp < target.maxHp * 0.42)) return 'super';
+            if (!decoy && ai.kuroDecoyCooldown <= 0 && (combatState === 'setup' || combatState === 'retreat' || combatState === 'evade' || dist < 210)) return 'switch';
+            break;
+        }
     }
     return null;
 }
@@ -845,6 +881,8 @@ function runFighterAI(game, ai, dt, diff) {
     brain.evadeTimer = Math.max(0, (brain.evadeTimer || 0) - dt);
     brain.strafeTimer = Math.max(0, (brain.strafeTimer || 0) - dt);
     brain.combatStateTimer = Math.max(0, (brain.combatStateTimer || 0) - dt);
+    brain.kuroChargeTimer = Math.max(0, (brain.kuroChargeTimer || 0) - dt);
+    brain.intent.holdAttack = ai.heroName === 'Kuro' && brain.kuroChargeTimer > 0;
     if (ai.heroName !== 'Volt') brain.intent.holdJump = brain.jumpHoldTimer > 0;
     brain.actionLock = Math.max(0, brain.actionLock - dt);
     if (brain.navGoal && brain.navTimer <= 0) {
@@ -921,6 +959,14 @@ function runFighterAI(game, ai, dt, diff) {
     else if (combatState === 'pressure') attackCommitment = profile.ranged ? 0.88 : 1;
 
     if (canAttack && dukeCanAttack && ai.attackState === 'idle' && Math.random() < attackCommitment) {
+        if (ai.heroName === 'Kuro') {
+            const desiredCharge = ai.kuroEmpoweredShot || combatState === 'burst'
+                ? 1250
+                : ((combatState === 'retreat' || combatState === 'evade') ? 480 : 920);
+            brain.kuroChargeTimer = desiredCharge;
+            brain.intent.holdAttack = true;
+            keys[ai.controls.attack] = true;
+        }
         press(ai, 'attack');
         if (combatState === 'burst') brain.actionLock = 20;
         else if (combatState === 'retreat' || combatState === 'evade') brain.actionLock = profile.ranged ? 360 : 220;

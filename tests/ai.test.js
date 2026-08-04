@@ -30,6 +30,34 @@ function loadAI() {
     return context;
 }
 
+function loadProjectileContext() {
+    const context = {
+        window: {},
+        Math,
+        CANVAS_W: 1280,
+        CANVAS_H: 760,
+        GROUND_Y: 660,
+        GRAVITY: 0.6,
+        checkAABB(first, second) {
+            return first.x < second.x + second.w && first.x + first.w > second.x
+                && first.y < second.y + second.h && first.y + first.h > second.y;
+        }
+    };
+    context.game = {
+        hurricane: null,
+        minions: [],
+        particles: [],
+        opponents: [],
+        getEnemyOf: () => null,
+        getOpponentsOf() { return this.opponents; },
+        createExplosion() {}
+    };
+    vm.createContext(context);
+    const source = fs.readFileSync(path.join(__dirname, '..', 'entities.js'), 'utf8');
+    vm.runInContext(`${source}\nwindow.Projectile = Projectile;`, context, { filename: 'entities.js' });
+    return context;
+}
+
 function makeControls(prefix) {
     return {
         left: `${prefix}_LEFT`, right: `${prefix}_RIGHT`, jump: `${prefix}_JUMP`, down: `${prefix}_DOWN`,
@@ -75,8 +103,12 @@ function makeFighter(heroName, id = 'cpu') {
         gensanShadows: [],
         gensanShadowCD: 1000,
         gensanSwitchCD: 0,
+        kuroCloaked: false,
+        kuroDecoyCooldown: 1000,
+        kuroEmpoweredShot: false,
+        kuroRelocateTimer: 0,
         isMeleeAttack() {
-            return !['Hason', 'Willi', 'Ugo', 'Kila', 'Volt', 'Noae'].includes(this.heroName)
+            return !['Hason', 'Willi', 'Ugo', 'Kila', 'Volt', 'Noae', 'Kuro'].includes(this.heroName)
                 && !(this.heroName === 'Hunter' && this.hunterWeapon === 'musket')
                 && !(this.heroName === 'Euclid' && this.euclidWeapon === 'magic');
         }
@@ -110,10 +142,11 @@ function readyBrain(ai, target) {
         tacticScores: {},
         targetWasVulnerable: false,
         voltRecovering: false,
+        kuroChargeTimer: 0,
         stuckTimer: 0,
         lastX: ai.x,
         lastY: ai.y,
-        intent: { left: false, right: false, down: false, holdJump: false },
+        intent: { left: false, right: false, down: false, holdJump: false, holdAttack: false },
         profile: { observePlayer() {} }
     };
 }
@@ -145,6 +178,23 @@ function loadPhysicsGame(heroName = 'Hunter') {
         }
     }
     class Particle extends Entity {}
+    class Projectile extends Entity {
+        constructor(x, y, w, h, vx, vy, damage, owner, color, type) {
+            super(x, y, w, h);
+            Object.assign(this, { vx, vy, damage, owner, color, type });
+        }
+    }
+    class KuroDecoy extends Entity {
+        constructor(owner, x, y) {
+            super(x, y, owner.w, owner.h);
+            this.owner = owner;
+            this.type = 'kuro_decoy';
+            this.hp = 1;
+            this.maxHp = 1;
+            this.buffs = {};
+        }
+        update() {}
+    }
 
     const platforms = [
         { x: 300, y: 480, w: 400, h: 20, type: 'center' },
@@ -155,6 +205,8 @@ function loadPhysicsGame(heroName = 'Hunter') {
         Math: deterministicMath,
         Entity,
         Particle,
+        Projectile,
+        KuroDecoy,
         Minion,
         CANVAS_W: 1280,
         CANVAS_H: 760,
@@ -164,7 +216,8 @@ function loadPhysicsGame(heroName = 'Hunter') {
         HEROES: {
             Hunter: { maxHp: 750, speed: 4.5, jump: 14, width: 45, height: 70, color: '#008080', superCD: 20000 },
             Willi: { maxHp: 500, speed: 6.5, jump: 16, width: 35, height: 65, color: '#2F4F4F', superCD: 12000 },
-            Volt: { maxHp: 650, speed: 4, jump: 15, width: 35, height: 65, color: '#FFD700', superCD: 30000 }
+            Volt: { maxHp: 650, speed: 4, jump: 15, width: 35, height: 65, color: '#FFD700', superCD: 30000 },
+            Kuro: { maxHp: 600, speed: 5.2, jump: 14, width: 38, height: 70, color: '#244d3b', superCD: 26000 }
         },
         keys: {},
         keysPressed: {},
@@ -200,7 +253,8 @@ function loadPhysicsGame(heroName = 'Hunter') {
         minions: [], projectiles: [], particles: [], hazards: [], hurricane: null,
         getOpponentsOf: fighter => fighter === ai ? [target] : [ai],
         getEnemyOf: fighter => fighter === ai ? target : ai,
-        createExplosion() {}
+        createExplosion() {},
+        handleFighterDefeat() {}
     };
     context.game = game;
     const step = () => {
@@ -301,7 +355,7 @@ test('every hero with a direct super can decide to use it', () => {
     const context = loadAI();
     const directSuperHeroes = [
         'Hason', 'Willi', 'Hunter', 'Macu', 'Artu', 'Duke', 'Kadaxi', 'Euclid',
-        'Lique', 'Kae', 'Kila', 'Volt', 'Gensan', 'Noae', 'Wolf'
+        'Lique', 'Kae', 'Kila', 'Volt', 'Gensan', 'Noae', 'Wolf', 'Kuro'
     ];
 
     for (const heroName of directSuperHeroes) {
@@ -309,6 +363,7 @@ test('every hero with a direct super can decide to use it', () => {
         const ai = makeFighter(heroName, `cpu_${heroName}`);
         const target = makeFighter('Noae', `target_${heroName}`);
         target.x = heroName === 'Lique' ? 510 : 540;
+        if (heroName === 'Kuro') target.hp = target.maxHp * 0.35;
         if (heroName === 'Artu') ai.superCooldown = 0;
         const game = makeGame(ai, target);
         if (heroName === 'Noae') {
@@ -566,4 +621,138 @@ test('hero archetypes expose distinct tactical roles and low-health priorities',
         assert.equal(ai.aiTacticalRole, testCase.role);
         if (testCase.hero === 'Lique') assert.notEqual(ai.aiTacticalState, 'retreat');
     }
+});
+
+test('Kuro CPU holds Longshot, prioritizes range, and relocates after firing', () => {
+    const context = loadAI();
+    const ai = makeFighter('Kuro', 'cpu_kuro');
+    const target = makeFighter('Macu', 'target_kuro');
+    ai.superCooldown = 5000;
+    ai.kuroDecoyCooldown = 5000;
+    target.x = 700;
+    readyBrain(ai, target);
+
+    context.window.runAI(makeGame(ai, target), 16);
+
+    assert.equal(ai.aiTacticalRole, 'sniper');
+    assert.equal(context.keysPressed[ai.controls.attack], true, 'Kuro did not begin Longshot');
+    assert.equal(context.keys[ai.controls.attack], true, 'Kuro did not hold the attack input to charge');
+    assert.ok(ai.aiBrain.kuroChargeTimer >= 900);
+
+    ai.kuroRelocateTimer = 1200;
+    ai.aiBrain.decisionTimer = 0;
+    ai.aiBrain.combatStateTimer = 0;
+    context.window.runAI(makeGame(ai, target), 16);
+    assert.equal(ai.aiTacticalState, 'retreat');
+});
+
+test('CPU loses distant Kuro while cloaked without a decoy or visible movement', () => {
+    const context = loadAI();
+    const ai = makeFighter('Hunter', 'cpu_hunter');
+    const target = makeFighter('Kuro', 'target_kuro');
+    ai.superCooldown = 5000;
+    target.x = 900;
+    target.kuroCloaked = true;
+    target.vx = 0;
+    readyBrain(ai, target);
+
+    context.window.runAI(makeGame(ai, target), 16);
+
+    assert.equal(ai.aiTarget, null);
+    assert.equal(context.keysPressed[ai.controls.attack], undefined);
+    assert.equal(context.keys[ai.controls.left], false);
+    assert.equal(context.keys[ai.controls.right], false);
+});
+
+test('Kuro cloaks patiently and fires a fully charged Phantom Round', () => {
+    const simulation = loadPhysicsGame('Kuro');
+    const { ai, context } = simulation;
+    ai.isCPU = false;
+    ai.attackState = 'idle';
+    ai.stateTimer = 0;
+    ai.superCooldown = 0;
+
+    for (let frame = 0; frame < 80; frame++) ai.update(16);
+    assert.equal(ai.kuroCloaked, true, 'Kuro did not enter Optical Veil');
+
+    ai.performSuper();
+    assert.equal(ai.kuroEmpoweredShot, true);
+    assert.equal(ai.kuroEmpoweredTimer, 7000);
+
+    context.keys[ai.controls.attack] = true;
+    context.keysPressed[ai.controls.attack] = true;
+    ai.update(16);
+    delete context.keysPressed[ai.controls.attack];
+    assert.equal(ai.attackState, 'charging');
+
+    for (let frame = 0; frame < 80; frame++) ai.update(16);
+
+    assert.equal(context.game.projectiles.length, 1);
+    assert.equal(context.game.projectiles[0].type, 'phantom_round');
+    assert.equal(context.game.projectiles[0].damage, 130);
+    assert.equal(ai.kuroEmpoweredShot, false);
+    assert.equal(ai.kuroCloaked, false);
+    assert.ok(ai.kuroRevealTimer > 0);
+});
+
+test('Kuro decoy recloaks instantly and damage interrupts Longshot', () => {
+    const simulation = loadPhysicsGame('Kuro');
+    const { ai, target, context } = simulation;
+    ai.isCPU = false;
+    ai.attackState = 'idle';
+    ai.stateTimer = 0;
+
+    context.keysPressed[ai.controls.switch] = true;
+    ai.update(16);
+    delete context.keysPressed[ai.controls.switch];
+
+    assert.equal(context.game.minions.length, 1);
+    assert.equal(context.game.minions[0].type, 'kuro_decoy');
+    assert.equal(ai.kuroCloaked, true);
+    assert.equal(ai.kuroDecoyCooldown, 8000);
+
+    context.keys[ai.controls.attack] = true;
+    context.keysPressed[ai.controls.attack] = true;
+    ai.update(16);
+    delete context.keysPressed[ai.controls.attack];
+    assert.equal(ai.attackState, 'charging');
+
+    ai.takeDamage(10, target);
+    assert.equal(ai.attackState, 'idle');
+    assert.equal(ai.kuroCloaked, false);
+    assert.ok(ai.kuroRevealTimer >= 2000);
+});
+
+test('Kuro sniper rounds apply their piercing and control effects', () => {
+    const context = loadProjectileContext();
+    const owner = { id: 'kuro', heroName: 'Kuro' };
+    const makeTarget = (id, heroName = 'Hunter') => ({
+        id, heroName, x: 100, y: 100, w: 40, h: 70, dead: false, invincible: 0,
+        hp: 500, buffs: {},
+        takeDamage(amount) { this.hp -= amount; }
+    });
+    const first = makeTarget('first');
+    const second = makeTarget('second');
+    context.game.opponents = [first, second];
+
+    const phantom = new context.window.Projectile(100, 100, 22, 4, 0, 0, 130, owner, '#fff', 'phantom_round');
+    phantom.update(16);
+
+    assert.equal(first.hp, 370);
+    assert.equal(second.hp, 370);
+    assert.equal(first.buffs.dizzy, 1000);
+    assert.equal(second.buffs.dizzy, undefined);
+    assert.equal(phantom.dead, false);
+
+    const minionA = makeTarget('minion-a', null);
+    const minionB = makeTarget('minion-b', null);
+    context.game.opponents = [];
+    context.game.minions = [minionA, minionB];
+    const fullRound = new context.window.Projectile(100, 100, 22, 4, 0, 0, 80, owner, '#9ad8c0', 'sniper_round_full');
+    fullRound.update(16);
+
+    assert.equal(minionA.hp, 420);
+    assert.equal(minionB.hp, 420);
+    assert.equal(minionA.buffs.slow, 2000);
+    assert.equal(fullRound.dead, false);
 });

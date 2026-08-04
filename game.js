@@ -342,16 +342,28 @@ class Game {
     }
 
     getEnemyOf(fighter) {
-        if (fighter?.aiTarget && !fighter.aiTarget.dead && fighter.aiTarget !== fighter) return fighter.aiTarget;
+        const resolveVisibleTarget = target => {
+            if (!target || target.dead || target === fighter) return null;
+            if (fighter?.isCPU && target.heroName === 'Kuro' && target.kuroCloaked) {
+                const decoy = this.minions?.find(minion => minion.type === 'kuro_decoy' && minion.owner === target && !minion.dead);
+                if (decoy) return decoy;
+                const distance = Math.hypot(target.x - fighter.x, target.y - fighter.y);
+                if (distance > 125 && !(Math.abs(target.vx || 0) > 2.2 && distance < 340)) return null;
+            }
+            return target;
+        };
+
+        if (fighter?.aiTarget && !fighter.aiTarget.dead && fighter.aiTarget !== fighter) return resolveVisibleTarget(fighter.aiTarget);
         const opponents = this.getOpponentsOf(fighter);
         if (!opponents.length) return null;
         const sx = fighter.x + fighter.w / 2;
         const sy = fighter.y + fighter.h / 2;
-        return opponents.reduce((closest, candidate) => {
+        const closest = opponents.reduce((closestCandidate, candidate) => {
             const candidateDist = Math.hypot(candidate.x + candidate.w / 2 - sx, candidate.y + candidate.h / 2 - sy);
-            const closestDist = Math.hypot(closest.x + closest.w / 2 - sx, closest.y + closest.h / 2 - sy);
-            return candidateDist < closestDist ? candidate : closest;
+            const closestDist = Math.hypot(closestCandidate.x + closestCandidate.w / 2 - sx, closestCandidate.y + closestCandidate.h / 2 - sy);
+            return candidateDist < closestDist ? candidate : closestCandidate;
         });
+        return resolveVisibleTarget(closest);
     }
 
     createExplosion(x, y, radius, damage, owner, friendlyFire = true, stunDuration = 0) {
@@ -437,6 +449,13 @@ class Game {
             p1Stat += `[Marks: ${this.p1.wolfComboCount}/5]`;
             if (this.p1.wolfAttackTimer >= 1500) p1Stat += " [INSTINCT READY]";
         }
+        if (this.p1.heroName === 'Kuro') {
+            if (this.p1.attackState === 'charging') p1Stat += `[LONGSHOT: ${Math.round(this.p1.kuroCharge / this.p1.kuroChargeMax * 100)}%]`;
+            if (this.p1.kuroCloaked) p1Stat += " [VEILED]";
+            else if (this.p1.kuroRevealTimer > 0) p1Stat += ` [REVEALED ${(this.p1.kuroRevealTimer/1000).toFixed(1)}s]`;
+            if (this.p1.kuroEmpoweredShot) p1Stat += ` [PHANTOM ${(this.p1.kuroEmpoweredTimer/1000).toFixed(1)}s]`;
+            if (this.p1.kuroDecoyCooldown > 0) p1Stat += ` [DECOY ${(this.p1.kuroDecoyCooldown/1000).toFixed(1)}s]`;
+        }
 
         if (this.p1.buffs.poison > 0) p1Stat += " [POISONED]";
         if (this.p1.buffs.burn > 0) p1Stat += " [BURN]";
@@ -509,6 +528,13 @@ class Game {
         if (this.p2.heroName === 'Wolf') {
             p2Stat += `[Marks: ${this.p2.wolfComboCount}/5]`;
             if (this.p2.wolfAttackTimer >= 1500) p2Stat += " [INSTINCT READY]";
+        }
+        if (this.p2.heroName === 'Kuro') {
+            if (this.p2.attackState === 'charging') p2Stat += `[LONGSHOT: ${Math.round(this.p2.kuroCharge / this.p2.kuroChargeMax * 100)}%]`;
+            if (this.p2.kuroCloaked) p2Stat += " [VEILED]";
+            else if (this.p2.kuroRevealTimer > 0) p2Stat += ` [REVEALED ${(this.p2.kuroRevealTimer/1000).toFixed(1)}s]`;
+            if (this.p2.kuroEmpoweredShot) p2Stat += ` [PHANTOM ${(this.p2.kuroEmpoweredTimer/1000).toFixed(1)}s]`;
+            if (this.p2.kuroDecoyCooldown > 0) p2Stat += ` [DECOY ${(this.p2.kuroDecoyCooldown/1000).toFixed(1)}s]`;
         }
 
         if (this.p2.buffs.poison > 0) p2Stat += " [POISONED]";
@@ -987,7 +1013,7 @@ class Game {
         this.getFighters().forEach(fighter => {
             if (fighter.dead) return;
             fighter.draw(this.ctx);
-            if (this.isBattleRoyale) {
+            if (this.isBattleRoyale && !(fighter.heroName === 'Kuro' && fighter.kuroCloaked)) {
                 this.ctx.save();
                 this.ctx.font = '10px monospace';
                 this.ctx.textAlign = 'center';
