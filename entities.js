@@ -578,7 +578,7 @@ class Projectile extends Entity {
         }
 
         if (!this.dead && this.type !== "dynamite") {
-            let targets = [...game.getOpponentsOf(this.owner), ...game.minions.filter(m => m && m.owner !== this.owner)];
+            let targets = Array.from(new Set([...game.getOpponentsOf(this.owner), ...game.minions.filter(m => m && m.owner !== this.owner)]));
             for (let t of targets) {
                 if (!t || t.untargetable) continue;
 
@@ -762,10 +762,15 @@ class Projectile extends Entity {
             ctx.beginPath(); ctx.arc(0, 0, this.w/2 + 4 + Math.sin(Date.now()*0.02)*2, 0, Math.PI*2); ctx.stroke();
             ctx.restore();
             game.particles.push(new Particle(this.x + this.w/2, this.y + this.h/2, '#35d5e8', 0, 0, 120, 3));
-        } else if (this.type === "fire_bolt" || this.type === "water_bolt") {
+        } else if (this.type === "fire_bolt" || this.type === "water_bolt" || this.type === "boss_fire_orb") {
             ctx.fillStyle = this.color;
+            if (this.type === "boss_fire_orb") {
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = '#ff5a36';
+            }
             ctx.beginPath(); ctx.arc(this.x+this.w/2, this.y+this.h/2, this.w/2, 0, Math.PI*2); ctx.fill();
             game.particles.push(new Particle(this.x+this.w/2, this.y+this.h/2, this.color, 0, 0, 100, 3));
+            ctx.shadowBlur = 0;
         } else if (this.type === "volt_laser") {
             ctx.fillStyle = this.color;
             ctx.shadowBlur = 10;
@@ -870,10 +875,10 @@ class GravityWell extends Entity {
         const centerY = this.y + this.h/2;
         const damageTicks = Math.floor(this.tickTimer / 250);
         if (damageTicks > 0) this.tickTimer %= 250;
-        const targets = [
+        const targets = Array.from(new Set([
             ...game.getOpponentsOf(this.owner),
             ...game.minions.filter(minion => minion && minion !== this && minion.owner !== this.owner && !minion.untargetable)
-        ];
+        ]));
 
         for (const target of targets) {
             if (!target || target.dead) continue;
@@ -1019,10 +1024,10 @@ class D2FDrone extends Entity {
     }
 
     getTargets() {
-        return [
+        return Array.from(new Set([
             ...(typeof game.getOpponentsOf === 'function' ? game.getOpponentsOf(this.owner) : []),
             ...game.minions.filter(minion => minion && minion !== this && minion.owner !== this.owner && !minion.untargetable)
-        ].filter(target => target && !target.dead && !(target.invincible > 0));
+        ])).filter(target => target && !target.dead && !(target.invincible > 0));
     }
 
     getTarget() {
@@ -1275,10 +1280,10 @@ class D2FGiantRobot extends Entity {
         const fighters = typeof game.getOpponentsOf === 'function' ? game.getOpponentsOf(this.owner) : [];
         const preferred = fighters.find(candidate => candidate && candidate.id === this.targetId && !candidate.dead);
         if (preferred) return preferred;
-        const targets = [
+        const targets = Array.from(new Set([
             ...fighters,
             ...game.minions.filter(minion => minion && minion !== this && minion.owner !== this.owner && !minion.untargetable)
-        ].filter(target => target && !target.dead && !(target.invincible > 0));
+        ])).filter(target => target && !target.dead && !(target.invincible > 0));
         if (!targets.length) return null;
         const cx = this.x + this.w/2;
         const cy = this.y + this.h/2;
@@ -1289,10 +1294,10 @@ class D2FGiantRobot extends Entity {
         if (this.landingImpactDone) return;
         this.landingImpactDone = true;
         const hitbox = { x: this.x - 35, y: this.y + this.h - 68, w: this.w + 70, h: 78 };
-        const targets = [
+        const targets = Array.from(new Set([
             ...(typeof game.getOpponentsOf === 'function' ? game.getOpponentsOf(this.owner) : []),
             ...game.minions.filter(minion => minion && minion !== this && minion.owner !== this.owner && !minion.untargetable)
-        ];
+        ]));
         for (const target of targets) {
             if (!target || target.dead || target.invincible > 0 || !checkAABB(hitbox, target)) continue;
             target.takeDamage(42.5, this.owner);
@@ -1399,6 +1404,626 @@ class D2FGiantRobot extends Entity {
         ctx.fillStyle = '#35d5e8'; ctx.fillRect(this.x, this.y - 12, this.w * Math.max(0, this.hp / this.maxHp), 5);
     }
 }
+
+class BossBase extends Entity {
+    constructor(bossId, x, groundY, w, h) {
+        super(x, groundY - h, w, h);
+        const definition = BOSSES[bossId];
+        this.id = `boss-${bossId}`;
+        this.bossId = bossId;
+        this.type = 'boss';
+        this.isBoss = true;
+        this.owner = this;
+        this.displayName = definition.name;
+        this.hp = definition.maxHp;
+        this.maxHp = definition.maxHp;
+        this.color = definition.color;
+        this.facing = -1;
+        this.invincible = 0;
+        this.buffs = { dizzy: 0, slow: 0, burn: 0, poison: 0, bleed: 0 };
+        this.statusTickTimer = 0;
+        this.solaForceHeld = false;
+        this.solaForceSourceId = null;
+    }
+
+    getPlayers() {
+        return typeof game.getFighters === 'function'
+            ? game.getFighters().filter(player => player && !player.dead)
+            : [];
+    }
+
+    getNearestPlayer() {
+        const players = this.getPlayers();
+        if (!players.length) return null;
+        const cx = this.x + this.w / 2;
+        const cy = this.y + this.h / 2;
+        return players.reduce((closest, player) => {
+            const distance = Math.hypot(player.x + player.w / 2 - cx, player.y + player.h / 2 - cy);
+            const closestDistance = Math.hypot(closest.x + closest.w / 2 - cx, closest.y + closest.h / 2 - cy);
+            return distance < closestDistance ? player : closest;
+        });
+    }
+
+    updateBossStatus(dt) {
+        this.invincible = Math.max(0, (this.invincible || 0) - dt);
+        for (const key of ['slow', 'burn', 'poison', 'bleed']) {
+            this.buffs[key] = Math.max(0, (this.buffs[key] || 0) - dt);
+        }
+        this.buffs.dizzy = Math.max(0, Math.min(300, this.buffs.dizzy || 0) - dt);
+        this.statusTickTimer += dt;
+        while (this.statusTickTimer >= 1000 && !this.dead) {
+            this.statusTickTimer -= 1000;
+            const damage = (this.buffs.burn > 0 ? 5 : 0) + (this.buffs.poison > 0 ? 2 : 0) + (this.buffs.bleed > 0 ? 5 : 0);
+            if (damage > 0) this.takeDamage(damage, null, true);
+        }
+        return !this.dead && !this.solaForceHeld && this.buffs.dizzy <= 0;
+    }
+
+    getMoveMultiplier() {
+        return this.buffs.slow > 0 ? 0.72 : 1;
+    }
+
+    takeDamage(amount, attacker) {
+        if (this.dead || this.invincible > 0) return;
+        this.hp -= Math.max(0, Number(amount) || 0);
+        if (this.hp > 0) return;
+        this.hp = 0;
+        this.dead = true;
+        for (let i = 0; i < 70; i++) {
+            game.particles.push(new Particle(this.x + Math.random() * this.w, this.y + Math.random() * this.h, i % 3 ? this.color : '#ffffff', (Math.random() - 0.5) * 20, (Math.random() - 0.5) * 18, 900, 5 + Math.random() * 5));
+        }
+        if (typeof game.handleBossDefeat === 'function') game.handleBossDefeat(this, attacker);
+    }
+
+    drawBossHealth(ctx) {
+        ctx.fillStyle = 'rgba(0,0,0,0.8)';
+        ctx.fillRect(this.x, this.y - 18, this.w, 8);
+        ctx.fillStyle = this.color;
+        ctx.fillRect(this.x + 2, this.y - 16, (this.w - 4) * Math.max(0, this.hp / this.maxHp), 4);
+    }
+}
+
+class BossLaserStrike extends Entity {
+    constructor(owner, centerX, delay = 1000) {
+        super(Math.max(0, Math.min(CANVAS_W - 92, centerX - 46)), 20, 92, Math.max(80, GROUND_Y - 20));
+        this.owner = owner;
+        this.type = 'boss_laser_strike';
+        this.delay = delay;
+        this.duration = 450;
+        this.hitTargets = new Set();
+        this.untargetable = true;
+    }
+
+    update(dt) {
+        if (this.dead || !this.owner || this.owner.dead) { this.dead = true; return; }
+        if (this.delay > 0) { this.delay = Math.max(0, this.delay - dt); return; }
+        this.duration -= dt;
+        for (const target of game.getOpponentsOf(this.owner)) {
+            if (!target || target.dead || target.invincible > 0 || this.hitTargets.has(target) || !checkAABB(this, target)) continue;
+            target.takeDamage(70, this.owner, false, true);
+            this.hitTargets.add(target);
+        }
+        if (this.duration <= 0) this.dead = true;
+    }
+
+    draw(ctx) {
+        ctx.save();
+        if (this.delay > 0) {
+            const pulse = 0.25 + 0.25 * Math.sin(Date.now() * 0.025);
+            ctx.fillStyle = `rgba(255, 56, 70, ${pulse})`;
+            ctx.fillRect(this.x, GROUND_Y - 12, this.w, 12);
+            ctx.strokeStyle = 'rgba(255, 102, 102, 0.7)';
+            ctx.setLineDash([9, 8]);
+            ctx.strokeRect(this.x, this.y, this.w, this.h);
+        } else {
+            ctx.fillStyle = 'rgba(53, 213, 232, 0.36)';
+            ctx.shadowBlur = 22;
+            ctx.shadowColor = '#35d5e8';
+            ctx.fillRect(this.x, this.y, this.w, this.h);
+            ctx.fillStyle = '#eaffff';
+            ctx.fillRect(this.x + this.w * 0.42, this.y, this.w * 0.16, this.h);
+        }
+        ctx.restore();
+    }
+}
+
+class TyranntBoss extends BossBase {
+    constructor(x, groundY) {
+        super('tyrannt', x, groundY, 230, 170);
+        this.y = 105;
+        this.droneTimer = 0;
+        this.giantTimer = 0;
+        this.laserTimer = 0;
+        this.hoverPhase = 0;
+    }
+
+    summonDrones() {
+        const count = 5 + Math.floor(Math.random() * 6);
+        for (let i = 0; i < count; i++) {
+            game.minions.push(new D2FDrone(this, this.x + this.w / 2 - 17 + (Math.random() - 0.5) * 140, this.y + this.h - 35 + Math.random() * 55, i));
+        }
+    }
+
+    summonGiants() {
+        const players = this.getPlayers();
+        if (!players.length) return;
+        for (let i = 0; i < 2; i++) game.minions.push(new D2FGiantRobot(this, players[i % players.length]));
+    }
+
+    fireLaserMatrix() {
+        for (const player of this.getPlayers()) {
+            const center = player.x + player.w / 2;
+            for (const offset of [-108, 0, 108]) game.hazards.push(new BossLaserStrike(this, center + offset));
+        }
+    }
+
+    update(dt) {
+        if (!this.updateBossStatus(dt)) return;
+        const target = this.getNearestPlayer();
+        const frameScale = Math.min(2, Math.max(0.25, dt / 16.67));
+        this.hoverPhase += dt * 0.002;
+        if (target) {
+            const targetCenter = target.x + target.w / 2;
+            this.facing = targetCenter < this.x + this.w / 2 ? -1 : 1;
+            const desiredX = targetCenter + (this.facing > 0 ? -520 : 520) - this.w / 2;
+            const desiredY = 90 + Math.sin(this.hoverPhase) * 42;
+            const movement = this.getMoveMultiplier();
+            this.x += Math.max(-3.2, Math.min(3.2, (desiredX - this.x) * 0.018)) * movement * frameScale;
+            this.y += Math.max(-2, Math.min(2, (desiredY - this.y) * 0.035)) * movement * frameScale;
+        }
+        this.x = Math.max(20, Math.min(CANVAS_W - this.w - 20, this.x));
+        this.y = Math.max(45, Math.min(GROUND_Y - this.h - 80, this.y));
+
+        this.droneTimer += dt;
+        this.giantTimer += dt;
+        this.laserTimer += dt;
+        while (this.droneTimer >= 6000) { this.droneTimer -= 6000; this.summonDrones(); }
+        while (this.giantTimer >= 10000) { this.giantTimer -= 10000; this.summonGiants(); }
+        while (this.laserTimer >= 12000) { this.laserTimer -= 12000; this.fireLaserMatrix(); }
+    }
+
+    draw(ctx) {
+        ctx.save();
+        ctx.translate(this.x + this.w / 2, this.y + this.h / 2);
+        if (this.facing < 0) ctx.scale(-1, 1);
+        ctx.fillStyle = '#101a20';
+        ctx.fillRect(-82, -48, 164, 96);
+        ctx.fillStyle = '#294653';
+        ctx.fillRect(-66, -38, 132, 70);
+        ctx.fillStyle = '#35d5e8';
+        ctx.shadowBlur = 22;
+        ctx.shadowColor = '#35d5e8';
+        ctx.fillRect(28, -22, 30, 16);
+        ctx.fillRect(-22, -12, 44, 28);
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = '#17252b';
+        ctx.fillRect(-115, -20, 34, 54);
+        ctx.fillRect(81, -20, 34, 54);
+        ctx.fillStyle = '#8cf4ff';
+        for (const x of [-98, -48, 48, 98]) ctx.fillRect(x - 13, -62, 26, 6);
+        ctx.fillStyle = '#dffcff';
+        ctx.fillRect(60, -8, 18, 8);
+        ctx.restore();
+        this.drawBossHealth(ctx);
+    }
+}
+
+class BossFireDemon extends Entity {
+    constructor(owner, x, y, slot = 0) {
+        super(x, y, 46, 38);
+        this.owner = owner;
+        this.type = 'boss_fire_demon';
+        this.hp = 35;
+        this.maxHp = 35;
+        this.life = 22000;
+        this.slot = slot;
+        this.shootTimer = 500 + slot * 260;
+        this.buffs = { dizzy: 0, slow: 0, burn: 0 };
+        this.invincible = 0;
+    }
+
+    takeDamage(amount) {
+        if (this.dead || this.invincible > 0) return;
+        this.hp -= Math.max(0, amount || 0);
+        if (this.hp <= 0) this.dead = true;
+    }
+
+    update(dt) {
+        if (this.dead) return;
+        this.life -= dt;
+        if (this.life <= 0 || !this.owner || this.owner.dead) { this.dead = true; return; }
+        if (this.buffs.dizzy > 0) { this.buffs.dizzy = Math.max(0, this.buffs.dizzy - dt); return; }
+        const targets = game.getOpponentsOf(this.owner);
+        if (!targets.length) return;
+        const target = targets.reduce((closest, player) => Math.hypot(player.x - this.x, player.y - this.y) < Math.hypot(closest.x - this.x, closest.y - this.y) ? player : closest);
+        const cx = this.x + this.w / 2;
+        const cy = this.y + this.h / 2;
+        const tx = target.x + target.w / 2;
+        const ty = target.y + target.h / 2;
+        const dx = tx - cx;
+        const dy = ty - cy;
+        const distance = Math.max(1, Math.hypot(dx, dy));
+        const desiredDistance = 390 + (this.slot % 3 - 1) * 45;
+        const radial = distance > desiredDistance + 50 ? 4.2 : (distance < desiredDistance - 50 ? -4.2 : 0);
+        const desiredVx = dx / distance * radial;
+        const desiredY = Math.max(70, Math.min(GROUND_Y - 170, ty - 130 + (this.slot % 3 - 1) * 55));
+        this.vx += (desiredVx - this.vx) * 0.12;
+        this.vy += (Math.max(-4, Math.min(4, (desiredY - cy) * 0.04)) - this.vy) * 0.12;
+        const frameScale = Math.min(2, Math.max(0.25, dt / 16.67));
+        this.x = Math.max(10, Math.min(CANVAS_W - this.w - 10, this.x + this.vx * frameScale));
+        this.y = Math.max(45, Math.min(GROUND_Y - this.h - 45, this.y + this.vy * frameScale));
+        this.shootTimer += dt;
+        if (this.shootTimer >= 1800) {
+            this.shootTimer %= 1800;
+            const angle = Math.atan2(ty - cy, tx - cx);
+            const orb = new Projectile(cx, cy, 15, 15, Math.cos(angle) * 9, Math.sin(angle) * 9, 10, this.owner, '#ff7a32', 'boss_fire_orb');
+            game.projectiles.push(orb);
+        }
+    }
+
+    draw(ctx) {
+        ctx.save();
+        ctx.translate(this.x + this.w / 2, this.y + this.h / 2);
+        if (this.vx < 0) ctx.scale(-1, 1);
+        ctx.fillStyle = '#6e1f1a';
+        ctx.beginPath(); ctx.moveTo(20, 0); ctx.lineTo(-9, -15); ctx.lineTo(-20, -4); ctx.lineTo(-12, 0); ctx.lineTo(-20, 13); ctx.lineTo(-7, 9); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#ffb347';
+        ctx.fillRect(8, -5, 8, 6);
+        ctx.restore();
+        ctx.fillStyle = '#240d0d'; ctx.fillRect(this.x, this.y - 8, this.w, 3);
+        ctx.fillStyle = '#ff6a35'; ctx.fillRect(this.x, this.y - 8, this.w * Math.max(0, this.hp / this.maxHp), 3);
+    }
+}
+
+class DragonBoss extends BossBase {
+    constructor(x, groundY) {
+        super('dragon', x, groundY, 290, 178);
+        this.y = 120;
+        this.flameCooldown = 0;
+        this.flameTimer = 0;
+        this.flameTickTimer = 0;
+        this.flameAngle = Math.PI;
+        this.demonTimer = 0;
+        this.dashCooldown = 0;
+        this.dashPhase = null;
+        this.dashTimer = 0;
+        this.dashHitTargets = new Set();
+    }
+
+    summonDemons() {
+        for (let i = 0; i < 4; i++) game.minions.push(new BossFireDemon(this, this.x + this.w / 2 - 23 + (Math.random() - 0.5) * 180, this.y + 60 + Math.random() * 90, i));
+    }
+
+    startDash(target) {
+        if (!target) return;
+        this.dashPhase = 'rise';
+        this.dashTimer = 900;
+        this.dashTargetId = target.id;
+        this.dashHitTargets.clear();
+        this.dashCooldown = 0;
+    }
+
+    getDashTarget() {
+        return this.getPlayers().find(player => player.id === this.dashTargetId) || this.getNearestPlayer();
+    }
+
+    damageDashPath(hitbox, impact = false) {
+        for (const target of this.getPlayers()) {
+            if (target.dead || target.invincible > 0 || (!impact && this.dashHitTargets.has(target)) || !checkAABB(hitbox, target)) continue;
+            target.takeDamage(impact ? 75 : 105, this, false, true);
+            target.buffs.slow = Math.max(target.buffs.slow || 0, impact ? 1800 : 3200);
+            target.vx += this.facing * 12;
+            if (!impact) this.dashHitTargets.add(target);
+        }
+    }
+
+    updateDash(dt) {
+        const target = this.getDashTarget();
+        if (this.dashPhase === 'rise') {
+            this.dashTimer -= dt;
+            this.y = Math.max(35, this.y - dt * 0.28);
+            if (target) this.x += Math.max(-4, Math.min(4, target.x + target.w / 2 - (this.x + this.w / 2))) * Math.min(2, dt / 16.67);
+            if (this.dashTimer <= 0) {
+                this.dashPhase = 'dive';
+                this.dashTimer = 680;
+                this.dashMaxTimer = 680;
+                this.dashFromX = this.x;
+                this.dashFromY = this.y;
+                const aim = target || { x: this.x, w: 0 };
+                this.dashEndX = Math.max(10, Math.min(CANVAS_W - this.w - 10, aim.x + aim.w / 2 - this.w / 2));
+                this.dashEndY = GROUND_Y - this.h;
+                this.facing = this.dashEndX >= this.x ? 1 : -1;
+            }
+            return;
+        }
+        if (this.dashPhase === 'dive') {
+            const previous = { x: this.x, y: this.y, w: this.w, h: this.h };
+            this.dashTimer = Math.max(0, this.dashTimer - dt);
+            const progress = 1 - this.dashTimer / this.dashMaxTimer;
+            this.x = this.dashFromX + (this.dashEndX - this.dashFromX) * progress;
+            this.y = this.dashFromY + (this.dashEndY - this.dashFromY) * progress;
+            const swept = {
+                x: Math.min(previous.x, this.x) - 30,
+                y: Math.min(previous.y, this.y) - 20,
+                w: this.w + Math.abs(this.x - previous.x) + 60,
+                h: this.h + Math.abs(this.y - previous.y) + 40
+            };
+            this.damageDashPath(swept, false);
+            if (this.dashTimer <= 0) {
+                this.damageDashPath({ x: this.x - 120, y: GROUND_Y - 210, w: this.w + 240, h: 220 }, true);
+                for (let i = 0; i < 45; i++) game.particles.push(new Particle(this.x + this.w / 2, GROUND_Y, i % 2 ? '#ff5a36' : '#ffd166', (Math.random() - 0.5) * 20, -Math.random() * 16, 650, 6));
+                this.dashPhase = 'recover';
+                this.dashTimer = 600;
+            }
+            return;
+        }
+        this.dashTimer -= dt;
+        if (this.dashTimer <= 0) this.dashPhase = null;
+    }
+
+    updateFlame(dt, target) {
+        if (target) {
+            const desired = Math.atan2(target.y + target.h / 2 - (this.y + this.h * 0.48), target.x + target.w / 2 - (this.x + this.w / 2));
+            this.flameAngle = desired;
+            this.facing = Math.cos(desired) >= 0 ? 1 : -1;
+        }
+        this.flameTimer = Math.max(0, this.flameTimer - dt);
+        this.flameTickTimer += dt;
+        const ticks = Math.floor(this.flameTickTimer / 250);
+        if (ticks > 0) this.flameTickTimer %= 250;
+        const startX = this.x + this.w / 2 + Math.cos(this.flameAngle) * 105;
+        const startY = this.y + this.h * 0.48 + Math.sin(this.flameAngle) * 35;
+        const endX = startX + Math.cos(this.flameAngle) * 720;
+        const endY = startY + Math.sin(this.flameAngle) * 720;
+        for (const player of this.getPlayers()) {
+            const px = player.x + player.w / 2;
+            const py = player.y + player.h / 2;
+            const dx = endX - startX;
+            const dy = endY - startY;
+            const projection = Math.max(0, Math.min(1, ((px - startX) * dx + (py - startY) * dy) / Math.max(1, dx * dx + dy * dy)));
+            const distance = Math.hypot(px - (startX + dx * projection), py - (startY + dy * projection));
+            if (projection <= 0 || distance > 45 + projection * 105) continue;
+            for (let tick = 0; tick < ticks && !player.dead; tick++) player.takeDamage(9, this, true, true, true);
+            player.buffs.burn = Math.max(player.buffs.burn || 0, 600);
+        }
+    }
+
+    update(dt) {
+        if (!this.updateBossStatus(dt)) return;
+        const target = this.getNearestPlayer();
+        this.demonTimer += dt;
+        this.flameCooldown += dt;
+        this.dashCooldown += dt;
+        while (this.demonTimer >= 10000) { this.demonTimer -= 10000; this.summonDemons(); }
+
+        if (this.dashPhase) { this.updateDash(dt); return; }
+        if (this.flameTimer > 0) { this.updateFlame(dt, target); return; }
+        if (this.flameCooldown >= 12000) {
+            this.flameCooldown -= 12000;
+            this.flameTimer = 5000;
+            this.flameTickTimer = 0;
+            this.updateFlame(0, target);
+            return;
+        }
+        if (this.dashCooldown >= 9000) { this.startDash(target); return; }
+
+        if (target) {
+            this.facing = target.x + target.w / 2 >= this.x + this.w / 2 ? 1 : -1;
+            const desiredX = target.x + (this.facing > 0 ? -470 : 470) - this.w / 2;
+            const desiredY = 105 + Math.sin(Date.now() * 0.0018) * 55;
+            const frameScale = Math.min(2, Math.max(0.25, dt / 16.67)) * this.getMoveMultiplier();
+            this.x += Math.max(-3, Math.min(3, (desiredX - this.x) * 0.018)) * frameScale;
+            this.y += Math.max(-2.2, Math.min(2.2, (desiredY - this.y) * 0.035)) * frameScale;
+        }
+        this.x = Math.max(15, Math.min(CANVAS_W - this.w - 15, this.x));
+        this.y = Math.max(40, Math.min(GROUND_Y - this.h, this.y));
+    }
+
+    draw(ctx) {
+        ctx.save();
+        if (this.flameTimer > 0) {
+            const startX = this.x + this.w / 2 + Math.cos(this.flameAngle) * 100;
+            const startY = this.y + this.h * 0.48 + Math.sin(this.flameAngle) * 35;
+            const endX = startX + Math.cos(this.flameAngle) * 720;
+            const endY = startY + Math.sin(this.flameAngle) * 720;
+            const sideX = -Math.sin(this.flameAngle) * 120;
+            const sideY = Math.cos(this.flameAngle) * 120;
+            ctx.fillStyle = 'rgba(255, 82, 30, 0.48)';
+            ctx.shadowBlur = 20; ctx.shadowColor = '#ff8a28';
+            ctx.beginPath(); ctx.moveTo(startX, startY); ctx.lineTo(endX + sideX, endY + sideY); ctx.lineTo(endX - sideX, endY - sideY); ctx.closePath(); ctx.fill();
+            ctx.shadowBlur = 0;
+        }
+        ctx.translate(this.x + this.w / 2, this.y + this.h / 2);
+        if (this.facing < 0) ctx.scale(-1, 1);
+        const wing = Math.sin(Date.now() * 0.009) * 18;
+        ctx.fillStyle = '#7a201c';
+        ctx.beginPath(); ctx.moveTo(-55, -18); ctx.lineTo(-145, -70 - wing); ctx.lineTo(-82, 12); ctx.lineTo(-150, 70 + wing); ctx.lineTo(-34, 40); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#a93122';
+        ctx.beginPath(); ctx.ellipse(0, 10, 94, 48, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(62, -8); ctx.lineTo(126, -30); ctx.lineTo(145, 4); ctx.lineTo(92, 25); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#ffd166'; ctx.fillRect(116, -12, 14, 9);
+        ctx.fillStyle = '#4f1215';
+        ctx.beginPath(); ctx.moveTo(-80, 20); ctx.lineTo(-145, 52); ctx.lineTo(-112, 4); ctx.fill();
+        ctx.restore();
+        this.drawBossHealth(ctx);
+    }
+}
+
+class BossKnight extends Entity {
+    constructor(owner, x) {
+        super(x, GROUND_Y - 74, 42, 74);
+        this.owner = owner;
+        this.type = 'boss_knight';
+        this.hp = 55;
+        this.maxHp = 55;
+        this.life = 24000;
+        this.facing = -1;
+        this.attackCooldown = Math.random() * 500;
+        this.isGrounded = true;
+        this.buffs = { dizzy: 0, slow: 0, burn: 0 };
+        this.invincible = 0;
+    }
+
+    takeDamage(amount) {
+        if (this.dead || this.invincible > 0) return;
+        this.hp -= Math.max(0, amount || 0);
+        if (this.hp <= 0) this.dead = true;
+    }
+
+    update(dt) {
+        this.life -= dt;
+        if (this.life <= 0 || !this.owner || this.owner.dead) { this.dead = true; return; }
+        if (this.buffs.dizzy > 0) { this.buffs.dizzy = Math.max(0, this.buffs.dizzy - dt); return; }
+        this.attackCooldown = Math.max(0, this.attackCooldown - dt);
+        const targets = game.getOpponentsOf(this.owner);
+        if (!targets.length) return;
+        const target = targets.reduce((closest, player) => Math.abs(player.x - this.x) < Math.abs(closest.x - this.x) ? player : closest);
+        const dx = target.x + target.w / 2 - (this.x + this.w / 2);
+        const dy = target.y + target.h / 2 - (this.y + this.h / 2);
+        this.facing = dx >= 0 ? 1 : -1;
+        const slow = this.buffs.slow > 0 ? 0.65 : 1;
+        this.vx += (this.facing * (Math.abs(dx) > 55 ? 3.6 : 0) * slow - this.vx) * 0.2;
+        if (this.isGrounded && dy < -65) { this.vy = -13; this.isGrounded = false; }
+        const frameScale = Math.min(2, Math.max(0.25, dt / 16.67));
+        const previousBottom = this.y + this.h;
+        this.x += this.vx * frameScale;
+        this.vy += GRAVITY * frameScale;
+        this.y += this.vy * frameScale;
+        let landingY = GROUND_Y;
+        if (this.vy >= 0) {
+            for (const platform of PLATFORMS) {
+                if (previousBottom <= platform.y && this.y + this.h >= platform.y && this.x + this.w > platform.x && this.x < platform.x + platform.w) landingY = Math.min(landingY, platform.y);
+            }
+        }
+        this.isGrounded = false;
+        if (this.y + this.h >= landingY) { this.y = landingY - this.h; this.vy = 0; this.isGrounded = true; }
+        this.x = Math.max(0, Math.min(CANVAS_W - this.w, this.x));
+        if (Math.abs(dx) < 70 && Math.abs(dy) < 90 && this.attackCooldown <= 0) {
+            target.takeDamage(12, this.owner);
+            this.attackCooldown = 950;
+        }
+    }
+
+    draw(ctx) {
+        ctx.save();
+        ctx.translate(this.x + this.w / 2, this.y + this.h / 2);
+        if (this.facing < 0) ctx.scale(-1, 1);
+        ctx.fillStyle = '#5b5f68'; ctx.fillRect(-17, -26, 34, 52);
+        ctx.fillStyle = '#b7bec8'; ctx.fillRect(-14, -34, 28, 18);
+        ctx.fillStyle = '#16181d'; ctx.fillRect(6, -28, 8, 4);
+        ctx.fillStyle = '#d8c07b'; ctx.fillRect(14, -8, 45, 7);
+        ctx.restore();
+        ctx.fillStyle = '#251313'; ctx.fillRect(this.x, this.y - 8, this.w, 3);
+        ctx.fillStyle = '#d8c07b'; ctx.fillRect(this.x, this.y - 8, this.w * Math.max(0, this.hp / this.maxHp), 3);
+    }
+}
+
+class LibertusBoss extends BossBase {
+    constructor(x, groundY) {
+        super('libertus', x, groundY, 176, 238);
+        this.y = groundY - this.h;
+        this.knightTimer = 0;
+        this.swingTimer = 0;
+        this.swingState = 'idle';
+        this.swingStateTimer = 0;
+        this.swingVisualTimer = 0;
+        this.swingFacing = -1;
+    }
+
+    summonKnights() {
+        for (let i = 0; i < 5; i++) {
+            const side = i % 2 === 0 ? -1 : 1;
+            const x = Math.max(10, Math.min(CANVAS_W - 52, this.x + this.w / 2 + side * (100 + Math.floor(i / 2) * 58)));
+            game.minions.push(new BossKnight(this, x));
+        }
+    }
+
+    startSwing(target) {
+        this.swingState = 'windup';
+        this.swingStateTimer = 1000;
+        this.swingFacing = target && target.x + target.w / 2 >= this.x + this.w / 2 ? 1 : -1;
+        this.swingTimer = 0;
+    }
+
+    releaseSwing() {
+        this.swingState = 'active';
+        this.swingStateTimer = 380;
+        this.swingVisualTimer = 380;
+        this.facing = this.swingFacing;
+        const range = 440;
+        const hitbox = {
+            x: this.swingFacing > 0 ? this.x + this.w * 0.45 : this.x - range + this.w * 0.55,
+            y: this.y - 45,
+            w: range,
+            h: this.h + 100
+        };
+        for (const player of this.getPlayers()) {
+            if (!player.dead && player.invincible <= 0 && checkAABB(hitbox, player)) {
+                player.takeDamage(125, this, false, true);
+                player.vx = this.swingFacing * 22;
+                player.vy = -7;
+            }
+        }
+        for (let i = 0; i < 35; i++) game.particles.push(new Particle(this.x + this.w / 2 + this.swingFacing * Math.random() * range, this.y + 40 + Math.random() * this.h, '#e8d39c', this.swingFacing * (4 + Math.random() * 9), (Math.random() - 0.5) * 8, 500, 5));
+    }
+
+    update(dt) {
+        if (!this.updateBossStatus(dt)) return;
+        const target = this.getNearestPlayer();
+        this.knightTimer += dt;
+        this.swingTimer += dt;
+        this.swingVisualTimer = Math.max(0, this.swingVisualTimer - dt);
+        while (this.knightTimer >= 12000) { this.knightTimer -= 12000; this.summonKnights(); }
+
+        if (this.swingState !== 'idle') {
+            this.swingStateTimer -= dt;
+            if (this.swingState === 'windup' && this.swingStateTimer <= 0) this.releaseSwing();
+            else if (this.swingState === 'active' && this.swingStateTimer <= 0) this.swingState = 'idle';
+            return;
+        }
+        if (this.swingTimer >= 10000) { this.startSwing(target); return; }
+
+        if (target) {
+            const dx = target.x + target.w / 2 - (this.x + this.w / 2);
+            this.facing = dx >= 0 ? 1 : -1;
+            const move = Math.abs(dx) > 210 ? this.facing * 2.25 * this.getMoveMultiplier() : 0;
+            this.x += move * Math.min(2, Math.max(0.25, dt / 16.67));
+        }
+        this.x = Math.max(0, Math.min(CANVAS_W - this.w, this.x));
+        this.y = GROUND_Y - this.h;
+    }
+
+    draw(ctx) {
+        ctx.save();
+        ctx.translate(this.x + this.w / 2, this.y + this.h / 2);
+        if (this.facing < 0) ctx.scale(-1, 1);
+        if (this.swingState === 'windup') {
+            ctx.fillStyle = 'rgba(255, 218, 122, 0.18)';
+            ctx.fillRect(25, -this.h / 2 - 35, 440, this.h + 70);
+        }
+        if (this.swingVisualTimer > 0) {
+            ctx.strokeStyle = 'rgba(255, 235, 174, 0.75)';
+            ctx.lineWidth = 34;
+            ctx.beginPath(); ctx.arc(12, -5, 310, -1.15, 1.05); ctx.stroke();
+        }
+        ctx.fillStyle = '#3f444e'; ctx.fillRect(-63, -82, 126, 164);
+        ctx.fillStyle = '#9ca4ad'; ctx.fillRect(-52, -108, 104, 54);
+        ctx.fillStyle = '#111319'; ctx.fillRect(16, -88, 28, 8);
+        ctx.fillStyle = '#e8d39c'; ctx.fillRect(42, -25, 150, 18);
+        ctx.fillStyle = '#786a45'; ctx.fillRect(27, -40, 22, 50);
+        ctx.fillStyle = '#2a2d34'; ctx.fillRect(-56, 78, 48, 40); ctx.fillRect(8, 78, 48, 40);
+        ctx.restore();
+        this.drawBossHealth(ctx);
+    }
+}
+
+function createBoss(bossId, x, groundY) {
+    if (bossId === 'dragon') return new DragonBoss(x, groundY);
+    if (bossId === 'libertus') return new LibertusBoss(x, groundY);
+    return new TyranntBoss(x, groundY);
+}
+
+window.createBoss = createBoss;
 
 class Minion extends Entity {
     constructor(owner, x, y) {
@@ -1647,7 +2272,7 @@ class Puppet extends Entity {
                     if (!enemy.untargetable && checkAABB(hitBox, enemy)) targetsHit.push(enemy);
                 }
                 for (let m of game.minions) {
-                    if (m && m.owner !== this.owner && !m.dead && !m.untargetable && checkAABB(hitBox, m)) targetsHit.push(m);
+                    if (m && !m.isBoss && m.owner !== this.owner && !m.dead && !m.untargetable && checkAABB(hitBox, m)) targetsHit.push(m);
                 }
 
                 if (targetsHit.length > 0) {
@@ -1718,13 +2343,13 @@ class Hurricane extends Entity {
                 if (checkAABB(this, enemy)) enemy.takeDamage(0.6, this.owner, true);
             }
             for (let m of game.minions) {
-                if (m && m.owner !== this.owner && !m.dead && !m.untargetable && checkAABB(this, m)) m.takeDamage(0.6, this.owner, true);
+                if (m && !m.isBoss && m.owner !== this.owner && !m.dead && !m.untargetable && checkAABB(this, m)) m.takeDamage(0.6, this.owner, true);
             }
         }
         this.stunTickTimer += dt;
         if (this.stunTickTimer >= 1000) {
             this.stunTickTimer = 0;
-            let targets = [...game.getOpponentsOf(this.owner), ...game.minions.filter(m => m && m.owner !== this.owner && !m.untargetable)];
+            let targets = Array.from(new Set([...game.getOpponentsOf(this.owner), ...game.minions.filter(m => m && m.owner !== this.owner && !m.untargetable)]));
             for (let t of targets) {
                 if (t && !t.dead && checkAABB(this, t)) { t.buffs = t.buffs || {}; t.buffs.dizzy = 500; }
             }

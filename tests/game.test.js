@@ -19,6 +19,7 @@ function makeElement(hidden = true) {
             }
         },
         dataset: {},
+        style: {},
         innerText: '',
         innerHTML: ''
     };
@@ -260,4 +261,156 @@ test('match start exposes the Menu button only in single-player modes', () => {
 
     game.startGame(true, 'duel');
     assert.equal(harness.getElement('btn-pause-menu').classList.contains('hidden'), false);
+});
+
+function configureBossGameHarness(harness) {
+    const { context } = harness;
+    context.CANVAS_W = 1280;
+    context.CANVAS_H = 720;
+    context.GROUND_Y = 620;
+    context.PLATFORMS = [];
+    context.ARENAS = {
+        dojo: { name: 'Dojo' },
+        grand_arena: { name: 'Grand Warfield' }
+    };
+    context.BOSSES = {
+        tyrannt: { name: 'TYRANNT', color: '#35d5e8', maxHp: 9000 }
+    };
+    context.HEROES = {
+        Noae: { name: 'Noae' },
+        Wolf: { name: 'Wolf' }
+    };
+    context.buildArenaLayout = arenaId => ({
+        id: arenaId,
+        arena: context.ARENAS[arenaId],
+        worldWidth: arenaId === 'grand_arena' ? 2800 : 1280,
+        worldHeight: 720,
+        groundY: 620,
+        platforms: []
+    });
+    context.Fighter = class {
+        constructor(id, heroName, x, controls) {
+            Object.assign(this, {
+                id, heroName, x, controls,
+                y: 550, w: 40, h: 70, vx: 0,
+                maxHp: 100, hp: 100, dead: false,
+                superCooldown: 0, superCooldownMax: 10000,
+                buffs: {}
+            });
+        }
+    };
+    context.createBoss = (bossId, x, groundY) => ({
+        id: `boss-${bossId}`, bossId, displayName: 'TYRANNT', type: 'boss', isBoss: true,
+        x, y: groundY - 170, w: 230, h: 170, hp: 9000, maxHp: 9000, dead: false,
+        update() {}, draw() {}, takeDamage() {}
+    });
+
+    const game = makeLifecycleGame(harness);
+    Object.assign(game, {
+        selectedArena: 'dojo',
+        activeArena: context.ARENAS.dojo,
+        activeArenaId: 'dojo',
+        camera: { x: 0 },
+        canvas: { width: 1280, height: 720, dataset: {} },
+        p1Choice: 'Noae',
+        p2Choice: 'Wolf',
+        bossChoice: 'tyrannt',
+        bossPlayerCount: 1,
+        fighters: [],
+        aiFighters: []
+    });
+    return game;
+}
+
+test('solo Boss Mode starts one player on Grand Warfield with boss HUD and pause', () => {
+    const harness = loadGameClass();
+    const game = configureBossGameHarness(harness);
+
+    game.startBossGame();
+
+    assert.equal(game.gameMode, 'boss');
+    assert.equal(game.activeArenaId, 'grand_arena');
+    assert.equal(game.fighters.length, 1);
+    assert.equal(game.p2, game.p1);
+    assert.equal(game.aiFighters.length, 0);
+    assert.equal(game.minions.includes(game.boss), true);
+    assert.equal(harness.getElement('hud-p2').classList.contains('hidden'), true);
+    assert.equal(harness.getElement('boss-hud').classList.contains('hidden'), false);
+    assert.equal(harness.getElement('btn-pause-menu').classList.contains('hidden'), false);
+});
+
+test('two-player Boss Mode creates distinct local fighters and remains pausable', () => {
+    const harness = loadGameClass();
+    const game = configureBossGameHarness(harness);
+    game.bossPlayerCount = 2;
+
+    game.startBossGame();
+    assert.equal(game.fighters.length, 2);
+    assert.notEqual(game.p1, game.p2);
+    assert.equal(game.aiFighters.length, 0);
+    assert.equal(harness.getElement('hud-p2').classList.contains('hidden'), false);
+
+    game.pauseGame();
+    assert.equal(game.state, 'PAUSED');
+    assert.equal(harness.getElement('pause-screen').classList.contains('hidden'), false);
+});
+
+test('Boss Mode routes player attacks to the boss and boss units to living players', () => {
+    const harness = loadGameClass();
+    const game = configureBossGameHarness(harness);
+    game.startBossGame();
+
+    const bossUnit = { owner: game.boss };
+    assert.equal(game.getOpponentsOf(game.p1).length, 1);
+    assert.equal(game.getOpponentsOf(game.p1)[0], game.boss);
+    assert.equal(game.getOpponentsOf(bossUnit).length, 1);
+    assert.equal(game.getOpponentsOf(bossUnit)[0], game.p1);
+
+    game.p1.dead = true;
+    assert.equal(game.getOpponentsOf(game.boss).length, 0);
+});
+
+test('Boss Mode ends only after all players fall and cleans up boss-owned entities on victory', () => {
+    const harness = loadGameClass();
+    const game = configureBossGameHarness(harness);
+    game.bossPlayerCount = 2;
+    game.startBossGame();
+    let winner = null;
+    game.endGame = text => { winner = text; };
+
+    game.p1.dead = true;
+    game.handleFighterDefeat(game.p1, game.boss);
+    assert.equal(winner, null);
+    game.p2.dead = true;
+    game.handleFighterDefeat(game.p2, game.boss);
+    assert.equal(winner, 'TYRANNT');
+
+    game.p1.dead = false;
+    game.p2.dead = false;
+    winner = null;
+    const summon = { owner: game.boss, dead: false };
+    game.minions.push(summon);
+    game.handleBossDefeat(game.boss, game.p1);
+    assert.equal(summon.dead, true);
+    assert.equal(winner, 'Players');
+});
+
+test('Boss Mode camera follows a solo player and centers surviving co-op players', () => {
+    const harness = loadGameClass();
+    const game = configureBossGameHarness(harness);
+    game.isBossMode = true;
+    harness.context.CANVAS_W = 2800;
+    game.canvas.width = 1000;
+    game.p1 = { id: 'p1', x: 1900, y: 0, w: 40, h: 70, vx: 5, dead: false };
+    game.p2 = game.p1;
+    game.fighters = [game.p1];
+
+    game.updateCamera(1000);
+    assert.ok(game.camera.x > 1300);
+
+    game.p2 = { id: 'p2', x: 2300, y: 0, w: 40, h: 70, vx: 0, dead: false };
+    game.fighters = [game.p1, game.p2];
+    game.camera.x = 0;
+    game.updateCamera(1000);
+    assert.ok(game.camera.x > 1500 && game.camera.x < 1800);
 });

@@ -482,6 +482,57 @@
             gap: 16px;
         }
 
+        .boss-mode-panel {
+            width: min(900px, 92vw);
+            display: grid;
+            gap: 20px;
+        }
+
+        .boss-party-options {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+        }
+
+        .boss-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 12px;
+        }
+
+        .boss-option {
+            min-height: 118px;
+            display: grid;
+            align-content: center;
+            gap: 9px;
+            border-color: #665f53;
+            background: #171a20;
+        }
+
+        .boss-option strong {
+            color: #ffd93d;
+            font-size: 0.72rem;
+        }
+
+        .boss-option span {
+            color: #b8c0c7;
+            font-size: 0.46rem;
+            line-height: 1.7;
+        }
+
+        .boss-option.selected,
+        .boss-party-options button.selected {
+            border-color: #ffd93d;
+            box-shadow: inset 0 0 0 1px #ffd93d, 4px 4px 0 #000 !important;
+            background: #2b2518;
+        }
+
+        .boss-mode-actions {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+        }
+
         #menu-screen {
             justify-content: flex-start;
             box-sizing: border-box;
@@ -634,6 +685,42 @@
             box-shadow: 4px 4px 0 #000;
         }
 
+        #boss-hud {
+            position: absolute;
+            top: 58px;
+            left: 50%;
+            box-sizing: border-box;
+            width: 330px;
+            max-width: 26vw;
+            transform: translateX(-50%);
+            padding: 9px 12px;
+            border: 3px solid #8f794c;
+            background: rgba(8, 8, 11, 0.86);
+            box-shadow: 4px 4px 0 #000;
+        }
+
+        .boss-hud-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 6px;
+            color: #ffd93d;
+            font-size: 0.56rem;
+        }
+
+        .boss-hp-track {
+            height: 14px;
+            overflow: hidden;
+            border: 2px solid #000;
+            background: #281217;
+        }
+
+        #boss-hp-bar {
+            height: 100%;
+            width: 100%;
+            background: #d33b45;
+            transition: width 0.12s;
+        }
+
         .survivor-title,
         .survivor-label {
             display: flex;
@@ -685,7 +772,32 @@
             filter: grayscale(1);
         }
 
+        @media (min-width: 721px) and (max-width: 1200px) {
+            #game-ui.boss-mode .player-info {
+                box-sizing: border-box;
+                width: 32vw;
+            }
+
+            #game-ui.boss-mode .controls-hint {
+                font-size: 0.64rem;
+            }
+        }
+
         @media (max-width: 720px) {
+            .boss-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .boss-option {
+                min-height: 78px;
+            }
+
+            #boss-mode-screen {
+                overflow-y: auto;
+                justify-content: flex-start;
+                padding: 20px 10px;
+            }
+
             #btn-pause-menu {
                 right: 10px;
                 bottom: 10px;
@@ -693,6 +805,30 @@
                 min-height: 40px;
                 padding: 6px 10px;
                 font-size: 0.75rem;
+            }
+
+            #game-ui.boss-mode .hud-top {
+                padding: 8px 6px;
+            }
+
+            #game-ui.boss-mode .player-info {
+                box-sizing: border-box;
+                width: 46vw;
+                padding: 6px;
+            }
+
+            #game-ui.boss-mode .controls-hint {
+                display: none;
+            }
+
+            #game-ui.boss-mode .p-name {
+                font-size: 0.64rem;
+            }
+
+            #boss-hud {
+                top: 112px;
+                width: calc(100vw - 20px);
+                max-width: none;
             }
 
             .pause-panel {
@@ -804,6 +940,7 @@
     <div class="menu-btns">
         <button id="btn-sp" aria-expanded="false" style="background:#8b0000; border-color:#ff5252">Play with Computer</button>
         <button id="btn-mp">Local Multiplayer (1 Keyboard)</button>
+        <button id="btn-boss-mode" style="background:#3b2415; border-color:#ffd93d">Boss Mode</button>
         <button id="btn-online" style="background:#004080; border-color:#00bfff">Online Play</button>
         <button id="btn-open-settings" style="background:#333; border-color:#888">Controls</button>
     </div>
@@ -817,6 +954,26 @@
         <button id="btn-sp-survival" style="background:#164f35; border-color:#6bcb77">Last Fighter Standing</button>
     </div>
     <button id="btn-sp-back">Back</button>
+</div>
+
+<!-- Boss Mode Select -->
+<div id="boss-mode-screen" class="overlay hidden">
+    <h1>Boss Mode</h1>
+    <div class="boss-mode-panel">
+        <div class="boss-party-options" aria-label="Player count">
+            <button type="button" data-boss-players="1" class="selected" aria-pressed="true">Solo</button>
+            <button type="button" data-boss-players="2" aria-pressed="false">Two Players</button>
+        </div>
+        <div class="boss-grid" aria-label="Boss selection">
+            <button type="button" class="boss-option selected" data-boss-id="tyrannt" aria-pressed="true"><strong>TYRANNT</strong><span>Drone Overlord<br>900 WRD</span></button>
+            <button type="button" class="boss-option" data-boss-id="dragon" aria-pressed="false"><strong>DRAGON</strong><span>Infernal Sky Tyrant<br>750 WRD</span></button>
+            <button type="button" class="boss-option" data-boss-id="libertus" aria-pressed="false"><strong>LIBERTUS</strong><span>Titan Knight<br>850 WRD</span></button>
+        </div>
+        <div class="boss-mode-actions">
+            <button id="btn-boss-start" type="button" style="background:#6b1010; border-color:#ffd93d">Start Fight</button>
+            <button id="btn-boss-back" type="button">Back</button>
+        </div>
+    </div>
 </div>
 
 <!-- Settings Overlay -->
@@ -974,6 +1131,10 @@
     <div id="battle-royale-hud" class="hidden">
         <div class="survivor-title"><span>FIGHTERS</span><span id="survivor-count">6 / 6</span></div>
         <div id="battle-royale-list"></div>
+    </div>
+    <div id="boss-hud" class="hidden">
+        <div class="boss-hud-label"><span id="boss-name">BOSS</span><span id="boss-hp-text">0 / 0 WRD</span></div>
+        <div class="boss-hp-track"><div id="boss-hp-bar"></div></div>
     </div>
     <div id="dynamic-prompts"></div>
 </div>

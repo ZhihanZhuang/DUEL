@@ -463,10 +463,10 @@ class Fighter extends Entity {
         this.vx = this.solaChargeDirection * 18;
 
         const hitbox = this.getSolaChargeHitbox();
-        const targets = [
+        const targets = Array.from(new Set([
             ...game.getOpponentsOf(this),
             ...game.minions.filter(minion => minion && minion.owner !== this && !minion.dead && !minion.untargetable)
-        ];
+        ]));
         for (const target of targets) {
             if (!target || target.dead || target.untargetable || this.solaChargeHitTargets.has(target) || !checkAABB(hitbox, target)) continue;
             target.takeDamage(28, this);
@@ -1035,7 +1035,7 @@ class Fighter extends Entity {
                         }
                     }
                     for (let m of game.minions) {
-                        if (m && m.owner !== this && !m.dead && !m.untargetable && checkAABB(hitBox, m)) {
+                        if (m && !m.isBoss && m.owner !== this && !m.dead && !m.untargetable && checkAABB(hitBox, m)) {
                             m.takeDamage(this.getMeleeDamage(), this);
                             targetsHit.push(m);
                         }
@@ -1238,7 +1238,7 @@ class Fighter extends Entity {
                     const damage = 10 + charges * 15;
                     const centerX = this.x + this.w/2;
                     const centerY = this.y + this.h/2;
-                    const targets = [...game.getOpponentsOf(this), ...game.minions.filter(minion => minion && minion.owner !== this && !minion.dead && !minion.untargetable)];
+                    const targets = Array.from(new Set([...game.getOpponentsOf(this), ...game.minions.filter(minion => minion && minion.owner !== this && !minion.dead && !minion.untargetable)]));
                     for (const target of targets) {
                         const distance = Math.hypot(target.x + target.w/2 - centerX, target.y + target.h/2 - centerY);
                         if (distance > 210 || target.invincible > 0) continue;

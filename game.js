@@ -13,6 +13,10 @@ class Game {
         this.p1Choice = 'Noae';
         this.p2Choice = 'Wolf';
         this.gameMode = 'duel';
+        this.bossChoice = 'tyrannt';
+        this.bossPlayerCount = 1;
+        this.boss = null;
+        this.isBossMode = false;
         this.fighters = [];
         this.aiFighters = [];
         this.selectedArena = localStorage.getItem('otokojuku_duel_arena') || 'dojo';
@@ -86,6 +90,30 @@ class Game {
         document.getElementById('btn-sp-survival').onclick = () => this.startGame(true, 'survival');
         document.getElementById('btn-sp-back').onclick = () => this.showComputerModes(false);
         document.getElementById('btn-mp').onclick = () => this.startGame(false);
+        document.getElementById('btn-boss-mode').onclick = () => this.showBossMenu(true);
+        document.getElementById('btn-boss-back').onclick = () => this.showBossMenu(false);
+        document.getElementById('btn-boss-start').onclick = () => this.startBossGame();
+        document.querySelectorAll('[data-boss-players]').forEach(button => {
+            button.onclick = () => {
+                this.bossPlayerCount = Number(button.dataset.bossPlayers) === 2 ? 2 : 1;
+                document.querySelectorAll('[data-boss-players]').forEach(option => {
+                    const selected = option === button;
+                    option.classList.toggle('selected', selected);
+                    option.setAttribute('aria-pressed', selected ? 'true' : 'false');
+                });
+            };
+        });
+        document.querySelectorAll('[data-boss-id]').forEach(button => {
+            button.onclick = () => {
+                if (!BOSSES[button.dataset.bossId]) return;
+                this.bossChoice = button.dataset.bossId;
+                document.querySelectorAll('[data-boss-id]').forEach(option => {
+                    const selected = option === button;
+                    option.classList.toggle('selected', selected);
+                    option.setAttribute('aria-pressed', selected ? 'true' : 'false');
+                });
+            };
+        });
 
         document.getElementById('btn-restart').onclick = () => this.returnToMenu();
         document.getElementById('btn-pause-menu').onclick = () => this.pauseGame();
@@ -102,7 +130,7 @@ class Game {
         };
 
         window.addEventListener('keydown', event => {
-            if (event.defaultPrevented || event.code !== 'Escape' || !this.isSinglePlayer) return;
+            if (event.defaultPrevented || event.code !== 'Escape' || !this.canPauseMatch()) return;
             if (this.state === 'PLAYING') {
                 event.preventDefault();
                 this.pauseGame();
@@ -127,7 +155,10 @@ class Game {
             listeningKey = null;
         }
         document.getElementById('settings-screen').classList.add('hidden');
-        if (this.state === 'PAUSED') this.p1.controls = currentBinds.p1;
+        if (this.state === 'PAUSED') {
+            this.p1.controls = currentBinds.p1;
+            if (this.p2 && this.p2 !== this.p1) this.p2.controls = currentBinds.p2;
+        }
         if (this.state === 'PAUSED' && this.settingsReturnToPause) {
             document.getElementById('pause-screen').classList.remove('hidden');
         }
@@ -168,6 +199,11 @@ class Game {
         document.getElementById('btn-sp')?.setAttribute('aria-expanded', show ? 'true' : 'false');
     }
 
+    showBossMenu(show) {
+        document.getElementById('menu-screen').classList.toggle('hidden', show);
+        document.getElementById('boss-mode-screen').classList.toggle('hidden', !show);
+    }
+
     configureArena(arenaId, preserveFighters = true) {
         const oldWorldWidth = CANVAS_W || window.innerWidth;
         const layout = buildArenaLayout(arenaId, window.innerWidth, window.innerHeight);
@@ -205,7 +241,7 @@ class Game {
 
     updateCamera(dt) {
         const maxCameraX = Math.max(0, CANVAS_W - this.canvas.width);
-        if (!this.isBattleRoyale || maxCameraX <= 0) {
+        if ((!this.isBattleRoyale && !this.isBossMode) || maxCameraX <= 0) {
             this.camera.x = 0;
             this.canvas.dataset.cameraX = '0';
             this.canvas.dataset.worldWidth = String(CANVAS_W);
@@ -213,19 +249,27 @@ class Game {
         }
 
         const alive = this.getFighters().filter(fighter => !fighter.dead);
-        const target = !this.p1?.dead
-            ? this.p1
-            : alive.reduce((closest, fighter) => {
-                if (!closest) return fighter;
-                const viewCenter = this.camera.x + this.canvas.width / 2;
-                const fighterCenter = fighter.x + fighter.w / 2;
-                const closestCenter = closest.x + closest.w / 2;
-                return Math.abs(fighterCenter - viewCenter) < Math.abs(closestCenter - viewCenter) ? fighter : closest;
-            }, null);
-        if (!target) return;
+        if (!alive.length) return;
 
-        const lookAhead = Math.max(-150, Math.min(150, (target.vx || 0) * 18));
-        const desiredX = Math.max(0, Math.min(maxCameraX, target.x + target.w / 2 + lookAhead - this.canvas.width / 2));
+        let targetCenter;
+        let targetVelocity;
+        if (this.isBossMode) {
+            targetCenter = alive.reduce((sum, fighter) => sum + fighter.x + fighter.w / 2, 0) / alive.length;
+            targetVelocity = alive.reduce((sum, fighter) => sum + (fighter.vx || 0), 0) / alive.length;
+        } else {
+            const target = !this.p1?.dead
+                ? this.p1
+                : alive.reduce((closest, fighter) => {
+                    if (!closest) return fighter;
+                    const viewCenter = this.camera.x + this.canvas.width / 2;
+                    return Math.abs(fighter.x + fighter.w / 2 - viewCenter) < Math.abs(closest.x + closest.w / 2 - viewCenter) ? fighter : closest;
+                }, null);
+            targetCenter = target.x + target.w / 2;
+            targetVelocity = target.vx || 0;
+        }
+
+        const lookAhead = Math.max(-150, Math.min(150, targetVelocity * 18));
+        const desiredX = Math.max(0, Math.min(maxCameraX, targetCenter + lookAhead - this.canvas.width / 2));
         const blend = Math.min(1, Math.max(0.08, dt / 180));
         this.camera.x += (desiredX - this.camera.x) * blend;
         this.canvas.dataset.cameraX = String(Math.round(this.camera.x));
@@ -277,8 +321,12 @@ class Game {
         for (const code of Object.keys(keysPressed)) delete keysPressed[code];
     }
 
+    canPauseMatch() {
+        return !!(this.isSinglePlayer || this.isBossMode);
+    }
+
     pauseGame() {
-        if (!this.isSinglePlayer || this.state !== 'PLAYING') return;
+        if (!this.canPauseMatch() || this.state !== 'PLAYING') return;
         this.stopLoop();
         this.clearMatchInputs();
         this.state = 'PAUSED';
@@ -286,11 +334,12 @@ class Game {
     }
 
     resumeGame() {
-        if (!this.isSinglePlayer || this.state !== 'PAUSED') return;
+        if (!this.canPauseMatch() || this.state !== 'PAUSED') return;
         document.getElementById('pause-screen').classList.add('hidden');
         document.getElementById('settings-screen').classList.add('hidden');
         this.settingsReturnToPause = false;
         this.p1.controls = currentBinds.p1;
+        if (this.p2 && this.p2 !== this.p1) this.p2.controls = currentBinds.p2;
         this.clearMatchInputs();
         this.state = 'PLAYING';
         this.lastTime = performance.now();
@@ -309,17 +358,22 @@ class Game {
         document.getElementById('game-over-screen').classList.add('hidden');
         document.getElementById('game-ui').classList.add('hidden');
         document.getElementById('computer-mode-screen')?.classList.add('hidden');
+        document.getElementById('boss-mode-screen')?.classList.add('hidden');
         document.getElementById('menu-screen').classList.remove('hidden');
         document.getElementById('spectator-banner')?.classList.add('hidden');
         document.getElementById('ping-display')?.classList.add('hidden');
         document.getElementById('battle-royale-hud')?.classList.add('hidden');
+        document.getElementById('boss-hud')?.classList.add('hidden');
         document.getElementById('hud-p2')?.classList.remove('hidden');
         document.getElementById('game-ui')?.classList.remove('survival-mode');
+        document.getElementById('game-ui')?.classList.remove('boss-mode');
         document.getElementById('btn-pause-menu')?.classList.add('hidden');
         this.isSpectator = false;
         this.isOnline = false;
         this.isSinglePlayer = false;
         this.isBattleRoyale = false;
+        this.isBossMode = false;
+        this.boss = null;
         this.state = 'MENU';
     }
 
@@ -330,6 +384,7 @@ class Game {
         this.releaseAIControls();
         document.getElementById('menu-screen').classList.add('hidden');
         document.getElementById('computer-mode-screen')?.classList.add('hidden');
+        document.getElementById('boss-mode-screen')?.classList.add('hidden');
         document.getElementById('pause-screen')?.classList.add('hidden');
         document.getElementById('settings-screen')?.classList.add('hidden');
         document.getElementById('game-ui').classList.remove('hidden');
@@ -338,6 +393,8 @@ class Game {
         this.settingsReturnToPause = false;
         this.gameMode = isSinglePlayer ? singlePlayerMode : 'duel';
         this.isBattleRoyale = this.gameMode === 'survival';
+        this.isBossMode = false;
+        this.boss = null;
         this.configureArena(this.isBattleRoyale ? 'grand_arena' : this.selectedArena, false);
 
         let p2StartX = CANVAS_W - 150;
@@ -391,7 +448,9 @@ class Game {
 
         document.getElementById('hud-p2')?.classList.toggle('hidden', this.isBattleRoyale);
         document.getElementById('battle-royale-hud')?.classList.toggle('hidden', !this.isBattleRoyale);
+        document.getElementById('boss-hud')?.classList.add('hidden');
         document.getElementById('game-ui')?.classList.toggle('survival-mode', this.isBattleRoyale);
+        document.getElementById('game-ui')?.classList.remove('boss-mode');
         document.getElementById('btn-pause-menu')?.classList.toggle('hidden', !isSinglePlayer);
         if (this.isBattleRoyale) this.buildBattleRoyaleHUD();
         const arenaNameplate = document.getElementById('arena-nameplate');
@@ -407,12 +466,81 @@ class Game {
         this.animationFrameId = requestAnimationFrame(t => this.loop(t, generation));
     }
 
+    startBossGame() {
+        this.stopLoop();
+        if (this.endGameTimer) clearTimeout(this.endGameTimer);
+        this.endGameTimer = null;
+        this.releaseAIControls();
+        document.getElementById('menu-screen').classList.add('hidden');
+        document.getElementById('computer-mode-screen')?.classList.add('hidden');
+        document.getElementById('boss-mode-screen')?.classList.add('hidden');
+        document.getElementById('pause-screen')?.classList.add('hidden');
+        document.getElementById('settings-screen')?.classList.add('hidden');
+        document.getElementById('game-ui').classList.remove('hidden');
+
+        this.isSinglePlayer = this.bossPlayerCount === 1;
+        this.isBossMode = true;
+        this.isBattleRoyale = false;
+        this.gameMode = 'boss';
+        this.settingsReturnToPause = false;
+        this.configureArena('grand_arena', false);
+
+        this.p1 = new Fighter('p1', this.p1Choice, 220, currentBinds.p1, true);
+        this.p1.displayName = 'Player 1';
+        this.p1.facing = 1;
+        if (this.bossPlayerCount === 2) {
+            this.p2 = new Fighter('p2', this.p2Choice, 420, currentBinds.p2, false);
+            this.p2.displayName = 'Player 2';
+            this.p2.facing = 1;
+            this.fighters = [this.p1, this.p2];
+        } else {
+            this.p2 = this.p1;
+            this.fighters = [this.p1];
+        }
+        this.aiFighters = [];
+        this.projectiles = [];
+        this.particles = [];
+        this.minions = [];
+        this.hazards = [];
+        this.hurricane = null;
+        this.hitstop = 0;
+        this.aiTimer = 0;
+        this.aiProfile = null;
+
+        this.boss = createBoss(this.bossChoice, CANVAS_W - 480, GROUND_Y);
+        this.minions.push(this.boss);
+
+        document.getElementById('p1-name').innerText = `Player 1: ${HEROES[this.p1Choice].name}`;
+        document.getElementById('p2-name').innerText = `Player 2: ${HEROES[this.p2Choice].name}`;
+        document.getElementById('hud-p2')?.classList.toggle('hidden', this.bossPlayerCount === 1);
+        document.getElementById('battle-royale-hud')?.classList.add('hidden');
+        document.getElementById('boss-hud')?.classList.remove('hidden');
+        document.getElementById('game-ui')?.classList.remove('survival-mode');
+        document.getElementById('game-ui')?.classList.add('boss-mode');
+        document.getElementById('btn-pause-menu')?.classList.remove('hidden');
+        document.getElementById('p1-horse-container').classList.toggle('hidden', this.p1Choice !== 'Duke' && this.p1Choice !== 'Volt');
+        document.getElementById('p2-horse-container').classList.toggle('hidden', this.bossPlayerCount === 1 || (this.p2Choice !== 'Duke' && this.p2Choice !== 'Volt'));
+        this.updateBossHUD();
+
+        this.state = 'PLAYING';
+        this.lastTime = performance.now();
+        this.updateCamera(1000);
+        const generation = this.loopGeneration;
+        this.animationFrameId = requestAnimationFrame(timestamp => this.loop(timestamp, generation));
+    }
+
     getFighters() {
         if (this.fighters?.length) return this.fighters;
         return [this.p1, this.p2].filter(Boolean);
     }
 
     getOpponentsOf(fighter) {
+        if (this.isBossMode) {
+            const belongsToBoss = fighter === this.boss || fighter?.isBoss || fighter?.owner === this.boss;
+            if (belongsToBoss) return this.getFighters().filter(candidate => candidate && !candidate.dead);
+            const belongsToPlayers = this.getFighters().includes(fighter) || this.getFighters().includes(fighter?.owner);
+            if (belongsToPlayers) return this.boss && !this.boss.dead ? [this.boss] : [];
+        }
         return this.getFighters().filter(candidate => candidate && candidate !== fighter && !candidate.dead);
     }
 
@@ -707,6 +835,23 @@ class Game {
             this.lastPromptsHTML = promptsHTML;
         }
         if (this.isBattleRoyale) this.updateBattleRoyaleHUD();
+        if (this.isBossMode) this.updateBossHUD();
+    }
+
+    updateBossHUD() {
+        if (!this.boss) return;
+        const definition = BOSSES[this.bossChoice] || {};
+        const hp = Math.max(0, this.boss.hp || 0);
+        const maxHp = Math.max(1, this.boss.maxHp || definition.maxHp || 1);
+        const name = document.getElementById('boss-name');
+        const hpText = document.getElementById('boss-hp-text');
+        const hpBar = document.getElementById('boss-hp-bar');
+        if (name) name.innerText = definition.name || this.boss.displayName || 'BOSS';
+        if (hpText) hpText.innerText = `${(hp / 10).toFixed(1)} / ${(maxHp / 10).toFixed(1)} WRD`;
+        if (hpBar) {
+            hpBar.style.width = `${Math.max(0, Math.min(100, hp / maxHp * 100))}%`;
+            hpBar.style.background = definition.color || '#d33b45';
+        }
     }
 
     buildBattleRoyaleHUD() {
@@ -746,6 +891,10 @@ class Game {
         }
 
         const alive = this.getFighters().filter(candidate => !candidate.dead);
+        if (this.isBossMode) {
+            if (alive.length === 0) this.endGame(this.boss?.displayName || BOSSES[this.bossChoice]?.name || 'Boss');
+            return;
+        }
         if (this.isBattleRoyale) {
             this.updateBattleRoyaleHUD();
             if (alive.length <= 1) {
@@ -761,6 +910,15 @@ class Game {
         const winner = alive[0] || (attacker && !attacker.dead ? attacker : null);
         const winnerText = winner === this.p1 ? 'Player 1' : 'Player 2';
         this.endGame(winnerText);
+    }
+
+    handleBossDefeat(boss, attacker) {
+        if (!this.isBossMode || boss !== this.boss || this.state === 'GAMEOVER') return;
+        for (const entity of [...this.minions, ...this.projectiles, ...this.hazards]) {
+            if (entity && entity !== boss && (entity.owner === boss || entity.owner?.owner === boss)) entity.dead = true;
+        }
+        const winner = this.bossPlayerCount === 2 ? 'Players' : 'Player 1';
+        this.endGame(winner);
     }
 
     endGame(winnerText) {
@@ -1105,7 +1263,11 @@ class Game {
         if (this.particles.length > 1000) this.particles.splice(0, this.particles.length - 1000);
         if (this.projectiles.length > 420) this.projectiles.splice(0, this.projectiles.length - 420);
         if (this.hazards.length > 120) this.hazards.splice(0, this.hazards.length - 120);
-        if (this.minions.length > 120) this.minions.splice(0, this.minions.length - 120);
+        if (this.minions.length > 120) {
+            const bosses = this.minions.filter(minion => minion?.isBoss);
+            const others = this.minions.filter(minion => !minion?.isBoss);
+            this.minions = [...bosses, ...others.slice(-(120 - bosses.length))];
+        }
 
         if (this.state === 'PLAYING') {
             const activeFighters = this.getFighters().filter(fighter => !fighter.dead);
@@ -1169,14 +1331,14 @@ class Game {
         this.getFighters().forEach(fighter => {
             if (fighter.dead) return;
             fighter.draw(this.ctx, { revealOwnedKuro: fighter === localFighter });
-            if (this.isBattleRoyale && !(fighter.heroName === 'Kuro' && fighter.kuroCloaked)) {
+            if ((this.isBattleRoyale || this.isBossMode) && !(fighter.heroName === 'Kuro' && fighter.kuroCloaked)) {
                 this.ctx.save();
                 this.ctx.font = '10px monospace';
                 this.ctx.textAlign = 'center';
-                this.ctx.fillStyle = fighter === this.p1 ? '#6bcb77' : '#ffffff';
+                this.ctx.fillStyle = fighter === this.p1 ? '#6bcb77' : '#ffd166';
                 this.ctx.strokeStyle = '#000000';
                 this.ctx.lineWidth = 3;
-                const label = fighter === this.p1 ? 'YOU' : fighter.displayName;
+                const label = this.isBossMode ? fighter.displayName : (fighter === this.p1 ? 'YOU' : fighter.displayName);
                 this.ctx.strokeText(label, fighter.x + fighter.w / 2, fighter.y - 16);
                 this.ctx.fillText(label, fighter.x + fighter.w / 2, fighter.y - 16);
                 this.ctx.restore();
@@ -1195,7 +1357,7 @@ var game = new Game();
 window.game = game;
 
 window.addEventListener('resize', () => {
-    const arenaId = game.isBattleRoyale ? 'grand_arena' : game.selectedArena;
+    const arenaId = game.isBattleRoyale || game.isBossMode ? 'grand_arena' : game.selectedArena;
     game.configureArena(arenaId, game.state === 'PLAYING' || game.state === 'PAUSED');
 });
 window.dispatchEvent(new Event('resize'));

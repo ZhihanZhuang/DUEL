@@ -202,6 +202,23 @@ var PLATFORMS = buildArenaLayout('dojo', CANVAS_W, CANVAS_H).platforms;
 window.ARENAS = ARENAS;
 window.buildArenaLayout = buildArenaLayout;
 
+var BOSSES = {
+    tyrannt: {
+        name: 'TYRANNT', title: 'Drone Overlord', color: '#35d5e8', maxHp: 9000,
+        summary: 'Laser Matrix / Drone Swarm / Giant Units'
+    },
+    dragon: {
+        name: 'DRAGON', title: 'Infernal Sky Tyrant', color: '#ff5a36', maxHp: 7500,
+        summary: 'Flame Breath / Skyfall Dash / Fire Demons'
+    },
+    libertus: {
+        name: 'LIBERTUS', title: 'Titan Knight', color: '#e8d39c', maxHp: 8500,
+        summary: 'Colossal Swing / Knight Legion'
+    }
+};
+
+window.BOSSES = BOSSES;
+
 var HEROES = {
     Hason: {
         name: "Hason", desc: "Cowboy with Colt Revolver",
