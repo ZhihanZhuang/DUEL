@@ -535,7 +535,7 @@ class Projectile extends Entity {
                     this.vy += (dy / Math.max(1, distance) * speed - this.vy) * 0.2;
                 }
             }
-        } else if (this.type === "homing_bullet" || this.type === "magic_burst" || this.type === "volt_laser") {
+        } else if (this.type === "homing_bullet" || this.type === "magic_burst" || this.type === "volt_laser" || this.type === "tracking_bird") {
             let target = game.getEnemyOf(this.owner);
             let minDist = target ? Math.hypot(target.x - this.x, target.y - this.y) : 9999;
             for (let m of game.minions) {
@@ -548,13 +548,14 @@ class Projectile extends Entity {
                 if (this.type !== "volt_laser" || this.timer < 1500) {
                     let tx = target.x + target.w/2; let ty = target.y + target.h/2;
                     let angle = Math.atan2(ty - (this.y + this.h/2), tx - (this.x + this.w/2));
-                    let speed = this.type === "magic_burst" ? 18 : (this.type === "volt_laser" ? 15 : 25);
-                    let turnSpeed = this.type === "magic_burst" ? 0.08 : (this.type === "volt_laser" ? 0.05 : 0.15);
+                    let speed = this.type === "magic_burst" ? 18 : (this.type === "volt_laser" ? 15 : (this.type === "tracking_bird" ? 18 : 25));
+                    let turnSpeed = this.type === "magic_burst" ? 0.08 : (this.type === "volt_laser" ? 0.05 : (this.type === "tracking_bird" ? 0.12 : 0.15));
                     this.vx += (Math.cos(angle) * speed - this.vx) * turnSpeed;
                     this.vy += (Math.sin(angle) * speed - this.vy) * turnSpeed;
                 }
             }
             this.timer += dt;
+            if (this.type === "tracking_bird" && this.timer >= 6000) this.dead = true;
         } else if (this.type === "knife" || this.type === "large_knife" || this.type === "enhanced_knife" || this.type === "ki_blast" || this.type === "thrown_axe") {
             if (this.type !== "ki_blast" && this.type !== "thrown_axe") this.vy += GRAVITY * 0.1;
         }
@@ -602,8 +603,14 @@ class Projectile extends Entity {
                         for(let i=0; i<15; i++) game.particles.push(new Particle(this.x, this.y, "#ffffff", (Math.random()-0.5)*20, (Math.random()-0.5)*20, 300, 6));
                         for(let i=0; i<10; i++) game.particles.push(new Particle(this.x, this.y, "#ffd700", (Math.random()-0.5)*15, (Math.random()-0.5)*15, 400, 4));
                     } else {
+                        if (this.type === "tracking_bird") {
+                            this.dead = true;
+                            game.createExplosion(this.x + this.w/2, this.y + this.h/2, 180, 70, this.owner, false, 4500);
+                            return;
+                        }
                         let noKnockback = (this.type === "bullet" || this.type === "homing_bullet" || this.type === "ki_blast" || this.type === "magic_burst" || this.type === "paper_plane" || this.type === "blue_paper_plane" || this.type === "fire_bolt" || this.type === "water_bolt" || this.type === "tidal_wave" || this.type === "volt_laser" || this.type === "pickaxe");
                         t.takeDamage(this.damage, this.owner, false, noKnockback);
+                        if (this.damage > 0 && this.owner?.heroName === 'Archor' && typeof this.owner.onArchorHit === 'function') this.owner.onArchorHit(t);
 
                         if (t.buffs) {
                             if (this.type === "large_knife" || this.type === "enhanced_knife") t.buffs.slow = 5000;
@@ -774,6 +781,25 @@ class Projectile extends Entity {
             ctx.shadowBlur = this.type === "phantom_round" ? 18 : 8;
             ctx.shadowColor = ctx.fillStyle;
             ctx.fillRect(-this.w * 1.8, -1.5, this.w * 2.3, 3);
+            ctx.restore();
+        } else if (this.type === "archor_arrow") {
+            ctx.save();
+            ctx.translate(this.x + this.w/2, this.y + this.h/2);
+            ctx.rotate(Math.atan2(this.vy, this.vx));
+            ctx.fillStyle = '#d7f5c8';
+            ctx.fillRect(-this.w/2, -1, this.w, 2);
+            ctx.fillStyle = '#7df0aa';
+            ctx.beginPath(); ctx.moveTo(this.w/2, 0); ctx.lineTo(this.w/2-7, -4); ctx.lineTo(this.w/2-7, 4); ctx.fill();
+            ctx.restore();
+        } else if (this.type === "tracking_bird") {
+            ctx.save();
+            ctx.translate(this.x + this.w/2, this.y + this.h/2);
+            ctx.rotate(Math.atan2(this.vy, this.vx));
+            const wing = Math.sin(this.timer * 0.018) * 8;
+            ctx.fillStyle = '#173b2a';
+            ctx.beginPath(); ctx.moveTo(16, 0); ctx.lineTo(-9, -4); ctx.lineTo(-18, -12-wing); ctx.lineTo(-5, 1); ctx.lineTo(-18, 12+wing); ctx.lineTo(-9, 4); ctx.fill();
+            ctx.fillStyle = '#7df0aa';
+            ctx.beginPath(); ctx.moveTo(18, 0); ctx.lineTo(9, -5); ctx.lineTo(9, 5); ctx.fill();
             ctx.restore();
         } else {
             ctx.fillRect(this.x, this.y, this.w, this.h);

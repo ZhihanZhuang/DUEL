@@ -189,6 +189,25 @@ test('fully invisible Kuro redirects targeting to the moving shade', () => {
     assert.equal(game.getEnemyOf(attacker), shade);
 });
 
+test('local viewing perspective follows online role and excludes spectators', () => {
+    const harness = loadGameClass();
+    const game = makeLifecycleGame(harness);
+    game.p1 = { id: 'p1' };
+    game.p2 = { id: 'p2' };
+
+    assert.equal(game.getLocalControlledFighter(), game.p1);
+
+    game.isOnline = true;
+    game.netRole = 'client';
+    assert.equal(game.getLocalControlledFighter(), game.p2);
+
+    game.netRole = 'host';
+    assert.equal(game.getLocalControlledFighter(), game.p1);
+
+    game.isSpectator = true;
+    assert.equal(game.getLocalControlledFighter(), null);
+});
+
 test('match start exposes the Menu button only in single-player modes', () => {
     const harness = loadGameClass();
     const { context } = harness;

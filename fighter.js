@@ -111,6 +111,12 @@ class Fighter extends Entity {
             this.orionCharges = 0;
             this.orionPulseCooldown = 0;
         }
+
+        if (this.heroName === 'Archor') {
+            this.archorDamageBonus = 0;
+            this.archorDamageBonusMax = 30;
+            this.archorSpeedCooldown = 0;
+        }
     }
 
     takeDamage(amt, attacker, isDoT = false, noKnockback = false) {
@@ -418,6 +424,7 @@ class Fighter extends Entity {
         if (this.heroName === 'Sola' && this.solaDashCooldown > 0) this.solaDashCooldown -= dt;
         if (this.heroName === 'Nyra' && this.nyraShiftCooldown > 0) this.nyraShiftCooldown -= dt;
         if (this.heroName === 'Orion' && this.orionPulseCooldown > 0) this.orionPulseCooldown -= dt;
+        if (this.heroName === 'Archor' && this.archorSpeedCooldown > 0) this.archorSpeedCooldown -= dt;
 
         if (this.heroName === 'Kuro') {
             if (this.kuroDecoyCooldown > 0) this.kuroDecoyCooldown -= dt;
@@ -562,7 +569,7 @@ class Fighter extends Entity {
 
         if (this.heroName === 'Kuro' && this.attackState === 'charging') currentSpeed *= 0.55;
 
-        if (this.buffs.msBoost > 0) currentSpeed *= (this.heroName === 'Wolf' ? 1.3 : 1.2);
+        if (this.buffs.msBoost > 0) currentSpeed *= (this.heroName === 'Wolf' ? 1.3 : (this.heroName === 'Archor' ? 1.65 : 1.2));
 
         if (this.buffs.dizzy > 0) {
             this.buffs.dizzy -= dt;
@@ -863,6 +870,7 @@ class Fighter extends Entity {
                         if (this.heroName === 'Sola') activeTime = 140;
                         if (this.heroName === 'Nyra') activeTime = 70;
                         if (this.heroName === 'Orion') activeTime = 170;
+                        if (this.heroName === 'Archor') activeTime = 25;
 
                         this.attackState = 'active';
                         this.stateTimer = activeTime;
@@ -977,6 +985,7 @@ class Fighter extends Entity {
                     if (this.heroName === 'Sola') recTime = 180;
                     if (this.heroName === 'Nyra') recTime = 140;
                     if (this.heroName === 'Orion') recTime = 300;
+                    if (this.heroName === 'Archor') recTime = 55;
 
                     this.attackState = 'recovery';
                     this.stateTimer = recTime;
@@ -1104,6 +1113,12 @@ class Fighter extends Entity {
                         const angle = Math.random() * Math.PI * 2;
                         game.particles.push(new Particle(centerX + Math.cos(angle)*45, centerY + Math.sin(angle)*45, '#a8b8ff', Math.cos(angle)*5, Math.sin(angle)*5, 420, 5));
                     }
+                } else if (this.heroName === 'Archor' && this.archorSpeedCooldown <= 0) {
+                    this.buffs.msBoost = 4000;
+                    this.archorSpeedCooldown = 8000;
+                    for (let i = 0; i < 16; i++) {
+                        game.particles.push(new Particle(this.x + this.w/2, this.y + this.h/2, '#7df0aa', (Math.random()-0.5)*12, (Math.random()-0.5)*12, 360, 4));
+                    }
                 }
             }
             if (keysPressed[this.controls.attack] && this.attackState === 'idle') {
@@ -1166,7 +1181,7 @@ class Fighter extends Entity {
     }
 
     isMeleeAttack() {
-        if (this.heroName === 'Hason' || this.heroName === 'Willi' || this.heroName === 'Ugo' || this.heroName === 'Kila' || this.heroName === 'Volt' || this.heroName === 'Noae' || this.heroName === 'Kuro' || this.heroName === 'Nyra') return false;
+        if (this.heroName === 'Hason' || this.heroName === 'Willi' || this.heroName === 'Ugo' || this.heroName === 'Kila' || this.heroName === 'Volt' || this.heroName === 'Noae' || this.heroName === 'Kuro' || this.heroName === 'Nyra' || this.heroName === 'Archor') return false;
         if (this.heroName === 'Euclid' && this.euclidWeapon === 'magic') return false;
         if (this.heroName === 'Hunter' && this.hunterWeapon === 'musket') return false;
         if (this.heroName === 'Kadaxi' && this.comboCount === 3) return false;
@@ -1254,6 +1269,7 @@ class Fighter extends Entity {
         if (this.heroName === 'Sola') this.stateTimer = 90;
         if (this.heroName === 'Nyra') this.stateTimer = 70;
         if (this.heroName === 'Orion') this.stateTimer = 170;
+        if (this.heroName === 'Archor') this.stateTimer = 20;
         if (this.heroName === 'Wolf') {
             this.stateTimer = 50;
             this.wolfPassiveReady = this.wolfAttackTimer >= 1500;
@@ -1270,7 +1286,7 @@ class Fighter extends Entity {
     executeActiveAttack() {
         let target = game.getEnemyOf(this);
 
-        if (this.heroName === 'Hason' || this.heroName === 'Willi' || this.heroName === 'Euclid' || this.heroName === 'Ugo' || this.heroName === 'Kila' || this.heroName === 'Volt' || this.heroName === 'Noae' || this.heroName === 'Nyra') {
+        if (this.heroName === 'Hason' || this.heroName === 'Willi' || this.heroName === 'Euclid' || this.heroName === 'Ugo' || this.heroName === 'Kila' || this.heroName === 'Volt' || this.heroName === 'Noae' || this.heroName === 'Nyra' || this.heroName === 'Archor') {
             let minDist = target ? Math.hypot(target.x - this.x, target.y - this.y) : 9999;
             for (let m of game.minions) {
                 if (m && m.owner !== this && !m.dead) {
@@ -1383,9 +1399,38 @@ class Fighter extends Entity {
             let speed = 23;
             game.projectiles.push(new Projectile(px, py - 4, 24, 24, Math.cos(aimAngle)*speed, Math.sin(aimAngle)*speed, 22, this, "#ff7ba7", "chakram"));
         }
+        else if (this.heroName === 'Archor') {
+            const speed = 29;
+            const damage = 20 + Math.min(this.archorDamageBonusMax, this.archorDamageBonus);
+            game.projectiles.push(new Projectile(px, py - 3, 22, 4, Math.cos(aimAngle)*speed, Math.sin(aimAngle)*speed, damage, this, "#d7f5c8", "archor_arrow"));
+        }
+    }
+
+    onArchorHit(target) {
+        if (this.heroName !== 'Archor' || !target?.heroName || target === this) return;
+        this.hp = Math.min(this.maxHp, this.hp + 30);
+        this.archorDamageBonus = Math.min(this.archorDamageBonusMax, this.archorDamageBonus + 2);
+        for (let i = 0; i < 7; i++) {
+            game.particles.push(new Particle(this.x + Math.random()*this.w, this.y + Math.random()*this.h, '#7df0aa', 0, -2-Math.random()*2, 320, 3));
+        }
     }
 
     performSuper() {
+        if (this.heroName === 'Archor') {
+            if (this.superCooldown <= 0) {
+                this.superCooldown = this.superCooldownMax;
+                const target = game.getEnemyOf(this);
+                const px = this.facing === 1 ? this.x + this.w : this.x - 34;
+                const py = this.y + 8;
+                const tx = target ? target.x + target.w/2 : px + this.facing * 500;
+                const ty = target ? target.y + target.h/2 : py;
+                const angle = Math.atan2(ty - py, tx - px);
+                game.projectiles.push(new Projectile(px, py, 34, 24, Math.cos(angle)*18, Math.sin(angle)*18, 0, this, '#7df0aa', 'tracking_bird'));
+                for (let i = 0; i < 22; i++) game.particles.push(new Particle(px, py, '#d7f5c8', (Math.random()-0.5)*14, (Math.random()-0.5)*14, 420, 4));
+            }
+            return;
+        }
+
         if (this.heroName === 'Sola') {
             this.startSolaForce();
             return;
@@ -1640,7 +1685,7 @@ class Fighter extends Entity {
         }
     }
 
-    draw(ctx) {
+    draw(ctx, view = {}) {
         if (this.solaForceHeld) {
             const centerX = this.x + this.w/2;
             const centerY = this.y + this.h/2;
@@ -1669,10 +1714,13 @@ class Fighter extends Entity {
             }
             ctx.restore();
         }
-        if (this.isKuroFullyInvisible()) return;
+        const kuroFullyInvisible = this.isKuroFullyInvisible();
+        const revealOwnedKuro = kuroFullyInvisible && view.revealOwnedKuro === true;
+        if (kuroFullyInvisible && !revealOwnedKuro) return;
         ctx.globalAlpha = 1.0;
         if (this.buffs.shade > 0) ctx.globalAlpha = 0.15;
         if (this.heroName === 'Kuro' && this.kuroCloaked) ctx.globalAlpha = 0.22;
+        if (revealOwnedKuro) ctx.globalAlpha = 0.42;
         if (this.invincible > 0) ctx.globalAlpha = 0.5;
 
         if (this.buffs.dizzy > 0) {
@@ -1864,6 +1912,18 @@ class Fighter extends Entity {
             for (let i = 0; i < this.orionCharges; i++) {
                 ctx.beginPath(); ctx.arc(-hw + 10 + i*12, -10, 4, 0, Math.PI*2); ctx.fill();
             }
+        } else if (this.heroName === 'Archor') {
+            ctx.fillStyle = "#153523";
+            ctx.fillRect(-hw - 2, -2, this.w + 4, h + 4);
+            ctx.fillStyle = this.color;
+            ctx.fillRect(-hw, 0, this.w, h);
+            ctx.fillStyle = "#d7f5c8";
+            ctx.fillRect(-hw + 5, 8, this.w - 10, 13);
+            ctx.fillStyle = "#523a25";
+            ctx.fillRect(-hw, 29, this.w, 7);
+            ctx.fillStyle = "#7df0aa";
+            const marks = Math.min(5, Math.ceil((this.archorDamageBonus || 0) / 6));
+            for (let i = 0; i < marks; i++) ctx.fillRect(-hw + 5 + i*6, -9, 4, 4);
         } else if (this.heroName === 'Wolf') {
             ctx.fillStyle = "#404040"; ctx.fillRect(-hw - 2, -2, this.w + 4, h + 4);
             ctx.fillStyle = this.color; ctx.fillRect(-hw, 0, this.w, h);
@@ -2020,6 +2080,20 @@ class Fighter extends Entity {
                 ctx.strokeStyle = "rgba(168, 184, 255, 0.45)";
                 ctx.beginPath(); ctx.arc(22 + thrust, 0, 24, 0, Math.PI*2); ctx.stroke();
             }
+            ctx.restore();
+        }
+        else if (this.heroName === 'Archor') {
+            ctx.save();
+            ctx.translate(hw - 2, 28);
+            const draw = this.attackState === 'windup' ? 8 * phaseProg : 0;
+            ctx.strokeStyle = "#d7b56d";
+            ctx.lineWidth = 3;
+            ctx.beginPath(); ctx.arc(-draw, 0, 25, -Math.PI/2, Math.PI/2); ctx.stroke();
+            ctx.strokeStyle = "#e8f3df";
+            ctx.lineWidth = 1;
+            ctx.beginPath(); ctx.moveTo(-draw, -25); ctx.lineTo(-draw-5, 0); ctx.lineTo(-draw, 25); ctx.stroke();
+            ctx.fillStyle = "#d7f5c8";
+            ctx.fillRect(-draw-5, -1, 32+draw, 2);
             ctx.restore();
         }
         else if (this.heroName === 'Volt') {
@@ -2212,8 +2286,17 @@ class Fighter extends Entity {
             ctx.strokeStyle = "rgba(255, 0, 0, 0.6)"; ctx.lineWidth = 3; ctx.strokeRect(this.x-2, this.y-2, this.w+4, this.h+4);
         }
 
-        ctx.fillStyle = "red"; ctx.fillRect(this.x, this.y - 12, this.w, 5);
-        ctx.fillStyle = "#4caf50"; ctx.fillRect(this.x, this.y - 12, this.w * (this.hp / this.maxHp), 5);
+        if (revealOwnedKuro) {
+            ctx.globalAlpha = 1;
+            ctx.strokeStyle = "#ff2d2d";
+            ctx.lineWidth = 3;
+            ctx.strokeRect(this.x - 5, this.y - 5, this.w + 10, this.h + 10);
+        }
+
+        if (!kuroFullyInvisible) {
+            ctx.fillStyle = "red"; ctx.fillRect(this.x, this.y - 12, this.w, 5);
+            ctx.fillStyle = "#4caf50"; ctx.fillRect(this.x, this.y - 12, this.w * (this.hp / this.maxHp), 5);
+        }
         ctx.globalAlpha = 1.0;
     }
 }

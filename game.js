@@ -422,6 +422,12 @@ class Game {
         return fighter.kuroAbsoluteCloakTimer > 0 || Math.hypot(fighter.vx || 0, fighter.vy || 0) <= 1.2;
     }
 
+    getLocalControlledFighter() {
+        if (this.isSpectator || this.netRole === 'spectator') return null;
+        if (this.isOnline && this.netRole === 'client') return this.p2 || null;
+        return this.p1 || null;
+    }
+
     getEnemyOf(fighter) {
         const resolveVisibleTarget = target => {
             if (!target || target.dead || target === fighter) return null;
@@ -458,6 +464,7 @@ class Game {
             if (!friendlyFire && (t === owner || t.owner === owner)) continue;
             if (!t.dead && Math.hypot((t.x + t.w/2) - x, (t.y + t.h/2) - y) <= radius) {
                 t.takeDamage(damage, owner);
+                if (damage > 0 && owner?.heroName === 'Archor' && typeof owner.onArchorHit === 'function') owner.onArchorHit(t);
                 if (stunDuration > 0 && !t.dead && !(t.invincible > 0)) {
                     if(!t.buffs) t.buffs = {};
                     t.buffs.dizzy = Math.max(t.buffs.dizzy || 0, stunDuration);
@@ -468,8 +475,6 @@ class Game {
 
     updateUI() {
         if (!this.p1 || !this.p2) return;
-        document.getElementById('hud-p1')?.classList.toggle('kuro-concealed', this.isFighterConcealed(this.p1));
-        document.getElementById('hud-p2')?.classList.toggle('kuro-concealed', this.isFighterConcealed(this.p2));
         document.getElementById('p1-hp').style.width = `${Math.max(0, (this.p1.hp / this.p1.maxHp) * 100)}%`;
         if (this.p1.heroName === 'Duke') {
             document.getElementById('p1-horse-hp').style.width = `${Math.max(0, (this.p1.horseHp / this.p1.maxHorseHp) * 100)}%`;
@@ -557,6 +562,11 @@ class Game {
         if (this.p1.heroName === 'Orion') {
             p1Stat += `[GRAVITY: ${this.p1.orionCharges}/3]`;
             if (this.p1.orionPulseCooldown > 0) p1Stat += ` [PULSE CD ${(this.p1.orionPulseCooldown/1000).toFixed(1)}s]`;
+        }
+        if (this.p1.heroName === 'Archor') {
+            p1Stat += `[BLOODHUNT +${((this.p1.archorDamageBonus || 0)/10).toFixed(1)} WRD]`;
+            if (this.p1.archorSpeedCooldown > 0) p1Stat += ` [SURGE CD ${(this.p1.archorSpeedCooldown/1000).toFixed(1)}s]`;
+            else p1Stat += " [SURGE READY]";
         }
 
         if (this.p1.buffs.poison > 0) p1Stat += " [POISONED]";
@@ -654,6 +664,11 @@ class Game {
             p2Stat += `[GRAVITY: ${this.p2.orionCharges}/3]`;
             if (this.p2.orionPulseCooldown > 0) p2Stat += ` [PULSE CD ${(this.p2.orionPulseCooldown/1000).toFixed(1)}s]`;
         }
+        if (this.p2.heroName === 'Archor') {
+            p2Stat += `[BLOODHUNT +${((this.p2.archorDamageBonus || 0)/10).toFixed(1)} WRD]`;
+            if (this.p2.archorSpeedCooldown > 0) p2Stat += ` [SURGE CD ${(this.p2.archorSpeedCooldown/1000).toFixed(1)}s]`;
+            else p2Stat += " [SURGE READY]";
+        }
 
         if (this.p2.buffs.poison > 0) p2Stat += " [POISONED]";
         if (this.p2.buffs.burn > 0) p2Stat += " [BURN]";
@@ -697,7 +712,6 @@ class Game {
             const row = document.querySelector(`.survivor-row[data-fighter-id="${fighter.id}"]`);
             if (!row) return;
             row.classList.toggle('eliminated', fighter.dead);
-            row.classList.toggle('kuro-concealed', this.isFighterConcealed(fighter));
             const bar = row.querySelector('.survivor-bar > div');
             if (bar) bar.style.width = `${Math.max(0, fighter.hp / fighter.maxHp * 100)}%`;
         });
@@ -1129,9 +1143,10 @@ class Game {
         if (this.hurricane && !this.hurricane.dead) this.hurricane.draw(this.ctx);
         this.hazards.forEach(h => h.draw(this.ctx));
         this.minions.forEach(m => m.draw(this.ctx));
+        const localFighter = this.getLocalControlledFighter();
         this.getFighters().forEach(fighter => {
             if (fighter.dead) return;
-            fighter.draw(this.ctx);
+            fighter.draw(this.ctx, { revealOwnedKuro: fighter === localFighter });
             if (this.isBattleRoyale && !(fighter.heroName === 'Kuro' && fighter.kuroCloaked)) {
                 this.ctx.save();
                 this.ctx.font = '10px monospace';

@@ -256,7 +256,8 @@ function loadPhysicsGame(heroName = 'Hunter') {
             Kuro: { maxHp: 600, speed: 5.2, jump: 14, width: 38, height: 70, color: '#244d3b', superCD: 26000 },
             Sola: { maxHp: 780, speed: 5.8, jump: 15, width: 40, height: 70, color: '#167d8d', superCD: 15000 },
             Nyra: { maxHp: 680, speed: 6.2, jump: 16, width: 36, height: 66, color: '#d84b78', superCD: 24000 },
-            Orion: { maxHp: 900, speed: 4.6, jump: 13.5, width: 46, height: 74, color: '#4056a1', superCD: 28000 }
+            Orion: { maxHp: 900, speed: 4.6, jump: 13.5, width: 46, height: 74, color: '#4056a1', superCD: 28000 },
+            Archor: { maxHp: 680, speed: 5.8, jump: 15, width: 38, height: 68, color: '#2f8f62', superCD: 18000 }
         },
         keys: {},
         keysPressed: {},
@@ -397,7 +398,7 @@ test('every hero with a direct super can decide to use it', () => {
     const context = loadAI();
     const directSuperHeroes = [
         'Hason', 'Willi', 'Hunter', 'Macu', 'Artu', 'Duke', 'Kadaxi', 'Euclid',
-        'Lique', 'Kae', 'Kila', 'Volt', 'Gensan', 'Noae', 'Wolf', 'Kuro', 'Sola', 'Nyra', 'Orion'
+        'Lique', 'Kae', 'Kila', 'Volt', 'Gensan', 'Noae', 'Wolf', 'Kuro', 'Sola', 'Nyra', 'Orion', 'Archor'
     ];
 
     for (const heroName of directSuperHeroes) {
@@ -430,14 +431,15 @@ test('weapon, puppet, stance, shadow, and mine utility skills are reachable', ()
         { hero: 'Ugo', action: 'switch', setup: ai => { ai.superCooldown = 5000; } },
         { hero: 'Kila', action: 'switch', setup: ai => { ai.superCooldown = 5000; ai.kilaSwitchCD = 0; ai.kilaElement = 'water'; } },
         { hero: 'Gensan', action: 'extra', setup: ai => { ai.superCooldown = 5000; ai.gensanShadowCD = 0; } },
-        { hero: 'Noae', action: 'switch', setup: ai => { ai.superCooldown = 5000; } }
+        { hero: 'Noae', action: 'switch', setup: ai => { ai.superCooldown = 5000; } },
+        { hero: 'Archor', action: 'switch', setup: ai => { ai.superCooldown = 5000; ai.archorSpeedCooldown = 0; } }
     ];
 
     for (const testCase of cases) {
         const context = loadAI();
         const ai = makeFighter(testCase.hero, `cpu_${testCase.hero}`);
         const target = makeFighter('Noae', `target_${testCase.hero}`);
-        target.x = testCase.hero === 'Hunter' || testCase.hero === 'Euclid'
+        target.x = testCase.hero === 'Hunter' || testCase.hero === 'Euclid' || testCase.hero === 'Archor'
             ? 420
             : (testCase.hero === 'Kila' ? 800 : 650);
         testCase.setup(ai);
@@ -727,6 +729,77 @@ test('absolute cloak defeats AI last-attacker tracking while Kuro moves', () => 
     assert.equal(context.keysPressed[ai.controls.attack], undefined);
 });
 
+test('Archor fires rapid arrows, heals on fighter hits, and caps Bloodhunt damage growth', () => {
+    const simulation = loadPhysicsGame('Archor');
+    const { ai, target, context } = simulation;
+    ai.isCPU = false;
+    ai.attackState = 'idle';
+    ai.stateTimer = 0;
+    ai.hp = 400;
+
+    ai.performAttack();
+    assert.equal(ai.stateTimer, 20, 'Archor did not use the rapid attack windup');
+    ai.update(20);
+    assert.equal(context.game.projectiles.length, 1);
+    assert.equal(context.game.projectiles[0].type, 'archor_arrow');
+    assert.equal(context.game.projectiles[0].damage, 20);
+
+    ai.onArchorHit(target);
+    assert.equal(ai.hp, 430, 'Bloodhunt did not heal 3 WRD');
+    assert.equal(ai.archorDamageBonus, 2);
+
+    ai.attackState = 'idle';
+    ai.executeActiveAttack();
+    assert.equal(context.game.projectiles[1].damage, 22, 'Bloodhunt did not increase arrow damage');
+
+    for (let hit = 0; hit < 30; hit++) ai.onArchorHit(target);
+    assert.equal(ai.hp, ai.maxHp);
+    assert.equal(ai.archorDamageBonus, 30, 'Bloodhunt exceeded its +3 WRD cap');
+});
+
+test('Archor speed switch and tracking bird super expose their full kit', () => {
+    const simulation = loadPhysicsGame('Archor');
+    const { ai, context } = simulation;
+    ai.isCPU = false;
+    ai.attackState = 'idle';
+    ai.stateTimer = 0;
+
+    context.keysPressed[ai.controls.switch] = true;
+    ai.update(16);
+    delete context.keysPressed[ai.controls.switch];
+    assert.equal(ai.buffs.msBoost, 4000);
+    assert.equal(ai.archorSpeedCooldown, 8000);
+
+    ai.superCooldown = 0;
+    ai.performSuper();
+    const bird = context.game.projectiles.find(projectile => projectile.type === 'tracking_bird');
+    assert.ok(bird, 'Hunting Roc was not launched');
+    assert.equal(ai.superCooldown, ai.superCooldownMax);
+});
+
+test('tracking bird impact creates wide 7 WRD AoE with 4.5s dizzy', () => {
+    const context = loadProjectileContext();
+    const owner = { id: 'archor', heroName: 'Archor' };
+    const target = {
+        x: 100, y: 100, w: 40, h: 70, vx: 0, vy: 0, hp: 200,
+        dead: false, invincible: 0, buffs: {},
+        takeDamage(amount) { this.hp -= amount; }
+    };
+    let explosion = null;
+    context.game.opponents = [target];
+    context.game.createExplosion = (...args) => { explosion = args; };
+    const bird = new context.window.Projectile(100, 100, 34, 24, 0, 0, 0, owner, '#7df0aa', 'tracking_bird');
+
+    bird.update(16);
+
+    assert.equal(bird.dead, true);
+    assert.ok(explosion, 'tracking bird did not explode on impact');
+    assert.equal(explosion[2], 180);
+    assert.equal(explosion[3], 70);
+    assert.equal(explosion[5], false);
+    assert.equal(explosion[6], 4500);
+});
+
 test('Kuro cloaks patiently and fires a fully charged Phantom Round', () => {
     const simulation = loadPhysicsGame('Kuro');
     const { ai, context } = simulation;
@@ -766,6 +839,39 @@ test('Kuro cloaks patiently and fires a fully charged Phantom Round', () => {
     assert.equal(ai.kuroEmpoweredShot, false);
     assert.equal(ai.kuroCloaked, false);
     assert.ok(ai.kuroRevealTimer > 0);
+});
+
+test('fully concealed Kuro is visible only to the owner with a red frame and no overhead HP bar', () => {
+    const { ai } = loadPhysicsGame('Kuro');
+    ai.kuroCloaked = true;
+    ai.kuroAbsoluteCloakTimer = 3000;
+    ai.vx = 0;
+    ai.vy = 0;
+
+    const makeContext = () => {
+        const calls = [];
+        const ctx = new Proxy({ calls }, {
+            get(target, key) {
+                if (key in target) return target[key];
+                return (...args) => calls.push({ method: key, args, strokeStyle: target.strokeStyle });
+            },
+            set(target, key, value) {
+                target[key] = value;
+                return true;
+            }
+        });
+        return ctx;
+    };
+
+    const opponentContext = makeContext();
+    ai.draw(opponentContext);
+    assert.equal(opponentContext.calls.length, 0, 'opponent view rendered a fully concealed Kuro');
+
+    const ownerContext = makeContext();
+    ai.draw(ownerContext, { revealOwnedKuro: true });
+    assert.ok(ownerContext.calls.some(call => call.method === 'fillRect'), 'owner could not see their concealed Kuro');
+    assert.ok(ownerContext.calls.some(call => call.method === 'strokeRect' && call.strokeStyle === '#ff2d2d'), 'owner visibility frame was missing');
+    assert.equal(ownerContext.calls.some(call => call.method === 'fillRect' && call.args[1] === ai.y - 12), false, 'concealed Kuro still rendered the overhead HP bar');
 });
 
 test('Kuro shade grants 5.5s absolute cloak through attacks and damage', () => {

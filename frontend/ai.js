@@ -52,7 +52,8 @@ const HERO_TACTICS = {
     Kuro:    { role: 'sniper', aggression: 0.48, caution: 1.42, burst: 1.70, kite: 1.55, setup: 1.25, highGround: 1.65, retreatHp: 0.44, retreatFireChance: 0.18 },
     Sola:    { role: 'sentinel', aggression: 1.02, caution: 0.82, burst: 1.18, kite: 0.12, setup: 0.18, highGround: 0.45, retreatHp: 0.27, retreatFireChance: 0.12 },
     Nyra:    { role: 'skirmisher', aggression: 0.74, caution: 1.12, burst: 1.30, kite: 1.28, setup: 0.42, highGround: 1.05, retreatHp: 0.38, retreatFireChance: 0.48 },
-    Orion:   { role: 'gravity', aggression: 1.12, caution: 0.55, burst: 1.25, kite: 0.08, setup: 0.95, highGround: 0.38, retreatHp: 0.24, retreatFireChance: 0.10 }
+    Orion:   { role: 'gravity', aggression: 1.12, caution: 0.55, burst: 1.25, kite: 0.08, setup: 0.95, highGround: 0.38, retreatHp: 0.24, retreatFireChance: 0.10 },
+    Archor:  { role: 'rapid_archer', aggression: 0.82, caution: 1.18, burst: 1.45, kite: 1.38, setup: 0.20, highGround: 1.28, retreatHp: 0.38, retreatFireChance: 0.62 }
 };
 
 function getHeroTactic(ai) {
@@ -426,6 +427,7 @@ function getCombatProfile(ai, source = ai) {
         case 'Sola': range = 86; preferred = 58; break;
         case 'Nyra': range = 390; preferred = 255; break;
         case 'Orion': range = 116; preferred = 76; break;
+        case 'Archor': range = 620; preferred = 390; break;
     }
     return { range, preferred, ranged: !ai.isMeleeAttack(), tactics };
 }
@@ -618,6 +620,9 @@ function chooseDefensiveAction(game, ai, target, threat) {
         case 'Nyra':
             if (ai.nyraShiftCooldown <= 0 && game.projectiles.some(projectile => projectile.owner === ai && (projectile.type === 'chakram' || projectile.type === 'chakram_super'))) return 'switch';
             break;
+        case 'Archor':
+            if (ai.archorSpeedCooldown <= 0) return 'switch';
+            break;
     }
     return null;
 }
@@ -740,6 +745,10 @@ function chooseHeroAction(game, ai, target, targetEntity, dist, verticalDistance
         case 'Orion':
             if (ai.orionCharges > 0 && ai.orionPulseCooldown <= 0 && dist < 205) return 'switch';
             if (superReady && dist < 680) return 'super';
+            break;
+        case 'Archor':
+            if (superReady && dist < 900) return 'super';
+            if (ai.archorSpeedCooldown <= 0 && (combatState === 'kite' || combatState === 'retreat' || dist < 230)) return 'switch';
             break;
     }
     return null;

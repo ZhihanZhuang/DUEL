@@ -302,6 +302,11 @@ var HEROES = {
         name: "Orion", desc: "Gravity Gauntlet Warden",
         color: "#4056a1", maxHp: 900, speed: 4.6, jump: 13.5, width: 46, height: 74, superCD: 28000,
         ui: { hp: "90 WRD", atk: "3.0 WRD (Extended Gravity Gauntlets)", passive: "Melee hits build Gravity Charges (max 3). Press [Switch] to consume every charge in a close Gravity Pulse, dealing 1 WRD + 1.5 WRD per charge and briefly pulling enemies inward (5s CD).", super: "<span class='skill-tag'>Black Hole</span> Creates a massive black hole for 5s at the enemy's position. It strongly pulls and heavily slows nearby enemies, dealing 0.7 WRD every 0.25s." }
+    },
+    Archor: {
+        name: "Archor", desc: "Bloodhunt Rapid Archer",
+        color: "#2f8f62", maxHp: 680, speed: 5.8, jump: 15, width: 38, height: 68, superCD: 18000,
+        ui: { hp: "68 WRD", atk: "2.0-5.0 WRD (Rapid Arrows)", passive: "<span class='skill-tag'>Bloodhunt</span> Every fighter hit heals Archor for 3 WRD and permanently adds 0.2 WRD arrow damage, up to +3 WRD. Press [Switch] for a 4s movement-speed surge (8s CD).", super: "<span class='skill-tag'>Hunting Roc</span> Fires a tracking bird that explodes on impact for 7 WRD in a wide area and dizzies affected opponents for 4.5s." }
     }
 };
 
