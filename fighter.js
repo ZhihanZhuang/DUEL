@@ -132,7 +132,7 @@ class Fighter extends Entity {
         }
     }
 
-    takeDamage(amt, attacker, isDoT = false, noKnockback = false) {
+    takeDamage(amt, attacker, isDoT = false, noKnockback = false, noHitReaction = false) {
         if (this.dead || this.invincible > 0) return;
 
         if (this.heroName === 'Sola' && this.solaForceActive) this.endSolaForce();
@@ -174,7 +174,7 @@ class Fighter extends Entity {
         }
 
         this.hp -= amt;
-        this.stunTimer = 150;
+        if (!noHitReaction) this.stunTimer = 150;
         this.timeSinceLastDamage = 0;
 
         if (this.heroName === 'Willi' && this.hp < this.maxHp * 0.5 && !this.williHasTriggeredHeal) {

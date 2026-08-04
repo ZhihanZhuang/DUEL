@@ -1138,7 +1138,7 @@ class D2FDrone extends Entity {
             if (ticks > 0) this.laserTickTimer %= 250;
             for (const enemy of this.getTargets()) {
                 if (!this.beamTouches(enemy, startX, startY, this.laserEndX, this.laserEndY)) continue;
-                for (let tick = 0; tick < ticks && !enemy.dead; tick++) enemy.takeDamage(2, this.owner, true, true);
+                for (let tick = 0; tick < ticks && !enemy.dead; tick++) enemy.takeDamage(2, this.owner, true, true, true);
             }
         } else {
             this.laserTickTimer = 0;
@@ -1244,8 +1244,8 @@ class D2FGiantRobot extends Entity {
         super(spawnX, Math.max(-112, target.y - 330), 88, 112);
         this.owner = owner;
         this.type = 'd2f_giant_robot';
-        this.hp = 300;
-        this.maxHp = 300;
+        this.hp = 150;
+        this.maxHp = 150;
         this.life = 14000;
         this.maxLife = 14000;
         this.targetId = target.id;
@@ -1292,7 +1292,7 @@ class D2FGiantRobot extends Entity {
         ];
         for (const target of targets) {
             if (!target || target.dead || target.invincible > 0 || !checkAABB(hitbox, target)) continue;
-            target.takeDamage(85, this.owner);
+            target.takeDamage(42.5, this.owner);
             target.buffs = target.buffs || {};
             target.buffs.dizzy = Math.max(target.buffs.dizzy || 0, 750);
         }
@@ -1342,7 +1342,7 @@ class D2FGiantRobot extends Entity {
             this.vx += (this.facing * (Math.abs(dx) > 62 ? 4.4 : 0) - this.vx) * 0.24 * frameScale;
             if (this.vy >= 0 && Math.abs(this.vy) < 0.8 && (dy < -55 || (Math.abs(dx) > 120 && Math.abs(dx) < 260))) this.vy = -13;
             if (Math.abs(dx) < 82 && Math.abs(dy) < 95 && this.attackCooldown <= 0) {
-                target.takeDamage(28, this.owner);
+                target.takeDamage(14, this.owner);
                 this.attackCooldown = 850;
                 for (let i = 0; i < 10; i++) game.particles.push(new Particle(target.x + target.w/2, target.y + target.h/2, '#35d5e8', this.facing*(2+Math.random()*5), (Math.random()-0.5)*7, 260, 4));
             }

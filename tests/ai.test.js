@@ -1025,8 +1025,11 @@ test('D2F-1 drones predict projectile paths, hold range, and cycle damage-only l
     const owner = { id: 'd2f', heroName: 'D2F1', x: 160, y: 560, w: 40, h: 66, dead: false };
     const target = {
         id: 'target', heroName: 'Hunter', x: 560, y: 500, w: 45, h: 70,
-        hp: 200, dead: false, invincible: 0, buffs: { burn: 125, slow: 80, dizzy: 40 },
-        takeDamage(amount) { this.hp -= amount; }
+        hp: 200, dead: false, invincible: 0, stunTimer: 0, buffs: { burn: 125, slow: 80, dizzy: 40 },
+        takeDamage(amount, attacker, isDoT, noKnockback, noHitReaction) {
+            this.hp -= amount;
+            if (!noHitReaction) this.stunTimer = 150;
+        }
     };
     context.game.opponents = [target];
     context.game.getEnemyOf = () => target;
@@ -1047,6 +1050,7 @@ test('D2F-1 drones predict projectile paths, hold range, and cycle damage-only l
     drone.update(250);
     assert.equal(drone.laserActive, true);
     assert.equal(target.hp, 198);
+    assert.equal(target.stunTimer, 0, 'laser damage applied a movement-locking hit reaction');
     assert.deepEqual(target.buffs, { burn: 125, slow: 80, dizzy: 40 });
 
     drone.cycleTimer = 1990;
@@ -1057,6 +1061,25 @@ test('D2F-1 drones predict projectile paths, hold range, and cycle damage-only l
     drone.cycleTimer = 2490;
     drone.update(10);
     assert.equal(drone.laserActive, true, 'laser did not restart on its 2.5-second cycle');
+});
+
+test('reaction-free drone damage does not interrupt fighter movement', () => {
+    const simulation = loadPhysicsGame('Hunter');
+    const { ai, context } = simulation;
+    ai.isCPU = false;
+    ai.attackState = 'idle';
+    ai.stateTimer = 0;
+    ai.stunTimer = 0;
+    const startingHp = ai.hp;
+    const startingX = ai.x;
+    context.keys[ai.controls.right] = true;
+
+    ai.takeDamage(2, { heroName: 'D2F1', x: 200, w: 40 }, true, true, true);
+    ai.update(16);
+
+    assert.equal(ai.hp, startingHp - 2);
+    assert.equal(ai.stunTimer, 0);
+    assert.ok(ai.x > startingX, 'fighter could not move while taking drone laser damage');
 });
 
 test('D2F-1 target beacon slows before a damaging robot landing and melee follow-up', () => {
@@ -1078,15 +1101,17 @@ test('D2F-1 target beacon slows before a damaging robot landing and melee follow
     beacon.update(500);
     const robot = context.game.minions.find(minion => minion.type === 'd2f_giant_robot');
     assert.ok(robot, 'beacon did not create the giant robot after one second');
+    assert.equal(robot.maxHp, 150);
+    assert.equal(robot.hp, 150);
 
     for (let frame = 0; frame < 120 && robot.dropping; frame++) robot.update(16);
     assert.equal(robot.dropping, false);
-    assert.equal(target.hp, 215);
+    assert.equal(target.hp, 257.5);
     assert.equal(target.buffs.dizzy, 750);
 
     robot.attackCooldown = 0;
     robot.update(16);
-    assert.equal(target.hp, 187);
+    assert.equal(target.hp, 243.5);
 });
 
 test('Hoin activates Bloodhunt after three continuous hits and loses it after 3.5s', () => {
