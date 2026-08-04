@@ -207,13 +207,44 @@ class GiantSword extends Entity {
         this.owner = owner;
         this.vy = 25;
         this.damageDealt = false;
+        this.hitTargets = new Set();
         this.untargetable = true;
         this.life = 1000;
+    }
+    getTargets() {
+        return [
+            ...game.getOpponentsOf(this.owner),
+            ...game.minions.filter(minion => minion && minion !== this && minion.owner !== this.owner && !minion.untargetable)
+        ].filter(target => target && !target.dead && !(target.invincible > 0));
+    }
+    isOnArenaFloor(target) {
+        return target.y + target.h >= GROUND_Y - 3;
+    }
+    hitTarget(target) {
+        if (this.hitTargets.has(target)) return;
+        target.takeDamage(90, this.owner);
+        this.hitTargets.add(target);
+        if (!target.dead && this.isOnArenaFloor(target) && target.buffs) {
+            target.buffs.dizzy = Math.max(target.buffs.dizzy || 0, 5000);
+        }
+    }
+    damageGroundImpact() {
+        const impactX = this.x + this.w/2;
+        const impactY = this.y + this.h;
+        for (const target of this.getTargets()) {
+            const distance = Math.hypot(target.x + target.w/2 - impactX, target.y + target.h/2 - impactY);
+            if (distance > 150) continue;
+            this.hitTarget(target);
+            if (!target.dead && this.isOnArenaFloor(target) && target.buffs) {
+                target.buffs.dizzy = Math.max(target.buffs.dizzy || 0, 5000);
+            }
+        }
     }
     update(dt) {
         if (this.life <= 0) { this.dead = true; return; }
 
         if (!this.damageDealt) {
+            const previousY = this.y;
             this.y += this.vy;
             let hitGround = false;
             if (this.y + this.h >= GROUND_Y) {
@@ -221,9 +252,19 @@ class GiantSword extends Entity {
                 hitGround = true;
             }
 
+            const sweptHitbox = {
+                x: this.x,
+                y: previousY,
+                w: this.w,
+                h: this.h + Math.max(0, this.y - previousY)
+            };
+            for (const target of this.getTargets()) {
+                if (checkAABB(sweptHitbox, target)) this.hitTarget(target);
+            }
+
             if (hitGround) {
                 this.damageDealt = true;
-                game.createExplosion(this.x + this.w/2, this.y + this.h, 150, 90, this.owner, false, 5000);
+                this.damageGroundImpact();
                 for(let i=0; i<30; i++) game.particles.push(new Particle(this.x+this.w/2, this.y+this.h, "#fff", (Math.random()-0.5)*20, -Math.random()*15, 600));
             }
         } else {
@@ -748,6 +789,8 @@ class GravityWell extends Entity {
         this.life = 5000;
         this.maxLife = this.life;
         this.tickTimer = 0;
+        this.effectRadius = 430;
+        this.tickDamage = 7;
         this.untargetable = true;
     }
 
@@ -771,15 +814,15 @@ class GravityWell extends Entity {
             const dx = centerX - (target.x + target.w/2);
             const dy = centerY - (target.y + target.h/2);
             const distance = Math.hypot(dx, dy);
-            if (distance > 340) continue;
-            const strength = 1 - distance / 340;
+            if (distance > this.effectRadius) continue;
+            const strength = 1 - distance / this.effectRadius;
             const frameScale = Math.min(2, activeDt / 16.67);
             target.vx += dx / Math.max(1, distance) * (0.5 + strength * 0.9) * frameScale;
             target.vy += dy / Math.max(1, distance) * (0.1 + strength * 0.22) * frameScale;
             target.vx = Math.max(-14, Math.min(14, target.vx));
             target.vy = Math.max(-12, Math.min(12, target.vy));
             if (target.buffs) target.buffs.gravitySlow = Math.max(target.buffs.gravitySlow || 0, 350);
-            for (let tick = 0; tick < damageTicks && !target.dead; tick++) target.takeDamage(5, this.owner, true, true);
+            for (let tick = 0; tick < damageTicks && !target.dead; tick++) target.takeDamage(this.tickDamage, this.owner, true, true);
         }
 
         if (Math.random() < 0.35) {
@@ -803,7 +846,7 @@ class GravityWell extends Entity {
         ctx.beginPath(); ctx.arc(0, 0, 50, 0, Math.PI * 2); ctx.stroke();
         ctx.strokeStyle = `rgba(216, 75, 120, ${0.65 * progress})`;
         ctx.lineWidth = 2;
-        ctx.beginPath(); ctx.arc(0, 0, 82, 0, Math.PI * 2); ctx.stroke();
+        ctx.beginPath(); ctx.arc(0, 0, 100, 0, Math.PI * 2); ctx.stroke();
         ctx.restore();
     }
 }

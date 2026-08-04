@@ -271,7 +271,7 @@ var HEROES = {
     Gensan: {
         name: "Gensan", desc: "Phantom Blade Master",
         color: "#cccccc", maxHp: 800, speed: 7, jump: 15, width: 40, height: 70, superCD: 18000,
-        ui: { hp: "80 WRD", atk: "3.2 WRD (Sword)", passive: "Every 4th attack deals 5.2 WRD with +30% range and slows for 1.2s. Press [Extra] to leave a Sword Shadow (Max 2, 3s CD).", super: "<span class='skill-tag'>White Peak Array</span> Drops 3 giant swords at the enemy's position (9 WRD AoE, 5s Stun) and leaves a Sword Shadow at your position for 8s. Press [Switch] to teleport to furthest shadow (No CD)." }
+        ui: { hp: "80 WRD", atk: "3.2 WRD (Sword)", passive: "Every 4th attack deals 5.2 WRD with +30% range and slows for 1.2s. Press [Extra] to leave a Sword Shadow (Max 2, 3s CD).", super: "<span class='skill-tag'>White Peak Array</span> Drops 3 giant swords at the enemy's position. Falling swords deal 9 WRD along their path and on impact; only enemies struck on the arena floor are dizzied for 5s. Leaves a Sword Shadow at your position for 8s. Press [Switch] to teleport to furthest shadow (No CD)." }
     },
     Noae: {
         name: "Noae", desc: "Mine Engineer",
@@ -301,7 +301,7 @@ var HEROES = {
     Orion: {
         name: "Orion", desc: "Gravity Gauntlet Warden",
         color: "#4056a1", maxHp: 900, speed: 4.6, jump: 13.5, width: 46, height: 74, superCD: 28000,
-        ui: { hp: "90 WRD", atk: "3.0 WRD (Gravity Gauntlets)", passive: "Melee hits build Gravity Charges (max 3). Press [Switch] to consume every charge in a close Gravity Pulse, dealing 1 WRD + 1.5 WRD per charge and briefly pulling enemies inward (5s CD).", super: "<span class='skill-tag'>Black Hole</span> Creates a wide black hole for 5s at the enemy's position. It strongly pulls and heavily slows nearby enemies, dealing 0.5 WRD every 0.25s." }
+        ui: { hp: "90 WRD", atk: "3.0 WRD (Extended Gravity Gauntlets)", passive: "Melee hits build Gravity Charges (max 3). Press [Switch] to consume every charge in a close Gravity Pulse, dealing 1 WRD + 1.5 WRD per charge and briefly pulling enemies inward (5s CD).", super: "<span class='skill-tag'>Black Hole</span> Creates a massive black hole for 5s at the enemy's position. It strongly pulls and heavily slows nearby enemies, dealing 0.7 WRD every 0.25s." }
     }
 };
 

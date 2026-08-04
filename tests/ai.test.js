@@ -54,7 +54,7 @@ function loadProjectileContext() {
     };
     vm.createContext(context);
     const source = fs.readFileSync(path.join(__dirname, '..', 'entities.js'), 'utf8');
-    vm.runInContext(`${source}\nwindow.Projectile = Projectile; window.KuroDecoy = KuroDecoy; window.GravityWell = GravityWell;`, context, { filename: 'entities.js' });
+    vm.runInContext(`${source}\nwindow.Projectile = Projectile; window.KuroDecoy = KuroDecoy; window.GiantSword = GiantSword; window.GravityWell = GravityWell;`, context, { filename: 'entities.js' });
     return context;
 }
 
@@ -225,6 +225,8 @@ function loadPhysicsGame(heroName = 'Hunter') {
             this.owner = owner;
             this.type = 'gravity_well';
             this.life = 5000;
+            this.effectRadius = 430;
+            this.tickDamage = 7;
             this.untargetable = true;
         }
     }
@@ -1028,8 +1030,39 @@ test('Nyra chakrams return, support Rift Shift, and launch as a six-way Halo Sto
     assert.equal(halo.length, 6);
 });
 
+test('Gensan giant swords damage their falling path and only dizzy floor targets', () => {
+    const context = loadProjectileContext();
+    const owner = { id: 'gensan', heroName: 'Gensan' };
+    const makeTarget = (x, y, grounded) => ({
+        x, y, w: 40, h: 70, hp: 500, dead: false, invincible: 0,
+        isGrounded: grounded, buffs: {},
+        takeDamage(amount) { this.hp -= amount; }
+    });
+    const airbornePathTarget = makeTarget(110, 80, false);
+    const floorPathTarget = makeTarget(110, context.GROUND_Y - 70, true);
+    const impactOnlyTarget = makeTarget(240, context.GROUND_Y - 70, true);
+    context.game.opponents = [airbornePathTarget, floorPathTarget, impactOnlyTarget];
+    const sword = new context.window.GiantSword(owner, 100, -150);
+
+    for (let frame = 0; frame < 40 && !sword.damageDealt; frame++) sword.update(16);
+
+    assert.equal(sword.damageDealt, true);
+    assert.equal(airbornePathTarget.hp, 410);
+    assert.equal(airbornePathTarget.buffs.dizzy, undefined);
+    assert.equal(floorPathTarget.hp, 410, 'floor path target was damaged more than once');
+    assert.equal(floorPathTarget.buffs.dizzy, 5000);
+    assert.equal(impactOnlyTarget.hp, 410);
+    assert.equal(impactOnlyTarget.buffs.dizzy, 5000);
+});
+
 test('Orion spends Gravity Charges on a pulse and deploys a five-second Black Hole', () => {
     const simulation = loadPhysicsGame('Orion');
+    simulation.ai.facing = 1;
+    simulation.target.x = simulation.ai.x + simulation.ai.w + 70;
+    const extendedHitbox = simulation.ai.getMeleeHitbox();
+    assert.equal(extendedHitbox.w, 88);
+    assert.ok(simulation.target.x < extendedHitbox.x + extendedHitbox.w, 'Orion regular attack did not gain range');
+
     simulation.ai.attackState = 'idle';
     simulation.ai.orionCharges = 3;
     simulation.target.x = simulation.ai.x + 90;
@@ -1050,13 +1083,15 @@ test('Orion spends Gravity Charges on a pulse and deploys a five-second Black Ho
     assert.ok(well, 'Black Hole was not created');
     assert.equal(well.owner, simulation.ai);
     assert.equal(well.life, 5000);
+    assert.equal(well.effectRadius, 430);
+    assert.equal(well.tickDamage, 7);
 });
 
 test('Black Hole pulls, slows, and damages enemies every quarter-second for five seconds', () => {
     const context = loadProjectileContext();
     const owner = { id: 'orion', heroName: 'Orion' };
     const target = {
-        x: 110, y: 175, w: 40, h: 70, vx: 0, vy: 0, hp: 100,
+        x: 110, y: 175, w: 40, h: 70, vx: 0, vy: 0, hp: 200,
         dead: false, invincible: 0, buffs: {},
         takeDamage(amount) { this.hp -= amount; }
     };
@@ -1065,17 +1100,17 @@ test('Black Hole pulls, slows, and damages enemies every quarter-second for five
 
     well.update(250);
 
-    assert.equal(target.hp, 95);
+    assert.equal(target.hp, 193);
     assert.ok(target.vx > 0, 'gravity well did not pull the target toward its core');
     assert.ok(target.buffs.gravitySlow >= 350);
     assert.equal(well.life, 4750);
 
     well.update(750);
-    assert.equal(target.hp, 80, 'large frames must preserve all 250ms damage ticks');
+    assert.equal(target.hp, 172, 'large frames must preserve all 250ms damage ticks');
     assert.equal(well.life, 4000);
 
     well.update(4000);
-    assert.equal(target.hp, 0);
+    assert.equal(target.hp, 60);
     assert.equal(well.life, 0);
     assert.equal(well.dead, true);
 });
@@ -1089,14 +1124,14 @@ test('Black Hole affects multiple survival opponents independently', () => {
         takeDamage(amount) { this.hp -= amount; }
     });
     const first = makeTarget(110);
-    const second = makeTarget(490);
+    const second = makeTarget(590);
     context.game.opponents = [first, second];
     const well = new context.window.GravityWell(owner, 200, 200);
 
     well.update(250);
 
-    assert.equal(first.hp, 95);
-    assert.equal(second.hp, 95, 'expanded Black Hole range did not reach a distant opponent');
+    assert.equal(first.hp, 93);
+    assert.equal(second.hp, 93, 'expanded Black Hole range did not reach a distant opponent');
     assert.ok(first.buffs.gravitySlow >= 350);
     assert.ok(second.buffs.gravitySlow >= 350);
 });

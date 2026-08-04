@@ -1184,7 +1184,7 @@ class Fighter extends Entity {
         if (this.heroName === 'Gensan') range = this.gensanCombo === 3 ? 65 : 50;
         if (this.heroName === 'Wolf') range = 45;
         if (this.heroName === 'Sola') range = 65;
-        if (this.heroName === 'Orion') { range = 58; yOffset = 6; h = 54; }
+        if (this.heroName === 'Orion') { range = 88; yOffset = 6; h = 54; }
 
         if (this.heroName === 'Macu') {
             range = 110;
@@ -2008,7 +2008,7 @@ class Fighter extends Entity {
         else if (this.heroName === 'Orion') {
             ctx.save();
             ctx.translate(hw, 28);
-            const thrust = this.attackState === 'active' ? 34 * Math.sin(phaseProg * Math.PI) : 0;
+            const thrust = this.attackState === 'active' ? 52 * Math.sin(phaseProg * Math.PI) : 0;
             ctx.fillStyle = "#15182b";
             ctx.fillRect(-8, -13, 26 + thrust, 26);
             ctx.fillStyle = "#a8b8ff";

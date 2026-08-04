@@ -425,7 +425,7 @@ function getCombatProfile(ai, source = ai) {
         case 'Kuro': range = 920; preferred = 610; break;
         case 'Sola': range = 86; preferred = 58; break;
         case 'Nyra': range = 390; preferred = 255; break;
-        case 'Orion': range = 82; preferred = 54; break;
+        case 'Orion': range = 116; preferred = 76; break;
     }
     return { range, preferred, ranged: !ai.isMeleeAttack(), tactics };
 }
