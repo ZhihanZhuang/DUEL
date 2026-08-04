@@ -545,7 +545,9 @@ class Projectile extends Entity {
                 }
             }
             if (target && !target.dead && !(target.invincible > 0)) {
-                if (this.type !== "volt_laser" || this.timer < 1500) {
+                const trackingExpired = (this.type === "volt_laser" && this.timer >= 1500)
+                    || (this.type === "tracking_bird" && this.timer >= 2000);
+                if (!trackingExpired) {
                     let tx = target.x + target.w/2; let ty = target.y + target.h/2;
                     let angle = Math.atan2(ty - (this.y + this.h/2), tx - (this.x + this.w/2));
                     let speed = this.type === "magic_burst" ? 18 : (this.type === "volt_laser" ? 15 : (this.type === "tracking_bird" ? 18 : 25));
@@ -786,7 +788,7 @@ class Projectile extends Entity {
             ctx.save();
             ctx.translate(this.x + this.w/2, this.y + this.h/2);
             ctx.rotate(Math.atan2(this.vy, this.vx));
-            ctx.fillStyle = '#d7f5c8';
+            ctx.fillStyle = '#ffffa8';
             ctx.fillRect(-this.w/2, -1, this.w, 2);
             ctx.fillStyle = '#7df0aa';
             ctx.beginPath(); ctx.moveTo(this.w/2, 0); ctx.lineTo(this.w/2-7, -4); ctx.lineTo(this.w/2-7, 4); ctx.fill();
@@ -795,10 +797,11 @@ class Projectile extends Entity {
             ctx.save();
             ctx.translate(this.x + this.w/2, this.y + this.h/2);
             ctx.rotate(Math.atan2(this.vy, this.vx));
+            ctx.scale(1.45, 1.45);
             const wing = Math.sin(this.timer * 0.018) * 8;
-            ctx.fillStyle = '#173b2a';
+            ctx.fillStyle = '#e0a800';
             ctx.beginPath(); ctx.moveTo(16, 0); ctx.lineTo(-9, -4); ctx.lineTo(-18, -12-wing); ctx.lineTo(-5, 1); ctx.lineTo(-18, 12+wing); ctx.lineTo(-9, 4); ctx.fill();
-            ctx.fillStyle = '#7df0aa';
+            ctx.fillStyle = '#fff06a';
             ctx.beginPath(); ctx.moveTo(18, 0); ctx.lineTo(9, -5); ctx.lineTo(9, 5); ctx.fill();
             ctx.restore();
         } else {

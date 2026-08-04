@@ -729,7 +729,7 @@ test('absolute cloak defeats AI last-attacker tracking while Kuro moves', () => 
     assert.equal(context.keysPressed[ai.controls.attack], undefined);
 });
 
-test('Archor fires rapid arrows, heals on fighter hits, and caps Bloodhunt damage growth', () => {
+test('Hoin activates Bloodhunt after three continuous hits and loses it after 3.5s', () => {
     const simulation = loadPhysicsGame('Archor');
     const { ai, target, context } = simulation;
     ai.isCPU = false;
@@ -742,19 +742,37 @@ test('Archor fires rapid arrows, heals on fighter hits, and caps Bloodhunt damag
     ai.update(20);
     assert.equal(context.game.projectiles.length, 1);
     assert.equal(context.game.projectiles[0].type, 'archor_arrow');
-    assert.equal(context.game.projectiles[0].damage, 20);
+    assert.equal(context.game.projectiles[0].damage, 6);
+    assert.equal(context.game.projectiles[0].w, 36);
+    assert.equal(context.game.projectiles[0].color, '#ffffa8');
 
     ai.onArchorHit(target);
-    assert.equal(ai.hp, 430, 'Bloodhunt did not heal 3 WRD');
+    assert.equal(ai.hp, 400, 'Bloodhunt healed before the third continuous hit');
+    assert.equal(ai.archorHitChain, 1);
+    ai.update(1501);
+    assert.equal(ai.archorHitChain, 0, 'an interrupted hit chain did not reset');
+
+    ai.onArchorHit(target);
+    ai.onArchorHit(target);
+    assert.equal(ai.hp, 400, 'Bloodhunt activated before the third hit');
+    ai.onArchorHit(target);
+    assert.equal(ai.archorPassiveTimer, 3500);
+    assert.equal(ai.hp, 410, 'active Bloodhunt did not heal 1 WRD');
     assert.equal(ai.archorDamageBonus, 2);
 
     ai.attackState = 'idle';
     ai.executeActiveAttack();
-    assert.equal(context.game.projectiles[1].damage, 22, 'Bloodhunt did not increase arrow damage');
+    assert.equal(context.game.projectiles[1].damage, 8, 'Bloodhunt did not increase arrow damage');
 
     for (let hit = 0; hit < 30; hit++) ai.onArchorHit(target);
     assert.equal(ai.hp, ai.maxHp);
     assert.equal(ai.archorDamageBonus, 30, 'Bloodhunt exceeded its +3 WRD cap');
+
+    ai.attackState = 'idle';
+    ai.stateTimer = 0;
+    ai.update(3500);
+    assert.equal(ai.archorPassiveTimer, 0);
+    assert.equal(ai.archorDamageBonus, 0, 'temporary Bloodhunt damage remained after expiry');
 });
 
 test('Archor speed switch and tracking bird super expose their full kit', () => {
@@ -774,6 +792,9 @@ test('Archor speed switch and tracking bird super expose their full kit', () => 
     ai.performSuper();
     const bird = context.game.projectiles.find(projectile => projectile.type === 'tracking_bird');
     assert.ok(bird, 'Hunting Roc was not launched');
+    assert.equal(bird.w, 54);
+    assert.equal(bird.h, 40);
+    assert.equal(bird.color, '#ffd84d');
     assert.equal(ai.superCooldown, ai.superCooldownMax);
 });
 
@@ -798,6 +819,29 @@ test('tracking bird impact creates wide 7 WRD AoE with 4.5s dizzy', () => {
     assert.equal(explosion[3], 70);
     assert.equal(explosion[5], false);
     assert.equal(explosion[6], 4500);
+});
+
+test('Hoin bird tracks for two seconds and then keeps an unguided course', () => {
+    const context = loadProjectileContext();
+    const owner = { id: 'archor', heroName: 'Archor' };
+    const target = {
+        x: 700, y: 500, w: 40, h: 70, vx: 0, vy: 0, hp: 200,
+        dead: false, invincible: 0, buffs: {},
+        takeDamage(amount) { this.hp -= amount; }
+    };
+    context.game.opponents = [target];
+    context.game.getEnemyOf = () => target;
+
+    const trackingBird = new context.window.Projectile(200, 200, 54, 40, 18, 0, 0, owner, '#ffd84d', 'tracking_bird');
+    trackingBird.timer = 1900;
+    trackingBird.update(16);
+    assert.ok(trackingBird.vy > 0, 'bird did not steer toward its target before two seconds');
+
+    const unguidedBird = new context.window.Projectile(200, 200, 54, 40, 12, 3, 0, owner, '#ffd84d', 'tracking_bird');
+    unguidedBird.timer = 2000;
+    unguidedBird.update(16);
+    assert.equal(unguidedBird.vx, 12);
+    assert.equal(unguidedBird.vy, 3);
 });
 
 test('Kuro cloaks patiently and fires a fully charged Phantom Round', () => {

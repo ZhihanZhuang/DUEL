@@ -564,7 +564,8 @@ class Game {
             if (this.p1.orionPulseCooldown > 0) p1Stat += ` [PULSE CD ${(this.p1.orionPulseCooldown/1000).toFixed(1)}s]`;
         }
         if (this.p1.heroName === 'Archor') {
-            p1Stat += `[BLOODHUNT +${((this.p1.archorDamageBonus || 0)/10).toFixed(1)} WRD]`;
+            if (this.p1.archorPassiveTimer > 0) p1Stat += `[BLOODHUNT ${(this.p1.archorPassiveTimer/1000).toFixed(1)}s +${((this.p1.archorDamageBonus || 0)/10).toFixed(1)} WRD]`;
+            else p1Stat += `[HITS: ${this.p1.archorHitChain || 0}/3]`;
             if (this.p1.archorSpeedCooldown > 0) p1Stat += ` [SURGE CD ${(this.p1.archorSpeedCooldown/1000).toFixed(1)}s]`;
             else p1Stat += " [SURGE READY]";
         }
@@ -665,7 +666,8 @@ class Game {
             if (this.p2.orionPulseCooldown > 0) p2Stat += ` [PULSE CD ${(this.p2.orionPulseCooldown/1000).toFixed(1)}s]`;
         }
         if (this.p2.heroName === 'Archor') {
-            p2Stat += `[BLOODHUNT +${((this.p2.archorDamageBonus || 0)/10).toFixed(1)} WRD]`;
+            if (this.p2.archorPassiveTimer > 0) p2Stat += `[BLOODHUNT ${(this.p2.archorPassiveTimer/1000).toFixed(1)}s +${((this.p2.archorDamageBonus || 0)/10).toFixed(1)} WRD]`;
+            else p2Stat += `[HITS: ${this.p2.archorHitChain || 0}/3]`;
             if (this.p2.archorSpeedCooldown > 0) p2Stat += ` [SURGE CD ${(this.p2.archorSpeedCooldown/1000).toFixed(1)}s]`;
             else p2Stat += " [SURGE READY]";
         }

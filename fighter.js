@@ -116,6 +116,9 @@ class Fighter extends Entity {
             this.archorDamageBonus = 0;
             this.archorDamageBonusMax = 30;
             this.archorSpeedCooldown = 0;
+            this.archorHitChain = 0;
+            this.archorHitChainTimer = 0;
+            this.archorPassiveTimer = 0;
         }
     }
 
@@ -424,7 +427,20 @@ class Fighter extends Entity {
         if (this.heroName === 'Sola' && this.solaDashCooldown > 0) this.solaDashCooldown -= dt;
         if (this.heroName === 'Nyra' && this.nyraShiftCooldown > 0) this.nyraShiftCooldown -= dt;
         if (this.heroName === 'Orion' && this.orionPulseCooldown > 0) this.orionPulseCooldown -= dt;
-        if (this.heroName === 'Archor' && this.archorSpeedCooldown > 0) this.archorSpeedCooldown -= dt;
+        if (this.heroName === 'Archor') {
+            if (this.archorSpeedCooldown > 0) this.archorSpeedCooldown -= dt;
+            if (this.archorPassiveTimer > 0) {
+                this.archorPassiveTimer = Math.max(0, this.archorPassiveTimer - dt);
+                if (this.archorPassiveTimer <= 0) {
+                    this.archorDamageBonus = 0;
+                    this.archorHitChain = 0;
+                    this.archorHitChainTimer = 0;
+                }
+            } else if (this.archorHitChainTimer > 0) {
+                this.archorHitChainTimer = Math.max(0, this.archorHitChainTimer - dt);
+                if (this.archorHitChainTimer <= 0) this.archorHitChain = 0;
+            }
+        }
 
         if (this.heroName === 'Kuro') {
             if (this.kuroDecoyCooldown > 0) this.kuroDecoyCooldown -= dt;
@@ -1401,14 +1417,22 @@ class Fighter extends Entity {
         }
         else if (this.heroName === 'Archor') {
             const speed = 29;
-            const damage = 20 + Math.min(this.archorDamageBonusMax, this.archorDamageBonus);
-            game.projectiles.push(new Projectile(px, py - 3, 22, 4, Math.cos(aimAngle)*speed, Math.sin(aimAngle)*speed, damage, this, "#d7f5c8", "archor_arrow"));
+            const damage = 6 + Math.min(this.archorDamageBonusMax, this.archorDamageBonus);
+            game.projectiles.push(new Projectile(px, py - 3, 36, 4, Math.cos(aimAngle)*speed, Math.sin(aimAngle)*speed, damage, this, "#ffffa8", "archor_arrow"));
         }
     }
 
     onArchorHit(target) {
         if (this.heroName !== 'Archor' || !target?.heroName || target === this) return;
-        this.hp = Math.min(this.maxHp, this.hp + 30);
+        if (this.archorPassiveTimer <= 0) {
+            this.archorHitChain++;
+            this.archorHitChainTimer = 1500;
+            if (this.archorHitChain < 3) return;
+            this.archorPassiveTimer = 3500;
+            this.archorHitChain = 0;
+            this.archorHitChainTimer = 0;
+        }
+        this.hp = Math.min(this.maxHp, this.hp + 10);
         this.archorDamageBonus = Math.min(this.archorDamageBonusMax, this.archorDamageBonus + 2);
         for (let i = 0; i < 7; i++) {
             game.particles.push(new Particle(this.x + Math.random()*this.w, this.y + Math.random()*this.h, '#7df0aa', 0, -2-Math.random()*2, 320, 3));
@@ -1425,8 +1449,8 @@ class Fighter extends Entity {
                 const tx = target ? target.x + target.w/2 : px + this.facing * 500;
                 const ty = target ? target.y + target.h/2 : py;
                 const angle = Math.atan2(ty - py, tx - px);
-                game.projectiles.push(new Projectile(px, py, 34, 24, Math.cos(angle)*18, Math.sin(angle)*18, 0, this, '#7df0aa', 'tracking_bird'));
-                for (let i = 0; i < 22; i++) game.particles.push(new Particle(px, py, '#d7f5c8', (Math.random()-0.5)*14, (Math.random()-0.5)*14, 420, 4));
+                game.projectiles.push(new Projectile(px, py, 54, 40, Math.cos(angle)*18, Math.sin(angle)*18, 0, this, '#ffd84d', 'tracking_bird'));
+                for (let i = 0; i < 22; i++) game.particles.push(new Particle(px, py, '#ffd84d', (Math.random()-0.5)*14, (Math.random()-0.5)*14, 420, 4));
             }
             return;
         }
