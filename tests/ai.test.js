@@ -58,6 +58,24 @@ function loadProjectileContext() {
     return context;
 }
 
+function loadNetworkInputContext() {
+    const p1 = makeControls('P1');
+    const p2 = makeControls('P2');
+    const context = {
+        window: {
+            keys: {},
+            keysPressed: {},
+            currentBinds: { p1, p2 }
+        },
+        localStorage: { getItem: () => '' }
+    };
+    vm.createContext(context);
+    const source = fs.readFileSync(path.join(__dirname, '..', 'network.js'), 'utf8');
+    const inputOnlySource = source.slice(0, source.indexOf('if (window.Game'));
+    vm.runInContext(inputOnlySource, context, { filename: 'network.js' });
+    return { context, p1, p2 };
+}
+
 function makeControls(prefix) {
     return {
         left: `${prefix}_LEFT`, right: `${prefix}_RIGHT`, jump: `${prefix}_JUMP`, down: `${prefix}_DOWN`,
@@ -109,6 +127,7 @@ function makeFighter(heroName, id = 'cpu') {
         kuroRelocateTimer: 0,
         solaFocus: 0,
         solaDashCooldown: 0,
+        solaForceActive: false,
         nyraShiftCooldown: 0,
         orionCharges: 0,
         orionPulseCooldown: 0,
@@ -151,7 +170,7 @@ function readyBrain(ai, target) {
         stuckTimer: 0,
         lastX: ai.x,
         lastY: ai.y,
-        intent: { left: false, right: false, down: false, holdJump: false, holdAttack: false },
+        intent: { left: false, right: false, down: false, holdJump: false, holdAttack: false, holdSuper: false },
         profile: { observePlayer() {} }
     };
 }
@@ -205,7 +224,7 @@ function loadPhysicsGame(heroName = 'Hunter') {
             super(x - 30, y - 30, 60, 60);
             this.owner = owner;
             this.type = 'gravity_well';
-            this.life = 4000;
+            this.life = 5000;
             this.untargetable = true;
         }
     }
@@ -233,7 +252,7 @@ function loadPhysicsGame(heroName = 'Hunter') {
             Willi: { maxHp: 500, speed: 6.5, jump: 16, width: 35, height: 65, color: '#2F4F4F', superCD: 12000 },
             Volt: { maxHp: 650, speed: 4, jump: 15, width: 35, height: 65, color: '#FFD700', superCD: 30000 },
             Kuro: { maxHp: 600, speed: 5.2, jump: 14, width: 38, height: 70, color: '#244d3b', superCD: 26000 },
-            Sola: { maxHp: 780, speed: 5.8, jump: 15, width: 40, height: 70, color: '#167d8d', superCD: 22000 },
+            Sola: { maxHp: 780, speed: 5.8, jump: 15, width: 40, height: 70, color: '#167d8d', superCD: 15000 },
             Nyra: { maxHp: 680, speed: 6.2, jump: 16, width: 36, height: 66, color: '#d84b78', superCD: 24000 },
             Orion: { maxHp: 900, speed: 4.6, jump: 13.5, width: 46, height: 74, color: '#4056a1', superCD: 28000 }
         },
@@ -273,6 +292,7 @@ function loadPhysicsGame(heroName = 'Hunter') {
         minions: [], projectiles: [], particles: [], hazards: [], hurricane: null,
         getOpponentsOf: fighter => fighter === ai ? [target] : [ai],
         getEnemyOf: fighter => fighter === ai ? target : ai,
+        getFighters: () => [ai, target],
         createExplosion() {},
         handleFighterDefeat() {}
     };
@@ -852,7 +872,7 @@ test('Kuro sniper rounds apply their piercing and control effects', () => {
     assert.equal(fullRound.dead, false);
 });
 
-test('Sola deflects projectiles into Focus and converts Focus into super damage', () => {
+test('Sola deflects projectiles into Focus and channels Force Choke at arena range', () => {
     const projectileContext = loadProjectileContext();
     const shooter = { id: 'shooter', heroName: 'Hason' };
     const sola = {
@@ -874,16 +894,93 @@ test('Sola deflects projectiles into Focus and converts Focus into super damage'
     const simulation = loadPhysicsGame('Sola');
     simulation.ai.attackState = 'idle';
     simulation.ai.superCooldown = 0;
-    simulation.ai.solaFocus = 2;
-    simulation.target.x = simulation.ai.x + 180;
-    simulation.target.y = simulation.ai.y;
-    const hpBefore = simulation.target.hp;
+    simulation.ai.hp = 650;
+    simulation.target.x = 5;
+    simulation.target.y = 170;
+    const targetStartY = simulation.target.y;
+    simulation.context.keys[simulation.ai.controls.super] = true;
 
     simulation.ai.performSuper();
 
-    assert.equal(hpBefore - simulation.target.hp, 115);
-    assert.equal(simulation.ai.solaFocus, 0);
-    assert.ok(simulation.target.buffs.dizzy >= 700);
+    assert.equal(simulation.ai.solaForceActive, true);
+    assert.equal(simulation.target.solaForceHeld, true);
+    assert.equal(simulation.ai.superCooldown, 15000);
+
+    simulation.ai.update(249);
+    assert.equal(simulation.target.hp, 750);
+    simulation.ai.update(1);
+
+    assert.equal(simulation.target.hp, 745);
+    assert.equal(simulation.ai.hp, 655);
+    assert.ok(simulation.target.y < targetStartY, 'Force Choke did not lift its distant target');
+
+    simulation.context.keys[simulation.ai.controls.super] = false;
+    simulation.ai.update(16);
+    assert.equal(simulation.ai.solaForceActive, false);
+    assert.equal(simulation.target.solaForceHeld, false);
+});
+
+test('Sola Force Choke stops on movement, damage, target loss, and its 4.5s cap', () => {
+    const simulation = loadPhysicsGame('Sola');
+    const { ai, target, context } = simulation;
+    ai.attackState = 'idle';
+    ai.hp = 600;
+    context.keys[ai.controls.super] = true;
+
+    ai.superCooldown = 0;
+    ai.performSuper();
+    context.keys[ai.controls.left] = true;
+    ai.update(16);
+    assert.equal(ai.solaForceActive, false);
+    assert.equal(target.solaForceHeld, false);
+
+    context.keys[ai.controls.left] = false;
+    ai.superCooldown = 0;
+    ai.performSuper();
+    ai.takeDamage(10, target);
+    assert.equal(ai.solaForceActive, false);
+    assert.equal(target.solaForceHeld, false);
+
+    ai.stunTimer = 0;
+    ai.superCooldown = 0;
+    ai.performSuper();
+    target.dead = true;
+    ai.update(16);
+    assert.equal(ai.solaForceActive, false);
+    assert.equal(target.solaForceHeld, false);
+
+    target.dead = false;
+    target.hp = 750;
+    ai.superCooldown = 0;
+    ai.performSuper();
+    ai.update(4500);
+
+    assert.equal(target.hp, 660, 'Force Choke must drain exactly 18 five-HP ticks');
+    assert.equal(ai.hp, 680, 'Sola must heal only the HP actually drained');
+    assert.equal(ai.solaForceActive, false);
+    assert.equal(target.solaForceHeld, false);
+});
+
+test('Sola CPU starts and holds Force Choke without movement input', () => {
+    const context = loadAI();
+    const ai = makeFighter('Sola');
+    const target = makeFighter('Hunter', 'player');
+    target.x = 1220;
+    readyBrain(ai, target);
+    const game = makeGame(ai, target);
+
+    context.window.runAI(game, 16);
+
+    assert.equal(context.keysPressed[ai.controls.super], true);
+    assert.equal(context.keys[ai.controls.super], true);
+    assert.equal(context.keys[ai.controls.left], false);
+    assert.equal(context.keys[ai.controls.right], false);
+
+    ai.solaForceActive = true;
+    ai.aiBrain.intent.left = true;
+    context.window.runAI(game, 16);
+    assert.equal(context.keys[ai.controls.super], true);
+    assert.equal(context.keys[ai.controls.left], false);
 });
 
 test('Nyra chakrams return, support Rift Shift, and launch as a six-way Halo Storm', () => {
@@ -913,13 +1010,25 @@ test('Nyra chakrams return, support Rift Shift, and launch as a six-way Halo Sto
     assert.equal(anchor.dead, true);
     assert.equal(simulation.ai.nyraShiftCooldown, 7000);
 
+    for (const key in simulation.context.keysPressed) delete simulation.context.keysPressed[key];
+    simulation.ai.attackState = 'idle';
+    simulation.ai.performAttack();
+    assert.equal(simulation.ai.stateTimer, 70, 'Nyra basic throw windup was not accelerated');
+    simulation.ai.update(70);
+    const fastChakram = simulation.context.game.projectiles.find(projectile => projectile.type === 'chakram' && !projectile.dead);
+    assert.ok(fastChakram, 'Nyra did not release her accelerated basic chakram');
+    assert.ok(Math.abs(Math.hypot(fastChakram.vx, fastChakram.vy) - 23) < 0.001);
+    simulation.ai.update(70);
+    assert.equal(simulation.ai.attackState, 'recovery');
+    assert.equal(simulation.ai.stateTimer, 140, 'Nyra basic throw recovery was not accelerated');
+
     simulation.ai.superCooldown = 0;
     simulation.ai.performSuper();
     const halo = simulation.context.game.projectiles.filter(projectile => projectile.type === 'chakram_super');
     assert.equal(halo.length, 6);
 });
 
-test('Orion spends Gravity Charges on a pulse and deploys an Event Horizon', () => {
+test('Orion spends Gravity Charges on a pulse and deploys a five-second Black Hole', () => {
     const simulation = loadPhysicsGame('Orion');
     simulation.ai.attackState = 'idle';
     simulation.ai.orionCharges = 3;
@@ -938,24 +1047,89 @@ test('Orion spends Gravity Charges on a pulse and deploys an Event Horizon', () 
     simulation.ai.superCooldown = 0;
     simulation.ai.performSuper();
     const well = simulation.context.game.minions.find(minion => minion.type === 'gravity_well');
-    assert.ok(well, 'Event Horizon was not created');
+    assert.ok(well, 'Black Hole was not created');
     assert.equal(well.owner, simulation.ai);
+    assert.equal(well.life, 5000);
 });
 
-test('Event Horizon pulls and damages enemies once per second', () => {
+test('Black Hole pulls, slows, and damages enemies every quarter-second for five seconds', () => {
     const context = loadProjectileContext();
     const owner = { id: 'orion', heroName: 'Orion' };
     const target = {
         x: 110, y: 175, w: 40, h: 70, vx: 0, vy: 0, hp: 100,
-        dead: false, invincible: 0,
+        dead: false, invincible: 0, buffs: {},
         takeDamage(amount) { this.hp -= amount; }
     };
     context.game.opponents = [target];
     const well = new context.window.GravityWell(owner, 200, 200);
 
-    well.update(1000);
+    well.update(250);
 
-    assert.equal(target.hp, 90);
+    assert.equal(target.hp, 95);
     assert.ok(target.vx > 0, 'gravity well did not pull the target toward its core');
-    assert.equal(well.life, 3000);
+    assert.ok(target.buffs.gravitySlow >= 350);
+    assert.equal(well.life, 4750);
+
+    well.update(750);
+    assert.equal(target.hp, 80, 'large frames must preserve all 250ms damage ticks');
+    assert.equal(well.life, 4000);
+
+    well.update(4000);
+    assert.equal(target.hp, 0);
+    assert.equal(well.life, 0);
+    assert.equal(well.dead, true);
+});
+
+test('Black Hole affects multiple survival opponents independently', () => {
+    const context = loadProjectileContext();
+    const owner = { id: 'orion', heroName: 'Orion' };
+    const makeTarget = x => ({
+        x, y: 175, w: 40, h: 70, vx: 0, vy: 0, hp: 100,
+        dead: false, invincible: 0, buffs: {},
+        takeDamage(amount) { this.hp -= amount; }
+    });
+    const first = makeTarget(110);
+    const second = makeTarget(490);
+    context.game.opponents = [first, second];
+    const well = new context.window.GravityWell(owner, 200, 200);
+
+    well.update(250);
+
+    assert.equal(first.hp, 95);
+    assert.equal(second.hp, 95, 'expanded Black Hole range did not reach a distant opponent');
+    assert.ok(first.buffs.gravitySlow >= 350);
+    assert.ok(second.buffs.gravitySlow >= 350);
+});
+
+test('Black Hole gravity slow reduces movement more than a regular slow', () => {
+    const regularSlow = loadPhysicsGame('Hunter');
+    regularSlow.ai.attackState = 'idle';
+    regularSlow.ai.buffs.slow = 350;
+    regularSlow.context.keys[regularSlow.ai.controls.right] = true;
+    regularSlow.ai.update(16);
+
+    const gravitySlow = loadPhysicsGame('Hunter');
+    gravitySlow.ai.attackState = 'idle';
+    gravitySlow.ai.buffs.gravitySlow = 350;
+    gravitySlow.context.keys[gravitySlow.ai.controls.right] = true;
+    gravitySlow.ai.update(16);
+
+    assert.ok(gravitySlow.ai.vx < regularSlow.ai.vx * 0.7);
+});
+
+test('online input synchronization preserves held and pressed Super states', () => {
+    const { context, p1, p2 } = loadNetworkInputContext();
+    context.window.keys[p1.super] = true;
+    context.window.keysPressed[p1.super] = true;
+
+    const inputs = context.window.collectLocalOnlineInputs();
+    assert.equal(inputs.super, true);
+    assert.equal(inputs.pSuper, true);
+
+    context.window.applyRemoteOnlineInputs({ super: true, pSuper: true });
+    assert.equal(context.window.keys[p2.super], true);
+    assert.equal(context.window.keysPressed[p2.super], true);
+
+    context.window.applyRemoteOnlineInputs({ super: false });
+    assert.equal(context.window.keys[p2.super], false);
 });

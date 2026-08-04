@@ -545,6 +545,8 @@ class Game {
         }
         if (this.p1.heroName === 'Sola') {
             p1Stat += `[FOCUS: ${this.p1.solaFocus}/3]`;
+            if (this.p1.solaForceActive) p1Stat += ` [FORCE ${Math.max(0, (this.p1.solaForceMaxDuration - this.p1.solaForceElapsed)/1000).toFixed(1)}s]`;
+            else if (this.p1.solaForceHeld) p1Stat += " [FORCE HELD]";
             if (this.p1.solaDashCooldown > 0) p1Stat += ` [STEP CD ${(this.p1.solaDashCooldown/1000).toFixed(1)}s]`;
         }
         if (this.p1.heroName === 'Nyra') {
@@ -560,7 +562,7 @@ class Game {
         if (this.p1.buffs.poison > 0) p1Stat += " [POISONED]";
         if (this.p1.buffs.burn > 0) p1Stat += " [BURN]";
         if (this.p1.buffs.dizzy > 0) p1Stat += " [DIZZY]";
-        if (this.p1.buffs.slow > 0) p1Stat += " [SLOWED]";
+        if (this.p1.buffs.slow > 0 || this.p1.buffs.gravitySlow > 0) p1Stat += " [SLOWED]";
         if (this.p1.buffs.bleed > 0) p1Stat += " [BLEEDING]";
         document.getElementById('p1-status').innerText = p1Stat;
 
@@ -639,6 +641,8 @@ class Game {
         }
         if (this.p2.heroName === 'Sola') {
             p2Stat += `[FOCUS: ${this.p2.solaFocus}/3]`;
+            if (this.p2.solaForceActive) p2Stat += ` [FORCE ${Math.max(0, (this.p2.solaForceMaxDuration - this.p2.solaForceElapsed)/1000).toFixed(1)}s]`;
+            else if (this.p2.solaForceHeld) p2Stat += " [FORCE HELD]";
             if (this.p2.solaDashCooldown > 0) p2Stat += ` [STEP CD ${(this.p2.solaDashCooldown/1000).toFixed(1)}s]`;
         }
         if (this.p2.heroName === 'Nyra') {
@@ -654,7 +658,7 @@ class Game {
         if (this.p2.buffs.poison > 0) p2Stat += " [POISONED]";
         if (this.p2.buffs.burn > 0) p2Stat += " [BURN]";
         if (this.p2.buffs.dizzy > 0) p2Stat += " [DIZZY]";
-        if (this.p2.buffs.slow > 0) p2Stat += " [SLOWED]";
+        if (this.p2.buffs.slow > 0 || this.p2.buffs.gravitySlow > 0) p2Stat += " [SLOWED]";
         if (this.p2.buffs.bleed > 0) p2Stat += " [BLEEDING]";
         document.getElementById('p2-status').innerText = p2Stat;
 

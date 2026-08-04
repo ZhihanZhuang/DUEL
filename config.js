@@ -290,18 +290,18 @@ var HEROES = {
     },
     Sola: {
         name: "Sola", desc: "Lightsaber Sentinel",
-        color: "#167d8d", maxHp: 780, speed: 5.8, jump: 15, width: 40, height: 70, superCD: 22000,
-        ui: { hp: "78 WRD", atk: "2.8 WRD (Lightsaber)", passive: "<span class='skill-tag'>Luminous Guard</span> Lightsaber attacks deflect most projectiles. Each deflection stores 1 Focus (max 3), adding 0.8 WRD to the next saber hit. Press [Switch] for an invincible short Force Step (6s CD).", super: "<span class='skill-tag'>Singularity Slash</span> Pulls nearby enemies into saber range and strikes for 8.5 WRD + 1.5 WRD per stored Focus, then dizzies them for 0.7s." }
+        color: "#167d8d", maxHp: 780, speed: 5.8, jump: 15, width: 40, height: 70, superCD: 15000,
+        ui: { hp: "78 WRD", atk: "2.8 WRD (Lightsaber)", passive: "<span class='skill-tag'>Luminous Guard</span> Lightsaber attacks deflect most projectiles. Each deflection stores 1 Focus (max 3), adding 0.8 WRD to the next saber hit. Press [Switch] for an invincible short Force Step (6s CD).", super: "<span class='skill-tag'>Force Choke</span> Hold [Super] to seize an enemy anywhere in the arena for up to 4.5s. They rise inside a lightning sphere while Sola steals 0.5 WRD every 0.25s. Releasing [Super], moving, or taking damage ends the channel. 15s CD." }
     },
     Nyra: {
         name: "Nyra", desc: "Chakram Rift Dancer",
         color: "#d84b78", maxHp: 680, speed: 6.2, jump: 16, width: 36, height: 66, superCD: 24000,
-        ui: { hp: "68 WRD", atk: "2.2 WRD Out + 2.2 WRD Return (Chakram)", passive: "Thrown chakrams reverse after 0.6s and can hit again on the way back. Press [Switch] to Rift Shift to one of your active chakrams and destroy it (7s CD).", super: "<span class='skill-tag'>Halo Storm</span> Launches six returning chakrams in every direction. Each deals 2 WRD on the outward and return paths." }
+        ui: { hp: "68 WRD", atk: "2.2 WRD Out + 2.2 WRD Return (Fast Chakram)", passive: "Thrown chakrams reverse after 0.6s and can hit again on the way back. Nyra recovers rapidly between throws. Press [Switch] to Rift Shift to one of your active chakrams and destroy it (7s CD).", super: "<span class='skill-tag'>Halo Storm</span> Launches six returning chakrams in every direction. Each deals 2 WRD on the outward and return paths." }
     },
     Orion: {
         name: "Orion", desc: "Gravity Gauntlet Warden",
         color: "#4056a1", maxHp: 900, speed: 4.6, jump: 13.5, width: 46, height: 74, superCD: 28000,
-        ui: { hp: "90 WRD", atk: "3.0 WRD (Gravity Gauntlets)", passive: "Melee hits build Gravity Charges (max 3). Press [Switch] to consume every charge in a close Gravity Pulse, dealing 1 WRD + 1.5 WRD per charge and briefly pulling enemies inward (5s CD).", super: "<span class='skill-tag'>Event Horizon</span> Creates a 4s gravity well at the enemy's position. It drags enemies toward its core and deals 1 WRD each second." }
+        ui: { hp: "90 WRD", atk: "3.0 WRD (Gravity Gauntlets)", passive: "Melee hits build Gravity Charges (max 3). Press [Switch] to consume every charge in a close Gravity Pulse, dealing 1 WRD + 1.5 WRD per charge and briefly pulling enemies inward (5s CD).", super: "<span class='skill-tag'>Black Hole</span> Creates a wide black hole for 5s at the enemy's position. It strongly pulls and heavily slows nearby enemies, dealing 0.5 WRD every 0.25s." }
     }
 };
 

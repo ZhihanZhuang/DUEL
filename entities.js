@@ -489,7 +489,7 @@ class Projectile extends Entity {
                 if (distance < 34) {
                     this.dead = true;
                 } else {
-                    const speed = this.type === "chakram_super" ? 19 : 21;
+                    const speed = this.type === "chakram_super" ? 19 : 24;
                     this.vx += (dx / Math.max(1, distance) * speed - this.vx) * 0.2;
                     this.vy += (dy / Math.max(1, distance) * speed - this.vy) * 0.2;
                 }
@@ -745,39 +745,41 @@ class GravityWell extends Entity {
         super(x - 30, y - 30, 60, 60);
         this.owner = owner;
         this.type = "gravity_well";
-        this.life = 4000;
+        this.life = 5000;
         this.maxLife = this.life;
         this.tickTimer = 0;
         this.untargetable = true;
     }
 
     update(dt) {
-        this.life -= dt;
-        this.tickTimer += dt;
-        if (this.life <= 0) {
-            this.dead = true;
-            return;
-        }
+        if (this.dead || this.life <= 0) { this.dead = true; return; }
+        const activeDt = Math.min(Math.max(0, dt), this.life);
+        this.life = Math.max(0, this.life - activeDt);
+        this.tickTimer += activeDt;
 
         const centerX = this.x + this.w/2;
         const centerY = this.y + this.h/2;
-        const shouldDamage = this.tickTimer >= 1000;
-        if (shouldDamage) this.tickTimer %= 1000;
+        const damageTicks = Math.floor(this.tickTimer / 250);
+        if (damageTicks > 0) this.tickTimer %= 250;
         const targets = [
             ...game.getOpponentsOf(this.owner),
             ...game.minions.filter(minion => minion && minion !== this && minion.owner !== this.owner && !minion.untargetable)
         ];
 
         for (const target of targets) {
-            if (!target || target.dead || target.invincible > 0) continue;
+            if (!target || target.dead) continue;
             const dx = centerX - (target.x + target.w/2);
             const dy = centerY - (target.y + target.h/2);
             const distance = Math.hypot(dx, dy);
-            if (distance > 230) continue;
-            const strength = 1 - distance / 230;
-            target.vx += dx / Math.max(1, distance) * (0.45 + strength * 0.75);
-            target.vy += dy / Math.max(1, distance) * (0.08 + strength * 0.2);
-            if (shouldDamage) target.takeDamage(10, this.owner, false, true);
+            if (distance > 340) continue;
+            const strength = 1 - distance / 340;
+            const frameScale = Math.min(2, activeDt / 16.67);
+            target.vx += dx / Math.max(1, distance) * (0.5 + strength * 0.9) * frameScale;
+            target.vy += dy / Math.max(1, distance) * (0.1 + strength * 0.22) * frameScale;
+            target.vx = Math.max(-14, Math.min(14, target.vx));
+            target.vy = Math.max(-12, Math.min(12, target.vy));
+            if (target.buffs) target.buffs.gravitySlow = Math.max(target.buffs.gravitySlow || 0, 350);
+            for (let tick = 0; tick < damageTicks && !target.dead; tick++) target.takeDamage(5, this.owner, true, true);
         }
 
         if (Math.random() < 0.35) {
@@ -785,6 +787,7 @@ class GravityWell extends Entity {
             const radius = 20 + Math.random() * 70;
             game.particles.push(new Particle(centerX + Math.cos(angle)*radius, centerY + Math.sin(angle)*radius, '#a8b8ff', -Math.cos(angle)*2, -Math.sin(angle)*2, 300, 3));
         }
+        if (this.life <= 0) this.dead = true;
     }
 
     draw(ctx) {
@@ -797,10 +800,10 @@ class GravityWell extends Entity {
         ctx.beginPath(); ctx.arc(0, 0, 28, 0, Math.PI * 2); ctx.fill();
         ctx.strokeStyle = `rgba(168, 184, 255, ${0.85 * progress})`;
         ctx.lineWidth = 4;
-        ctx.beginPath(); ctx.arc(0, 0, 42, 0, Math.PI * 2); ctx.stroke();
+        ctx.beginPath(); ctx.arc(0, 0, 50, 0, Math.PI * 2); ctx.stroke();
         ctx.strokeStyle = `rgba(216, 75, 120, ${0.65 * progress})`;
         ctx.lineWidth = 2;
-        ctx.beginPath(); ctx.arc(0, 0, 62, 0, Math.PI * 2); ctx.stroke();
+        ctx.beginPath(); ctx.arc(0, 0, 82, 0, Math.PI * 2); ctx.stroke();
         ctx.restore();
     }
 }

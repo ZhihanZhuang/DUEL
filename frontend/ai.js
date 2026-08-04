@@ -133,7 +133,7 @@ function makeBrain(ai) {
         stuckTimer: 0,
         lastX: ai.x,
         lastY: ai.y,
-        intent: { left: false, right: false, down: false, holdJump: false, holdAttack: false },
+        intent: { left: false, right: false, down: false, holdJump: false, holdAttack: false, holdSuper: false },
         profile: new AdaptiveAIProfile()
     };
     return ai.aiBrain;
@@ -153,6 +153,7 @@ function applyHeldInput(ai, brain) {
     keys[ai.controls.down] = !!brain.intent.down;
     keys[ai.controls.jump] = !!brain.intent.holdJump;
     keys[ai.controls.attack] = !!brain.intent.holdAttack;
+    keys[ai.controls.super] = !!brain.intent.holdSuper;
 }
 
 function press(ai, action) {
@@ -727,7 +728,7 @@ function chooseHeroAction(game, ai, target, targetEntity, dist, verticalDistance
             break;
         }
         case 'Sola':
-            if (superReady && dist < 520 && (ai.solaFocus > 0 || isVulnerableTarget(target) || target.hp < target.maxHp * 0.45)) return 'super';
+            if (superReady && (combatState !== 'evade' || ai.hp < ai.maxHp * 0.4)) return 'super';
             if (ai.solaDashCooldown <= 0 && aligned && dist > 155 && dist < 430 && combatState === 'pressure') return 'switch';
             break;
         case 'Nyra': {
@@ -904,6 +905,17 @@ function runFighterAI(game, ai, dt, diff) {
         return;
     }
 
+    brain.intent.holdSuper = ai.heroName === 'Sola' && !!ai.solaForceActive;
+    if (brain.intent.holdSuper) {
+        brain.intent.left = false;
+        brain.intent.right = false;
+        brain.intent.down = false;
+        brain.intent.holdJump = false;
+        brain.intent.holdAttack = false;
+        applyHeldInput(ai, brain);
+        return;
+    }
+
     brain.tacticTimer = Math.max(0, (brain.tacticTimer || 0) - dt);
     brain.jumpHoldTimer = Math.max(0, (brain.jumpHoldTimer || 0) - dt);
     brain.navTimer = Math.max(0, (brain.navTimer || 0) - dt);
@@ -973,6 +985,15 @@ function runFighterAI(game, ai, dt, diff) {
     if (heroAction && Math.random() < diff.skillChance) {
         if (ai.heroName === 'Willi' && heroAction === 'super' && (threat || combatState === 'retreat' || combatState === 'evade')) {
             ai.facing = brain.evadeDirection || (dx > 0 ? -1 : 1);
+        }
+        if (ai.heroName === 'Sola' && heroAction === 'super') {
+            brain.intent.left = false;
+            brain.intent.right = false;
+            brain.intent.down = false;
+            brain.intent.holdJump = false;
+            brain.intent.holdAttack = false;
+            brain.intent.holdSuper = true;
+            applyHeldInput(ai, brain);
         }
         press(ai, heroAction);
         brain.actionLock = heroAction === 'super' ? 300 : 210;

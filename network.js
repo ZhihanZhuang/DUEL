@@ -44,6 +44,7 @@ function collectLocalOnlineInputs() {
         jump: !!window.keys[binds.jump],
         down: !!window.keys[binds.down],
         attack: !!window.keys[binds.attack],
+        super: !!window.keys[binds.super],
         pJump: !!window.keysPressed[binds.jump],
         pAttack: !!window.keysPressed[binds.attack],
         pSuper: !!window.keysPressed[binds.super],
@@ -60,12 +61,14 @@ window.applyRemoteOnlineInputs = function(inputs) {
     window.keys[binds.jump] = !!inputs.jump;
     window.keys[binds.down] = !!inputs.down;
     window.keys[binds.attack] = !!inputs.attack;
+    window.keys[binds.super] = !!inputs.super;
     if (inputs.pJump) window.keysPressed[binds.jump] = true;
     if (inputs.pAttack) window.keysPressed[binds.attack] = true;
     if (inputs.pSuper) window.keysPressed[binds.super] = true;
     if (inputs.pSwitch) window.keysPressed[binds.switch] = true;
     if (inputs.pExtra) window.keysPressed[binds.extra] = true;
 };
+window.collectLocalOnlineInputs = collectLocalOnlineInputs;
 
 if (window.Game && !window.Game.prototype.socketSyncPatched) {
     const entityClasses = {
