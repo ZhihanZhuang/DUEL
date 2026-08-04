@@ -54,7 +54,7 @@ function loadProjectileContext() {
     };
     vm.createContext(context);
     const source = fs.readFileSync(path.join(__dirname, '..', 'entities.js'), 'utf8');
-    vm.runInContext(`${source}\nwindow.Projectile = Projectile; window.KuroDecoy = KuroDecoy;`, context, { filename: 'entities.js' });
+    vm.runInContext(`${source}\nwindow.Projectile = Projectile; window.KuroDecoy = KuroDecoy; window.GravityWell = GravityWell;`, context, { filename: 'entities.js' });
     return context;
 }
 
@@ -107,8 +107,13 @@ function makeFighter(heroName, id = 'cpu') {
         kuroDecoyCooldown: 1000,
         kuroEmpoweredShot: false,
         kuroRelocateTimer: 0,
+        solaFocus: 0,
+        solaDashCooldown: 0,
+        nyraShiftCooldown: 0,
+        orionCharges: 0,
+        orionPulseCooldown: 0,
         isMeleeAttack() {
-            return !['Hason', 'Willi', 'Ugo', 'Kila', 'Volt', 'Noae', 'Kuro'].includes(this.heroName)
+            return !['Hason', 'Willi', 'Ugo', 'Kila', 'Volt', 'Noae', 'Kuro', 'Nyra'].includes(this.heroName)
                 && !(this.heroName === 'Hunter' && this.hunterWeapon === 'musket')
                 && !(this.heroName === 'Euclid' && this.euclidWeapon === 'magic');
         }
@@ -195,6 +200,15 @@ function loadPhysicsGame(heroName = 'Hunter') {
         }
         update() {}
     }
+    class GravityWell extends Entity {
+        constructor(owner, x, y) {
+            super(x - 30, y - 30, 60, 60);
+            this.owner = owner;
+            this.type = 'gravity_well';
+            this.life = 4000;
+            this.untargetable = true;
+        }
+    }
 
     const platforms = [
         { x: 300, y: 480, w: 400, h: 20, type: 'center' },
@@ -207,6 +221,7 @@ function loadPhysicsGame(heroName = 'Hunter') {
         Particle,
         Projectile,
         KuroDecoy,
+        GravityWell,
         Minion,
         CANVAS_W: 1280,
         CANVAS_H: 760,
@@ -217,7 +232,10 @@ function loadPhysicsGame(heroName = 'Hunter') {
             Hunter: { maxHp: 750, speed: 4.5, jump: 14, width: 45, height: 70, color: '#008080', superCD: 20000 },
             Willi: { maxHp: 500, speed: 6.5, jump: 16, width: 35, height: 65, color: '#2F4F4F', superCD: 12000 },
             Volt: { maxHp: 650, speed: 4, jump: 15, width: 35, height: 65, color: '#FFD700', superCD: 30000 },
-            Kuro: { maxHp: 600, speed: 5.2, jump: 14, width: 38, height: 70, color: '#244d3b', superCD: 26000 }
+            Kuro: { maxHp: 600, speed: 5.2, jump: 14, width: 38, height: 70, color: '#244d3b', superCD: 26000 },
+            Sola: { maxHp: 780, speed: 5.8, jump: 15, width: 40, height: 70, color: '#167d8d', superCD: 22000 },
+            Nyra: { maxHp: 680, speed: 6.2, jump: 16, width: 36, height: 66, color: '#d84b78', superCD: 24000 },
+            Orion: { maxHp: 900, speed: 4.6, jump: 13.5, width: 46, height: 74, color: '#4056a1', superCD: 28000 }
         },
         keys: {},
         keysPressed: {},
@@ -246,7 +264,9 @@ function loadPhysicsGame(heroName = 'Hunter') {
         id: 'player', heroName: 'Hunter', x: 175, y: upper.y - 70, w: 45, h: 70,
         vx: 0, vy: 0, hp: 750, maxHp: 750, dead: false, invincible: 0,
         isGrounded: true, currentPlatform: upper, attackState: 'idle',
-        isMeleeAttack: () => false
+        buffs: {},
+        isMeleeAttack: () => false,
+        takeDamage(amount) { this.hp -= amount; }
     };
     const game = {
         aiDifficulty: 'expert', isBattleRoyale: false, p1: target, aiFighters: [ai],
@@ -355,7 +375,7 @@ test('every hero with a direct super can decide to use it', () => {
     const context = loadAI();
     const directSuperHeroes = [
         'Hason', 'Willi', 'Hunter', 'Macu', 'Artu', 'Duke', 'Kadaxi', 'Euclid',
-        'Lique', 'Kae', 'Kila', 'Volt', 'Gensan', 'Noae', 'Wolf', 'Kuro'
+        'Lique', 'Kae', 'Kila', 'Volt', 'Gensan', 'Noae', 'Wolf', 'Kuro', 'Sola', 'Nyra', 'Orion'
     ];
 
     for (const heroName of directSuperHeroes) {
@@ -364,6 +384,7 @@ test('every hero with a direct super can decide to use it', () => {
         const target = makeFighter('Noae', `target_${heroName}`);
         target.x = heroName === 'Lique' ? 510 : 540;
         if (heroName === 'Kuro') target.hp = target.maxHp * 0.35;
+        if (heroName === 'Sola') ai.solaFocus = 1;
         if (heroName === 'Artu') ai.superCooldown = 0;
         const game = makeGame(ai, target);
         if (heroName === 'Noae') {
@@ -604,7 +625,10 @@ test('hero archetypes expose distinct tactical roles and low-health priorities',
         { hero: 'Hason', role: 'zoner' },
         { hero: 'Noae', role: 'trapper' },
         { hero: 'Kadaxi', role: 'grappler' },
-        { hero: 'Lique', role: 'berserker', lowHealth: true }
+        { hero: 'Lique', role: 'berserker', lowHealth: true },
+        { hero: 'Sola', role: 'sentinel' },
+        { hero: 'Nyra', role: 'skirmisher' },
+        { hero: 'Orion', role: 'gravity' }
     ];
 
     for (const testCase of cases) {
@@ -826,4 +850,112 @@ test('Kuro sniper rounds apply their piercing and control effects', () => {
     assert.equal(minionB.hp, 420);
     assert.equal(minionA.buffs.slow, 2000);
     assert.equal(fullRound.dead, false);
+});
+
+test('Sola deflects projectiles into Focus and converts Focus into super damage', () => {
+    const projectileContext = loadProjectileContext();
+    const shooter = { id: 'shooter', heroName: 'Hason' };
+    const sola = {
+        id: 'sola', heroName: 'Sola', x: 108, y: 100, w: 40, h: 70,
+        facing: -1, attackState: 'active', solaFocus: 0, dead: false, invincible: 0,
+        isMeleeAttack: () => true,
+        takeDamage() {}
+    };
+    projectileContext.game.opponents = [sola];
+    const shot = new projectileContext.window.Projectile(100, 120, 12, 6, 10, 0, 28, shooter, '#fff', 'normal');
+
+    shot.update(16);
+
+    assert.equal(shot.owner, sola);
+    assert.ok(shot.vx < 0, 'deflected projectile did not reverse direction');
+    assert.equal(shot.dead, false);
+    assert.equal(sola.solaFocus, 1);
+
+    const simulation = loadPhysicsGame('Sola');
+    simulation.ai.attackState = 'idle';
+    simulation.ai.superCooldown = 0;
+    simulation.ai.solaFocus = 2;
+    simulation.target.x = simulation.ai.x + 180;
+    simulation.target.y = simulation.ai.y;
+    const hpBefore = simulation.target.hp;
+
+    simulation.ai.performSuper();
+
+    assert.equal(hpBefore - simulation.target.hp, 115);
+    assert.equal(simulation.ai.solaFocus, 0);
+    assert.ok(simulation.target.buffs.dizzy >= 700);
+});
+
+test('Nyra chakrams return, support Rift Shift, and launch as a six-way Halo Storm', () => {
+    const projectileContext = loadProjectileContext();
+    const owner = { x: 100, y: 100, w: 36, h: 66, dead: false };
+    projectileContext.game.opponents = [];
+    const chakram = new projectileContext.window.Projectile(250, 120, 24, 24, 10, 0, 22, owner, '#ff7ba7', 'chakram');
+    chakram.hitTargets.add({ id: 'outbound-target' });
+
+    chakram.update(600);
+
+    assert.equal(chakram.returning, true);
+    assert.equal(chakram.hitTargets.size, 0, 'return path could not hit targets a second time');
+    chakram.x = owner.x + owner.w/2 - chakram.w/2;
+    chakram.y = owner.y + owner.h/2 - chakram.h/2;
+    chakram.update(16);
+    assert.equal(chakram.dead, true, 'returning chakram was not caught by its owner');
+
+    const simulation = loadPhysicsGame('Nyra');
+    simulation.ai.attackState = 'idle';
+    const anchor = new simulation.context.Projectile(900, 400, 24, 24, 0, 0, 22, simulation.ai, '#ff7ba7', 'chakram');
+    simulation.context.game.projectiles.push(anchor);
+    simulation.context.keysPressed[simulation.ai.controls.switch] = true;
+    simulation.ai.update(16);
+
+    assert.ok(simulation.ai.x > 800, 'Rift Shift did not move Nyra to the chakram');
+    assert.equal(anchor.dead, true);
+    assert.equal(simulation.ai.nyraShiftCooldown, 7000);
+
+    simulation.ai.superCooldown = 0;
+    simulation.ai.performSuper();
+    const halo = simulation.context.game.projectiles.filter(projectile => projectile.type === 'chakram_super');
+    assert.equal(halo.length, 6);
+});
+
+test('Orion spends Gravity Charges on a pulse and deploys an Event Horizon', () => {
+    const simulation = loadPhysicsGame('Orion');
+    simulation.ai.attackState = 'idle';
+    simulation.ai.orionCharges = 3;
+    simulation.target.x = simulation.ai.x + 90;
+    simulation.target.y = simulation.ai.y;
+    const hpBefore = simulation.target.hp;
+    simulation.context.keysPressed[simulation.ai.controls.switch] = true;
+
+    simulation.ai.update(16);
+
+    assert.equal(hpBefore - simulation.target.hp, 55);
+    assert.equal(simulation.ai.orionCharges, 0);
+    assert.equal(simulation.ai.orionPulseCooldown, 5000);
+    assert.ok(simulation.target.buffs.dizzy >= 750);
+
+    simulation.ai.superCooldown = 0;
+    simulation.ai.performSuper();
+    const well = simulation.context.game.minions.find(minion => minion.type === 'gravity_well');
+    assert.ok(well, 'Event Horizon was not created');
+    assert.equal(well.owner, simulation.ai);
+});
+
+test('Event Horizon pulls and damages enemies once per second', () => {
+    const context = loadProjectileContext();
+    const owner = { id: 'orion', heroName: 'Orion' };
+    const target = {
+        x: 110, y: 175, w: 40, h: 70, vx: 0, vy: 0, hp: 100,
+        dead: false, invincible: 0,
+        takeDamage(amount) { this.hp -= amount; }
+    };
+    context.game.opponents = [target];
+    const well = new context.window.GravityWell(owner, 200, 200);
+
+    well.update(1000);
+
+    assert.equal(target.hp, 90);
+    assert.ok(target.vx > 0, 'gravity well did not pull the target toward its core');
+    assert.equal(well.life, 3000);
 });
