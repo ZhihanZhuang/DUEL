@@ -315,8 +315,8 @@ var HEROES = {
     },
     D2F1: {
         name: "D2F-1", desc: "Autonomous Drone Consciousness",
-        color: "#35d5e8", maxHp: 520, speed: 7.2, jump: 16, width: 40, height: 66, superCD: 20000,
-        ui: { hp: "52 WRD", atk: "0.5 WRD (Electromagnetic Ball)", passive: "Fast ranged chassis. Press [Switch] to deploy 3 autonomous laser drones (10s CD). Drones evade incoming projectiles and maintain firing distance; their 2s beams cycle every 2.5s and inflict continuous burn damage.", super: "<span class='skill-tag'>Orbital Drop Unit</span> Deploys 4 laser drones and marks an enemy for 1s, slowing them while the target reticle blinks. A giant melee robot then drops onto the mark, dealing 8.5 WRD and 0.75s dizzy on landing before fighting for D2F-1. 20s CD." }
+        color: "#35d5e8", maxHp: 520, speed: 7.2, jump: 16, width: 40, height: 66, superCD: 35000,
+        ui: { hp: "52 WRD", atk: "0.5 WRD (Electromagnetic Ball)", passive: "Fast ranged chassis. Press [Switch] to deploy 3 autonomous laser drones (10s CD). Drones evade incoming projectiles and maintain firing distance; their 2s beams cycle every 2.5s and inflict continuous burn damage.", super: "<span class='skill-tag'>Orbital Drop Unit</span> Deploys 4 laser drones and marks an enemy for 1s, slowing them while the target reticle blinks. A giant melee robot then drops onto the mark, dealing 8.5 WRD and 0.75s dizzy on landing before fighting for D2F-1. 35s CD." }
     }
 };
 

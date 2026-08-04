@@ -286,7 +286,7 @@ function loadPhysicsGame(heroName = 'Hunter') {
             Orion: { maxHp: 900, speed: 4.6, jump: 13.5, width: 46, height: 74, color: '#4056a1', superCD: 28000 },
             Archor: { maxHp: 340, speed: 5.8, jump: 15, width: 38, height: 68, color: '#2f8f62', superCD: 18000 },
             Itan: { maxHp: 820, speed: 5, jump: 14.5, width: 42, height: 72, color: '#9f3347', superCD: 3000 },
-            D2F1: { maxHp: 520, speed: 7.2, jump: 16, width: 40, height: 66, color: '#35d5e8', superCD: 20000 }
+            D2F1: { maxHp: 520, speed: 7.2, jump: 16, width: 40, height: 66, color: '#35d5e8', superCD: 35000 }
         },
         keys: {},
         keysPressed: {},
@@ -1017,7 +1017,7 @@ test('D2F-1 fires 0.5 WRD electromagnetic balls and deploys exact drone groups',
     const afterSuper = context.game.minions.filter(minion => minion.type === 'd2f_drone' && !minion.dead).length;
     assert.equal(afterSuper - beforeSuper, 4);
     assert.equal(context.game.minions.filter(minion => minion.type === 'd2f_target_beacon').length, 1);
-    assert.equal(ai.superCooldown, 20000);
+    assert.equal(ai.superCooldown, 35000);
 });
 
 test('D2F-1 drones predict projectile paths, hold range, and cycle damage-only lasers', () => {
