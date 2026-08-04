@@ -1464,6 +1464,110 @@ test('Sola deflects projectiles into Focus and channels Force Choke at arena ran
     simulation.ai.update(16);
     assert.equal(simulation.ai.solaForceActive, false);
     assert.equal(simulation.target.solaForceHeld, false);
+    assert.equal(simulation.target.solaForceFallPending, true);
+    assert.ok(simulation.target.solaForceFallPeakY < targetStartY);
+});
+
+test('Sola attacks faster and charges in a locked direction with continuous saber protection', () => {
+    const simulation = loadPhysicsGame('Sola');
+    const { ai, target, context } = simulation;
+    ai.attackState = 'idle';
+
+    assert.equal(ai.getMeleeDamage(), 56);
+    ai.solaFocus = 2;
+    assert.equal(ai.getMeleeDamage(), 72, 'Focus should remain an additive 0.8 WRD per stack');
+    ai.solaFocus = 0;
+
+    ai.performAttack();
+    assert.equal(ai.stateTimer, 60);
+    ai.update(60);
+    assert.equal(ai.attackState, 'active');
+    assert.equal(ai.stateTimer, 100);
+    ai.update(100);
+    assert.equal(ai.attackState, 'recovery');
+    assert.equal(ai.stateTimer, 120);
+
+    ai.attackState = 'idle';
+    ai.vx = 0;
+    ai.facing = 1;
+    ai.solaDashCooldown = 0;
+    context.keys[ai.controls.left] = true;
+    context.keysPressed[ai.controls.switch] = true;
+    ai.update(16);
+    delete context.keysPressed[ai.controls.switch];
+    delete context.keys[ai.controls.left];
+
+    assert.equal(ai.solaChargeTimer, 700);
+    assert.equal(ai.solaChargeDirection, -1);
+    assert.equal(ai.solaDashCooldown, 6000);
+
+    const startX = ai.x;
+    target.x = ai.x - 55;
+    target.y = ai.y;
+    const targetHp = target.hp;
+    context.checkAABB = (first, second) => first.x < second.x + second.w && first.x + first.w > second.x
+        && first.y < second.y + second.h && first.y + first.h > second.y;
+
+    ai.update(16);
+    assert.ok(ai.x < startX, 'Sola did not advance in the locked charge direction');
+    assert.equal(ai.facing, -1);
+    assert.equal(target.hp, targetHp - 28);
+
+    ai.update(16);
+    assert.equal(target.hp, targetHp - 28, 'the same target was damaged more than once by one charge');
+
+    const hpBefore = ai.hp;
+    ai.takeDamage(100, target);
+    assert.equal(ai.hp, hpBefore, 'incoming direct damage pierced Sola charge protection');
+});
+
+test('Force Choke victims take distance-based damage only when they land', () => {
+    const simulation = loadPhysicsGame('Sola');
+    const { ai, target } = simulation;
+    ai.attackState = 'idle';
+    ai.x = 610;
+    ai.y = 100;
+    ai.vx = 0;
+    ai.vy = 0;
+    ai.isGrounded = false;
+    ai.solaForceHeld = false;
+    ai.solaForceFallPending = true;
+    ai.solaForceFallSourceId = target.id;
+    ai.solaForceFallPeakY = ai.y;
+    const hpBefore = ai.hp;
+
+    ai.update(16);
+    assert.equal(ai.hp, hpBefore, 'fall damage was applied before landing');
+    assert.equal(ai.solaForceFallPending, true);
+
+    for (let i = 0; i < 80 && ai.solaForceFallPending; i++) ai.update(16);
+
+    assert.equal(ai.isGrounded, true);
+    assert.equal(ai.currentPlatform?.type, 'center');
+    assert.equal(ai.hp, hpBefore - 60, 'long Force Choke fall should use the 6 WRD cap');
+    assert.equal(ai.lastAttacker, target);
+    assert.equal(ai.solaForceFallPending, false);
+});
+
+test('Sola charge deflects every projectile type while the saber is otherwise idle', () => {
+    const context = loadProjectileContext();
+    const shooter = { id: 'shooter', heroName: 'Kila' };
+    const sola = {
+        id: 'sola', heroName: 'Sola', x: 108, y: 100, w: 40, h: 70,
+        facing: -1, attackState: 'idle', solaChargeTimer: 500, solaFocus: 0,
+        dead: false, invincible: 0,
+        isMeleeAttack: () => true,
+        takeDamage() {}
+    };
+    context.game.opponents = [sola];
+    const wave = new context.window.Projectile(100, 100, 80, 120, 12, 0, 10, shooter, '#168cff', 'tidal_wave');
+
+    wave.update(16);
+
+    assert.equal(wave.owner, sola);
+    assert.ok(wave.vx < 0, 'the tidal wave did not reverse direction');
+    assert.equal(wave.dead, false);
+    assert.equal(sola.solaFocus, 1);
 });
 
 test('Sola Force Choke stops on movement, damage, target loss, and its 4.5s cap', () => {

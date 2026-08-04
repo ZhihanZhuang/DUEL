@@ -552,7 +552,7 @@ class Game {
             p1Stat += `[FOCUS: ${this.p1.solaFocus}/3]`;
             if (this.p1.solaForceActive) p1Stat += ` [FORCE ${Math.max(0, (this.p1.solaForceMaxDuration - this.p1.solaForceElapsed)/1000).toFixed(1)}s]`;
             else if (this.p1.solaForceHeld) p1Stat += " [FORCE HELD]";
-            if (this.p1.solaDashCooldown > 0) p1Stat += ` [STEP CD ${(this.p1.solaDashCooldown/1000).toFixed(1)}s]`;
+            if (this.p1.solaDashCooldown > 0) p1Stat += ` [CHARGE CD ${(this.p1.solaDashCooldown/1000).toFixed(1)}s]`;
         }
         if (this.p1.heroName === 'Nyra') {
             const activeChakrams = this.projectiles.filter(projectile => projectile.owner === this.p1 && !projectile.dead && (projectile.type === 'chakram' || projectile.type === 'chakram_super')).length;
@@ -664,7 +664,7 @@ class Game {
             p2Stat += `[FOCUS: ${this.p2.solaFocus}/3]`;
             if (this.p2.solaForceActive) p2Stat += ` [FORCE ${Math.max(0, (this.p2.solaForceMaxDuration - this.p2.solaForceElapsed)/1000).toFixed(1)}s]`;
             else if (this.p2.solaForceHeld) p2Stat += " [FORCE HELD]";
-            if (this.p2.solaDashCooldown > 0) p2Stat += ` [STEP CD ${(this.p2.solaDashCooldown/1000).toFixed(1)}s]`;
+            if (this.p2.solaDashCooldown > 0) p2Stat += ` [CHARGE CD ${(this.p2.solaDashCooldown/1000).toFixed(1)}s]`;
         }
         if (this.p2.heroName === 'Nyra') {
             const activeChakrams = this.projectiles.filter(projectile => projectile.owner === this.p2 && !projectile.dead && (projectile.type === 'chakram' || projectile.type === 'chakram_super')).length;

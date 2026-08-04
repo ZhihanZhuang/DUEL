@@ -25,6 +25,9 @@ class Fighter extends Entity {
         this.solaForceHeld = false;
         this.solaForceSourceId = null;
         this.solaForceProgress = 0;
+        this.solaForceFallPending = false;
+        this.solaForceFallSourceId = null;
+        this.solaForceFallPeakY = this.y;
         this.flipCooldown = 0;
         this.timeSinceLastDamage = 0;
         this.flightDisabled = false;
@@ -93,6 +96,11 @@ class Fighter extends Entity {
         if (this.heroName === 'Sola') {
             this.solaFocus = 0;
             this.solaDashCooldown = 0;
+            this.solaChargeTimer = 0;
+            this.solaChargeDuration = 700;
+            this.solaChargeDirection = this.facing;
+            this.solaChargeElapsed = 0;
+            this.solaChargeHitTargets = new Set();
             this.solaForceActive = false;
             this.solaForceTarget = null;
             this.solaForceTargetId = null;
@@ -133,7 +141,7 @@ class Fighter extends Entity {
     }
 
     takeDamage(amt, attacker, isDoT = false, noKnockback = false, noHitReaction = false) {
-        if (this.dead || this.invincible > 0) return;
+        if (this.dead || this.invincible > 0 || (this.heroName === 'Sola' && this.solaChargeTimer > 0)) return;
 
         if (this.heroName === 'Sola' && this.solaForceActive) this.endSolaForce();
 
@@ -332,6 +340,9 @@ class Fighter extends Entity {
         target.solaForceHeld = true;
         target.solaForceSourceId = this.id;
         target.solaForceProgress = 0;
+        target.solaForceFallPending = false;
+        target.solaForceFallSourceId = null;
+        target.solaForceFallPeakY = target.y;
         target.attackState = 'idle';
         target.stateTimer = 0;
         target.superWindupTimer = 0;
@@ -353,6 +364,9 @@ class Fighter extends Entity {
             target.solaForceHeld = false;
             target.solaForceSourceId = null;
             target.solaForceProgress = 0;
+            target.solaForceFallPending = !target.dead;
+            target.solaForceFallSourceId = this.id;
+            target.solaForceFallPeakY = Math.min(target.solaForceFallPeakY ?? target.y, target.y);
             target.vx = 0;
             target.vy = Math.min(0, target.vy || 0);
         }
@@ -386,6 +400,7 @@ class Fighter extends Entity {
 
         target.x = Math.max(0, Math.min(CANVAS_W - target.w, target.x));
         target.y = Math.max(45, target.y - activeDt * 0.03);
+        target.solaForceFallPeakY = Math.min(target.solaForceFallPeakY ?? target.y, target.y);
         target.vx = 0;
         target.vy = 0;
         target.solaForceProgress = Math.min(1, this.solaForceElapsed / this.solaForceMaxDuration);
@@ -410,6 +425,86 @@ class Fighter extends Entity {
         return true;
     }
 
+    startSolaCharge() {
+        if (this.heroName !== 'Sola' || this.dead || this.attackState !== 'idle' || this.solaDashCooldown > 0 || this.solaChargeTimer > 0) return false;
+
+        if (keys[this.controls.left] && !keys[this.controls.right]) this.facing = -1;
+        else if (keys[this.controls.right] && !keys[this.controls.left]) this.facing = 1;
+
+        this.solaChargeDirection = this.facing;
+        this.solaChargeTimer = this.solaChargeDuration;
+        this.solaChargeElapsed = 0;
+        this.solaChargeHitTargets.clear();
+        this.solaDashCooldown = 6000;
+        this.vx = this.solaChargeDirection * 18;
+        this.vy = Math.max(this.vy, -1);
+        for (let i = 0; i < 18; i++) {
+            game.particles.push(new Particle(this.x + this.w/2, this.y + this.h/2, i % 2 ? '#ffffff' : '#8ffcff', (Math.random()-0.5)*10, (Math.random()-0.5)*10, 300, 3));
+        }
+        return true;
+    }
+
+    getSolaChargeHitbox() {
+        const range = 92;
+        return {
+            x: this.solaChargeDirection === 1 ? this.x + this.w - 8 : this.x - range + 8,
+            y: this.y - 12,
+            w: range,
+            h: this.h + 24
+        };
+    }
+
+    updateSolaCharge(dt) {
+        if (this.heroName !== 'Sola' || this.solaChargeTimer <= 0) return false;
+
+        this.solaChargeTimer = Math.max(0, this.solaChargeTimer - dt);
+        this.solaChargeElapsed += dt;
+        this.facing = this.solaChargeDirection;
+        this.vx = this.solaChargeDirection * 18;
+
+        const hitbox = this.getSolaChargeHitbox();
+        const targets = [
+            ...game.getOpponentsOf(this),
+            ...game.minions.filter(minion => minion && minion.owner !== this && !minion.dead && !minion.untargetable)
+        ];
+        for (const target of targets) {
+            if (!target || target.dead || target.untargetable || this.solaChargeHitTargets.has(target) || !checkAABB(hitbox, target)) continue;
+            target.takeDamage(28, this);
+            this.solaChargeHitTargets.add(target);
+            for (let i = 0; i < 10; i++) {
+                game.particles.push(new Particle(target.x + target.w/2, target.y + target.h/2, '#8ffcff', (Math.random()-0.5)*14, (Math.random()-0.5)*14, 260, 4));
+            }
+        }
+
+        if (Math.random() < 0.65) {
+            game.particles.push(new Particle(this.x + this.w/2 - this.solaChargeDirection * 12, this.y + 20 + Math.random()*this.h*0.6, '#8ffcff', -this.solaChargeDirection * 4, (Math.random()-0.5)*3, 220, 3));
+        }
+
+        if (this.solaChargeTimer <= 0) this.vx *= 0.35;
+        return this.solaChargeTimer > 0;
+    }
+
+    applySolaForceFallDamage() {
+        if (!this.solaForceFallPending || this.solaForceHeld || !this.isGrounded) return false;
+
+        const fallDistance = Math.max(0, this.y - (this.solaForceFallPeakY ?? this.y));
+        const source = typeof game.getFighters === 'function'
+            ? game.getFighters().find(fighter => fighter && fighter.id === this.solaForceFallSourceId) || null
+            : null;
+
+        this.solaForceFallPending = false;
+        this.solaForceFallSourceId = null;
+        this.solaForceFallPeakY = this.y;
+
+        if (fallDistance < 24) return false;
+        const damage = Math.min(60, Math.max(10, Math.round(fallDistance * 0.35)));
+        this.takeDamage(damage, source, false, true);
+        for (let i = 0; i < 16; i++) {
+            game.particles.push(new Particle(this.x + Math.random()*this.w, this.y + this.h, i % 2 ? '#ffffff' : '#bdefff', (Math.random()-0.5)*10, -Math.random()*8, 360, 4));
+        }
+        return true;
+    }
+
     update(dt) {
         if (this.dead) return;
 
@@ -420,6 +515,7 @@ class Fighter extends Entity {
         if (this.heroName === 'D2F1' && this.d2fDroneCooldown > 0) this.d2fDroneCooldown = Math.max(0, this.d2fDroneCooldown - dt);
 
         if (this.heroName === 'Sola' && this.solaForceActive) this.updateSolaForce(dt);
+        if (this.heroName === 'Sola' && this.solaChargeTimer > 0) this.updateSolaCharge(dt);
 
         if (this.heroName === 'Itan' && this.itanSuperWindupTimer > 0) {
             this.itanSuperWindupTimer = Math.max(0, this.itanSuperWindupTimer - dt);
@@ -442,6 +538,10 @@ class Fighter extends Entity {
             this.vx = 0;
             this.vy = 0;
             return;
+        }
+
+        if (this.solaForceFallPending && !this.solaForceHeld) {
+            this.solaForceFallPeakY = Math.min(this.solaForceFallPeakY ?? this.y, this.y);
         }
 
         if (this.waterStunImmunity > 0) this.waterStunImmunity -= dt;
@@ -509,7 +609,8 @@ class Fighter extends Entity {
         let isKilaSwitching = this.heroName === 'Kila' && this.kilaSwitchTimer > 0;
         let hasPuppet = this.heroName === 'Ugo' && game.minions.some(m => m.type === 'puppet' && m.owner === this && !m.dead);
         const isSolaForceLocked = !!(this.solaForceActive || this.solaForceHeld);
-        let canAct = (this.stunTimer <= 0 && this.buffs.dizzy <= 0 && this.grapplePhase !== 1 && this.superWindupTimer <= 0 && this.euclidSwitchTimer <= 0 && !(this.itanSuperWindupTimer > 0) && !isKilaSwitching && !isSolaForceLocked);
+        const isSolaCharging = this.heroName === 'Sola' && this.solaChargeTimer > 0;
+        let canAct = (this.stunTimer <= 0 && this.buffs.dizzy <= 0 && this.grapplePhase !== 1 && this.superWindupTimer <= 0 && this.euclidSwitchTimer <= 0 && !(this.itanSuperWindupTimer > 0) && !isKilaSwitching && !isSolaForceLocked && !isSolaCharging);
         let canMoveAndAttack = canAct && !hasPuppet;
 
         if (this.heroName === 'Gensan') {
@@ -842,7 +943,9 @@ class Fighter extends Entity {
         }
 
         let targetVx = 0;
-        if (this.heroName === 'Willi' && this.invincible > 0) {
+        if (isSolaCharging) {
+            targetVx = this.solaChargeDirection * 18;
+        } else if (this.heroName === 'Willi' && this.invincible > 0) {
             targetVx = this.facing * 40;
         } else if (canMoveAndAttack && this.flipActive <= 0) {
             if (keys[this.controls.left]) { targetVx = -currentSpeed; this.facing = -1; }
@@ -869,6 +972,7 @@ class Fighter extends Entity {
         let friction = 0.25;
         if (this.currentPlatform && this.currentPlatform.type === 'center') friction = 0.03;
         if (!canAct || ((this.heroName === 'Euclid' || this.heroName === 'Kae' || this.heroName === 'Ugo' || this.heroName === 'Volt' || this.heroName === 'Gensan' || this.heroName === 'Wolf') && this.attackState === 'windup') || hasPuppet) friction = 0.1;
+        if (isSolaCharging) friction = 1;
 
         this.vx += (targetVx - this.vx) * friction;
 
@@ -906,7 +1010,7 @@ class Fighter extends Entity {
                         if (this.heroName === 'Volt') activeTime = this.overdriveTimer > 0 ? 25 : 50;
                         if (this.heroName === 'Gensan') activeTime = 150;
                         if (this.heroName === 'Wolf') activeTime = 100;
-                        if (this.heroName === 'Sola') activeTime = 140;
+                        if (this.heroName === 'Sola') activeTime = 100;
                         if (this.heroName === 'Nyra') activeTime = 70;
                         if (this.heroName === 'Orion') activeTime = 170;
                         if (this.heroName === 'Archor') activeTime = 25;
@@ -1022,7 +1126,7 @@ class Fighter extends Entity {
                     if (this.heroName === 'Volt') recTime = this.overdriveTimer > 0 ? 75 : 150;
                     if (this.heroName === 'Gensan') recTime = 150;
                     if (this.heroName === 'Wolf') recTime = 100;
-                    if (this.heroName === 'Sola') recTime = 180;
+                    if (this.heroName === 'Sola') recTime = 120;
                     if (this.heroName === 'Nyra') recTime = 140;
                     if (this.heroName === 'Orion') recTime = 300;
                     if (this.heroName === 'Archor') recTime = 55;
@@ -1109,12 +1213,7 @@ class Fighter extends Entity {
                         game.particles.push(new Particle(this.x + this.w/2, this.y + this.h/2, '#9ad8c0', (Math.random()-0.5)*8, (Math.random()-0.5)*8, 350, 3));
                     }
                 } else if (this.heroName === 'Sola' && this.attackState === 'idle' && this.solaDashCooldown <= 0) {
-                    for (let i = 0; i < 12; i++) game.particles.push(new Particle(this.x+this.w/2, this.y+this.h/2, '#8ffcff', (Math.random()-0.5)*8, (Math.random()-0.5)*8, 260, 3));
-                    this.x = Math.max(0, Math.min(CANVAS_W - this.w, this.x + this.facing * 125));
-                    this.vx = this.facing * 8;
-                    this.invincible = 180;
-                    this.solaDashCooldown = 6000;
-                    for (let i = 0; i < 12; i++) game.particles.push(new Particle(this.x+this.w/2, this.y+this.h/2, '#ffffff', (Math.random()-0.5)*8, (Math.random()-0.5)*8, 260, 3));
+                    this.startSolaCharge();
                 } else if (this.heroName === 'Nyra' && this.attackState === 'idle' && this.nyraShiftCooldown <= 0) {
                     const chakrams = game.projectiles.filter(projectile => projectile.owner === this && !projectile.dead && (projectile.type === 'chakram' || projectile.type === 'chakram_super'));
                     let anchor = null;
@@ -1222,6 +1321,8 @@ class Fighter extends Entity {
                 }
             }
         }
+
+        this.applySolaForceFallDamage();
     }
 
     isMeleeAttack() {
@@ -1270,7 +1371,7 @@ class Fighter extends Entity {
         if (this.heroName === 'Kae') return this.kaeAwakened ? 35 : 25;
         if (this.heroName === 'Gensan') return this.gensanCombo === 3 ? 35 : 22;
         if (this.heroName === 'Wolf') return 20;
-        if (this.heroName === 'Sola') return 28 + (this.solaFocus || 0) * 8;
+        if (this.heroName === 'Sola') return 56 + (this.solaFocus || 0) * 8;
         if (this.heroName === 'Orion') return 30;
         if (this.heroName === 'Itan') return 32;
         return 13;
@@ -1312,7 +1413,7 @@ class Fighter extends Entity {
         if (this.heroName === 'Volt') this.stateTimer = this.overdriveTimer > 0 ? 25 : 50;
         if (this.heroName === 'Gensan') this.stateTimer = 100;
         if (this.heroName === 'Noae') this.stateTimer = 150;
-        if (this.heroName === 'Sola') this.stateTimer = 90;
+        if (this.heroName === 'Sola') this.stateTimer = 60;
         if (this.heroName === 'Nyra') this.stateTimer = 70;
         if (this.heroName === 'Orion') this.stateTimer = 170;
         if (this.heroName === 'Archor') this.stateTimer = 20;
@@ -2224,11 +2325,12 @@ class Fighter extends Entity {
             ctx.save();
             ctx.translate(hw - 2, 29);
             let angle = -0.45;
-            if (this.attackState === 'windup') angle = -0.45 - 1.35 * phaseProg;
+            if (this.solaChargeTimer > 0) angle = -0.45 + (this.solaChargeElapsed / 95) * Math.PI * 2;
+            else if (this.attackState === 'windup') angle = -0.45 - 1.35 * phaseProg;
             else if (this.attackState === 'active') angle = -1.8 + 3.45 * phaseProg;
             else if (this.attackState === 'recovery') angle = 1.65 - 2.1 * phaseProg;
             ctx.rotate(angle);
-            if (this.attackState === 'active') {
+            if (this.attackState === 'active' || this.solaChargeTimer > 0) {
                 ctx.beginPath(); ctx.arc(0, 0, 72, -1.8, angle);
                 ctx.lineWidth = 13;
                 ctx.strokeStyle = "rgba(143, 252, 255, 0.42)";

@@ -583,10 +583,10 @@ class Projectile extends Entity {
                 if (!t || t.untargetable) continue;
 
                 if (!t.dead && !(t.invincible > 0) && checkAABB(this, t) && !this.hitTargets.has(t)) {
+                    const solaChargeDeflect = t.heroName === 'Sola' && t.solaChargeTimer > 0;
                     const canDeflect = t.heroName === 'Sola'
-                        && (t.attackState === 'windup' || t.attackState === 'active')
-                        && t.isMeleeAttack?.()
-                        && this.type !== 'tidal_wave';
+                        && (solaChargeDeflect || ((t.attackState === 'windup' || t.attackState === 'active') && t.isMeleeAttack?.()))
+                        && (solaChargeDeflect || this.type !== 'tidal_wave');
                     if (canDeflect) {
                         this.owner = t;
                         this.hitTargets.clear();
