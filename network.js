@@ -78,6 +78,7 @@ if (window.Game && !window.Game.prototype.socketSyncPatched) {
         Hazard,
         FireDragon,
         Projectile,
+        GravityWell,
         Minion,
         Skeleton,
         Puppet,

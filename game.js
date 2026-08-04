@@ -24,6 +24,7 @@ class Game {
         this.loopGeneration = 0;
         this.endGameTimer = null;
         this.lastPromptsHTML = '';
+        this.settingsReturnToPause = false;
 
         this.setupMenu();
         updateControlsDisplay();
@@ -86,34 +87,52 @@ class Game {
         document.getElementById('btn-sp-back').onclick = () => this.showComputerModes(false);
         document.getElementById('btn-mp').onclick = () => this.startGame(false);
 
-        document.getElementById('btn-restart').onclick = () => {
-            this.stopLoop();
-            if (this.endGameTimer) clearTimeout(this.endGameTimer);
-            this.endGameTimer = null;
-            document.getElementById('game-over-screen').classList.add('hidden');
-            document.getElementById('menu-screen').classList.remove('hidden');
-            document.getElementById('spectator-banner')?.classList.add('hidden');
-            document.getElementById('battle-royale-hud')?.classList.add('hidden');
-            document.getElementById('hud-p2')?.classList.remove('hidden');
-            document.getElementById('game-ui')?.classList.remove('survival-mode');
-            this.releaseAIControls();
-            this.isSpectator = false;
-            this.isOnline = false;
-            this.state = 'MENU';
-        };
+        document.getElementById('btn-restart').onclick = () => this.returnToMenu();
+        document.getElementById('btn-pause-menu').onclick = () => this.pauseGame();
+        document.getElementById('btn-pause-resume').onclick = () => this.resumeGame();
+        document.getElementById('btn-pause-back').onclick = () => this.returnToMenu();
+        document.getElementById('btn-pause-options').onclick = () => this.openSettings(true);
 
-        document.getElementById('btn-open-settings').onclick = () => {
-            buildSettingsUI();
-            document.getElementById('settings-screen').classList.remove('hidden');
-        };
-        document.getElementById('btn-close-settings').onclick = () => {
-            document.getElementById('settings-screen').classList.add('hidden');
-        };
+        document.getElementById('btn-open-settings').onclick = () => this.openSettings(false);
+        document.getElementById('btn-close-settings').onclick = () => this.closeSettings();
         document.getElementById('btn-reset-bindings').onclick = () => {
             currentBinds = JSON.parse(JSON.stringify(DEFAULT_BINDS));
             saveBinds();
             buildSettingsUI();
         };
+
+        window.addEventListener('keydown', event => {
+            if (event.defaultPrevented || event.code !== 'Escape' || !this.isSinglePlayer) return;
+            if (this.state === 'PLAYING') {
+                event.preventDefault();
+                this.pauseGame();
+            } else if (this.state === 'PAUSED') {
+                event.preventDefault();
+                if (document.getElementById('settings-screen').classList.contains('hidden')) this.resumeGame();
+                else this.closeSettings();
+            }
+        });
+    }
+
+    openSettings(returnToPause = false) {
+        this.settingsReturnToPause = returnToPause && this.state === 'PAUSED';
+        if (this.settingsReturnToPause) document.getElementById('pause-screen').classList.add('hidden');
+        buildSettingsUI();
+        document.getElementById('settings-screen').classList.remove('hidden');
+    }
+
+    closeSettings() {
+        if (typeof listeningKey !== 'undefined' && listeningKey) {
+            listeningKey.btn.classList.remove('listening');
+            listeningKey = null;
+        }
+        document.getElementById('settings-screen').classList.add('hidden');
+        if (this.state === 'PAUSED') this.p1.controls = currentBinds.p1;
+        if (this.state === 'PAUSED' && this.settingsReturnToPause) {
+            document.getElementById('pause-screen').classList.remove('hidden');
+        }
+        this.settingsReturnToPause = false;
+        this.clearMatchInputs();
     }
 
     setupArenaMenu() {
@@ -252,6 +271,58 @@ class Game {
         }
     }
 
+    clearMatchInputs() {
+        this.releaseAIControls();
+        for (const code of Object.keys(keys)) delete keys[code];
+        for (const code of Object.keys(keysPressed)) delete keysPressed[code];
+    }
+
+    pauseGame() {
+        if (!this.isSinglePlayer || this.state !== 'PLAYING') return;
+        this.stopLoop();
+        this.clearMatchInputs();
+        this.state = 'PAUSED';
+        document.getElementById('pause-screen').classList.remove('hidden');
+    }
+
+    resumeGame() {
+        if (!this.isSinglePlayer || this.state !== 'PAUSED') return;
+        document.getElementById('pause-screen').classList.add('hidden');
+        document.getElementById('settings-screen').classList.add('hidden');
+        this.settingsReturnToPause = false;
+        this.p1.controls = currentBinds.p1;
+        this.clearMatchInputs();
+        this.state = 'PLAYING';
+        this.lastTime = performance.now();
+        const generation = this.loopGeneration;
+        this.animationFrameId = requestAnimationFrame(timestamp => this.loop(timestamp, generation));
+    }
+
+    returnToMenu() {
+        this.stopLoop();
+        if (this.endGameTimer) clearTimeout(this.endGameTimer);
+        this.endGameTimer = null;
+        this.clearMatchInputs();
+        this.settingsReturnToPause = false;
+        document.getElementById('pause-screen').classList.add('hidden');
+        document.getElementById('settings-screen').classList.add('hidden');
+        document.getElementById('game-over-screen').classList.add('hidden');
+        document.getElementById('game-ui').classList.add('hidden');
+        document.getElementById('computer-mode-screen')?.classList.add('hidden');
+        document.getElementById('menu-screen').classList.remove('hidden');
+        document.getElementById('spectator-banner')?.classList.add('hidden');
+        document.getElementById('ping-display')?.classList.add('hidden');
+        document.getElementById('battle-royale-hud')?.classList.add('hidden');
+        document.getElementById('hud-p2')?.classList.remove('hidden');
+        document.getElementById('game-ui')?.classList.remove('survival-mode');
+        document.getElementById('btn-pause-menu')?.classList.add('hidden');
+        this.isSpectator = false;
+        this.isOnline = false;
+        this.isSinglePlayer = false;
+        this.isBattleRoyale = false;
+        this.state = 'MENU';
+    }
+
     startGame(isSinglePlayer, singlePlayerMode = 'duel') {
         this.stopLoop();
         if (this.endGameTimer) clearTimeout(this.endGameTimer);
@@ -259,9 +330,12 @@ class Game {
         this.releaseAIControls();
         document.getElementById('menu-screen').classList.add('hidden');
         document.getElementById('computer-mode-screen')?.classList.add('hidden');
+        document.getElementById('pause-screen')?.classList.add('hidden');
+        document.getElementById('settings-screen')?.classList.add('hidden');
         document.getElementById('game-ui').classList.remove('hidden');
 
         this.isSinglePlayer = isSinglePlayer;
+        this.settingsReturnToPause = false;
         this.gameMode = isSinglePlayer ? singlePlayerMode : 'duel';
         this.isBattleRoyale = this.gameMode === 'survival';
         this.configureArena(this.isBattleRoyale ? 'grand_arena' : this.selectedArena, false);
@@ -318,6 +392,7 @@ class Game {
         document.getElementById('hud-p2')?.classList.toggle('hidden', this.isBattleRoyale);
         document.getElementById('battle-royale-hud')?.classList.toggle('hidden', !this.isBattleRoyale);
         document.getElementById('game-ui')?.classList.toggle('survival-mode', this.isBattleRoyale);
+        document.getElementById('btn-pause-menu')?.classList.toggle('hidden', !isSinglePlayer);
         if (this.isBattleRoyale) this.buildBattleRoyaleHUD();
         const arenaNameplate = document.getElementById('arena-nameplate');
         if (arenaNameplate) arenaNameplate.innerText = this.activeArena.name;
@@ -341,12 +416,21 @@ class Game {
         return this.getFighters().filter(candidate => candidate && candidate !== fighter && !candidate.dead);
     }
 
+    isFighterConcealed(fighter) {
+        if (!fighter || fighter.heroName !== 'Kuro' || !fighter.kuroCloaked) return false;
+        if (typeof fighter.isKuroFullyInvisible === 'function') return fighter.isKuroFullyInvisible();
+        return fighter.kuroAbsoluteCloakTimer > 0 || Math.hypot(fighter.vx || 0, fighter.vy || 0) <= 1.2;
+    }
+
     getEnemyOf(fighter) {
         const resolveVisibleTarget = target => {
             if (!target || target.dead || target === fighter) return null;
-            if (fighter?.isCPU && target.heroName === 'Kuro' && target.kuroCloaked) {
+            if (target.heroName === 'Kuro' && target.kuroCloaked) {
                 const decoy = this.minions?.find(minion => minion.type === 'kuro_decoy' && minion.owner === target && !minion.dead);
                 if (decoy) return decoy;
+                if (this.isFighterConcealed(target)) return null;
+            }
+            if (fighter?.isCPU && target.heroName === 'Kuro' && target.kuroCloaked) {
                 const distance = Math.hypot(target.x - fighter.x, target.y - fighter.y);
                 if (distance > 125 && !(Math.abs(target.vx || 0) > 2.2 && distance < 340)) return null;
             }
@@ -384,6 +468,8 @@ class Game {
 
     updateUI() {
         if (!this.p1 || !this.p2) return;
+        document.getElementById('hud-p1')?.classList.toggle('kuro-concealed', this.isFighterConcealed(this.p1));
+        document.getElementById('hud-p2')?.classList.toggle('kuro-concealed', this.isFighterConcealed(this.p2));
         document.getElementById('p1-hp').style.width = `${Math.max(0, (this.p1.hp / this.p1.maxHp) * 100)}%`;
         if (this.p1.heroName === 'Duke') {
             document.getElementById('p1-horse-hp').style.width = `${Math.max(0, (this.p1.horseHp / this.p1.maxHorseHp) * 100)}%`;
@@ -451,10 +537,24 @@ class Game {
         }
         if (this.p1.heroName === 'Kuro') {
             if (this.p1.attackState === 'charging') p1Stat += `[LONGSHOT: ${Math.round(this.p1.kuroCharge / this.p1.kuroChargeMax * 100)}%]`;
-            if (this.p1.kuroCloaked) p1Stat += " [VEILED]";
+            if (this.p1.kuroAbsoluteCloakTimer > 0) p1Stat += ` [VANISHED ${(this.p1.kuroAbsoluteCloakTimer/1000).toFixed(1)}s]`;
+            else if (this.p1.kuroCloaked) p1Stat += " [VEILED]";
             else if (this.p1.kuroRevealTimer > 0) p1Stat += ` [REVEALED ${(this.p1.kuroRevealTimer/1000).toFixed(1)}s]`;
             if (this.p1.kuroEmpoweredShot) p1Stat += ` [PHANTOM ${(this.p1.kuroEmpoweredTimer/1000).toFixed(1)}s]`;
-            if (this.p1.kuroDecoyCooldown > 0) p1Stat += ` [DECOY ${(this.p1.kuroDecoyCooldown/1000).toFixed(1)}s]`;
+            if (this.p1.kuroDecoyCooldown > 0) p1Stat += ` [SHADE CD ${(this.p1.kuroDecoyCooldown/1000).toFixed(1)}s]`;
+        }
+        if (this.p1.heroName === 'Sola') {
+            p1Stat += `[FOCUS: ${this.p1.solaFocus}/3]`;
+            if (this.p1.solaDashCooldown > 0) p1Stat += ` [STEP CD ${(this.p1.solaDashCooldown/1000).toFixed(1)}s]`;
+        }
+        if (this.p1.heroName === 'Nyra') {
+            const activeChakrams = this.projectiles.filter(projectile => projectile.owner === this.p1 && !projectile.dead && (projectile.type === 'chakram' || projectile.type === 'chakram_super')).length;
+            p1Stat += `[CHAKRAMS: ${activeChakrams}]`;
+            if (this.p1.nyraShiftCooldown > 0) p1Stat += ` [SHIFT CD ${(this.p1.nyraShiftCooldown/1000).toFixed(1)}s]`;
+        }
+        if (this.p1.heroName === 'Orion') {
+            p1Stat += `[GRAVITY: ${this.p1.orionCharges}/3]`;
+            if (this.p1.orionPulseCooldown > 0) p1Stat += ` [PULSE CD ${(this.p1.orionPulseCooldown/1000).toFixed(1)}s]`;
         }
 
         if (this.p1.buffs.poison > 0) p1Stat += " [POISONED]";
@@ -531,10 +631,24 @@ class Game {
         }
         if (this.p2.heroName === 'Kuro') {
             if (this.p2.attackState === 'charging') p2Stat += `[LONGSHOT: ${Math.round(this.p2.kuroCharge / this.p2.kuroChargeMax * 100)}%]`;
-            if (this.p2.kuroCloaked) p2Stat += " [VEILED]";
+            if (this.p2.kuroAbsoluteCloakTimer > 0) p2Stat += ` [VANISHED ${(this.p2.kuroAbsoluteCloakTimer/1000).toFixed(1)}s]`;
+            else if (this.p2.kuroCloaked) p2Stat += " [VEILED]";
             else if (this.p2.kuroRevealTimer > 0) p2Stat += ` [REVEALED ${(this.p2.kuroRevealTimer/1000).toFixed(1)}s]`;
             if (this.p2.kuroEmpoweredShot) p2Stat += ` [PHANTOM ${(this.p2.kuroEmpoweredTimer/1000).toFixed(1)}s]`;
-            if (this.p2.kuroDecoyCooldown > 0) p2Stat += ` [DECOY ${(this.p2.kuroDecoyCooldown/1000).toFixed(1)}s]`;
+            if (this.p2.kuroDecoyCooldown > 0) p2Stat += ` [SHADE CD ${(this.p2.kuroDecoyCooldown/1000).toFixed(1)}s]`;
+        }
+        if (this.p2.heroName === 'Sola') {
+            p2Stat += `[FOCUS: ${this.p2.solaFocus}/3]`;
+            if (this.p2.solaDashCooldown > 0) p2Stat += ` [STEP CD ${(this.p2.solaDashCooldown/1000).toFixed(1)}s]`;
+        }
+        if (this.p2.heroName === 'Nyra') {
+            const activeChakrams = this.projectiles.filter(projectile => projectile.owner === this.p2 && !projectile.dead && (projectile.type === 'chakram' || projectile.type === 'chakram_super')).length;
+            p2Stat += `[CHAKRAMS: ${activeChakrams}]`;
+            if (this.p2.nyraShiftCooldown > 0) p2Stat += ` [SHIFT CD ${(this.p2.nyraShiftCooldown/1000).toFixed(1)}s]`;
+        }
+        if (this.p2.heroName === 'Orion') {
+            p2Stat += `[GRAVITY: ${this.p2.orionCharges}/3]`;
+            if (this.p2.orionPulseCooldown > 0) p2Stat += ` [PULSE CD ${(this.p2.orionPulseCooldown/1000).toFixed(1)}s]`;
         }
 
         if (this.p2.buffs.poison > 0) p2Stat += " [POISONED]";
@@ -579,6 +693,7 @@ class Game {
             const row = document.querySelector(`.survivor-row[data-fighter-id="${fighter.id}"]`);
             if (!row) return;
             row.classList.toggle('eliminated', fighter.dead);
+            row.classList.toggle('kuro-concealed', this.isFighterConcealed(fighter));
             const bar = row.querySelector('.survivor-bar > div');
             if (bar) bar.style.width = `${Math.max(0, fighter.hp / fighter.maxHp * 100)}%`;
         });
@@ -1040,6 +1155,6 @@ window.game = game;
 
 window.addEventListener('resize', () => {
     const arenaId = game.isBattleRoyale ? 'grand_arena' : game.selectedArena;
-    game.configureArena(arenaId, game.state === 'PLAYING');
+    game.configureArena(arenaId, game.state === 'PLAYING' || game.state === 'PAUSED');
 });
 window.dispatchEvent(new Event('resize'));

@@ -54,7 +54,7 @@ function loadProjectileContext() {
     };
     vm.createContext(context);
     const source = fs.readFileSync(path.join(__dirname, '..', 'entities.js'), 'utf8');
-    vm.runInContext(`${source}\nwindow.Projectile = Projectile;`, context, { filename: 'entities.js' });
+    vm.runInContext(`${source}\nwindow.Projectile = Projectile; window.KuroDecoy = KuroDecoy;`, context, { filename: 'entities.js' });
     return context;
 }
 
@@ -664,6 +664,23 @@ test('CPU loses distant Kuro while cloaked without a decoy or visible movement',
     assert.equal(context.keys[ai.controls.right], false);
 });
 
+test('absolute cloak defeats AI last-attacker tracking while Kuro moves', () => {
+    const context = loadAI();
+    const ai = makeFighter('Hunter', 'cpu_hunter');
+    const target = makeFighter('Kuro', 'target_kuro');
+    target.kuroCloaked = true;
+    target.kuroAbsoluteCloakTimer = 3000;
+    target.vx = 5;
+    ai.lastAttacker = target;
+    ai.lastAttackerTimer = 2000;
+    readyBrain(ai, target);
+
+    context.window.runAI(makeGame(ai, target), 16);
+
+    assert.equal(ai.aiTarget, null);
+    assert.equal(context.keysPressed[ai.controls.attack], undefined);
+});
+
 test('Kuro cloaks patiently and fires a fully charged Phantom Round', () => {
     const simulation = loadPhysicsGame('Kuro');
     const { ai, context } = simulation;
@@ -674,6 +691,16 @@ test('Kuro cloaks patiently and fires a fully charged Phantom Round', () => {
 
     for (let frame = 0; frame < 80; frame++) ai.update(16);
     assert.equal(ai.kuroCloaked, true, 'Kuro did not enter Optical Veil');
+    assert.equal(ai.isKuroFullyInvisible(), true, 'stationary Kuro was still visually exposed');
+    let hiddenDrawCalls = 0;
+    ai.draw({ fillRect() { hiddenDrawCalls++; } });
+    assert.equal(hiddenDrawCalls, 0, 'stationary veil still drew Kuro or his HP bar');
+    ai.vx = 3;
+    assert.equal(ai.isKuroFullyInvisible(), false, 'passive veil hid Kuro while moving');
+    ai.vx = 0;
+    ai.vy = 3;
+    assert.equal(ai.isKuroFullyInvisible(), false, 'passive veil hid Kuro while moving vertically');
+    ai.vy = 0;
 
     ai.performSuper();
     assert.equal(ai.kuroEmpoweredShot, true);
@@ -695,7 +722,7 @@ test('Kuro cloaks patiently and fires a fully charged Phantom Round', () => {
     assert.ok(ai.kuroRevealTimer > 0);
 });
 
-test('Kuro decoy recloaks instantly and damage interrupts Longshot', () => {
+test('Kuro shade grants 5.5s absolute cloak through attacks and damage', () => {
     const simulation = loadPhysicsGame('Kuro');
     const { ai, target, context } = simulation;
     ai.isCPU = false;
@@ -709,7 +736,8 @@ test('Kuro decoy recloaks instantly and damage interrupts Longshot', () => {
     assert.equal(context.game.minions.length, 1);
     assert.equal(context.game.minions[0].type, 'kuro_decoy');
     assert.equal(ai.kuroCloaked, true);
-    assert.equal(ai.kuroDecoyCooldown, 8000);
+    assert.equal(ai.kuroAbsoluteCloakTimer, 5500);
+    assert.equal(ai.kuroDecoyCooldown, 10000);
 
     context.keys[ai.controls.attack] = true;
     context.keysPressed[ai.controls.attack] = true;
@@ -717,10 +745,53 @@ test('Kuro decoy recloaks instantly and damage interrupts Longshot', () => {
     delete context.keysPressed[ai.controls.attack];
     assert.equal(ai.attackState, 'charging');
 
+    for (let frame = 0; frame < 80; frame++) ai.update(16);
+    assert.equal(context.game.projectiles.length, 1);
+    assert.equal(ai.kuroCloaked, true, 'attacking revealed Kuro during absolute cloak');
+    assert.ok(ai.kuroAbsoluteCloakTimer > 0);
+
+    context.keys[ai.controls.attack] = false;
+    ai.attackState = 'charging';
+    ai.kuroCharge = 300;
+
     ai.takeDamage(10, target);
     assert.equal(ai.attackState, 'idle');
+    assert.equal(ai.kuroCloaked, true, 'damage revealed Kuro during absolute cloak');
+    assert.equal(ai.kuroRevealTimer, 0);
+    ai.vx = 5;
+    assert.equal(ai.isKuroFullyInvisible(), true, 'movement exposed Kuro during absolute cloak');
+
+    ai.update(ai.kuroAbsoluteCloakTimer);
+    assert.equal(ai.kuroAbsoluteCloakTimer, 0);
     assert.equal(ai.kuroCloaked, false);
-    assert.ok(ai.kuroRevealTimer >= 2000);
+});
+
+test('Kuro shade wanders and renders its own HP bar', () => {
+    const context = loadProjectileContext();
+    context.PLATFORMS = [];
+    const owner = { w: 38, h: 70, facing: 1, isGrounded: true, baseSpeed: 5.2, baseJump: 14 };
+    const shade = new context.window.KuroDecoy(owner, 200, context.GROUND_Y - 70);
+    shade.moveDirection = 1;
+    shade.moveTimer = 1000;
+    shade.jumpTimer = 1000;
+    const startX = shade.x;
+
+    shade.update(16);
+
+    assert.ok(shade.x > startX, 'shade did not wander');
+    assert.equal(shade.isGrounded, true);
+
+    const rectangles = [];
+    const drawContext = {
+        globalAlpha: 1,
+        fillStyle: '',
+        save() {}, restore() {}, translate() {}, scale() {},
+        fillRect(x, y, w, h) { rectangles.push({ x, y, w, h, color: this.fillStyle }); }
+    };
+    shade.draw(drawContext);
+    const hpRects = rectangles.filter(rect => rect.y === shade.y - 12 && rect.h === 5);
+    assert.equal(hpRects.length, 2);
+    assert.ok(hpRects.some(rect => rect.color === '#4caf50' && rect.w === shade.w));
 });
 
 test('Kuro sniper rounds apply their piercing and control effects', () => {

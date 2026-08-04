@@ -96,21 +96,81 @@ class KuroDecoy extends Entity {
         this.life = 6000;
         this.maxLife = this.life;
         this.facing = owner.facing;
-        this.isGrounded = true;
+        this.isGrounded = !!owner.isGrounded;
         this.attackState = 'idle';
         this.buffs = {};
+        this.speed = Math.max(2.8, (owner.baseSpeed || 5.2) * 0.78);
+        this.moveDirection = Math.random() < 0.5 ? -1 : 1;
+        this.moveTimer = 450 + Math.random() * 750;
+        this.jumpTimer = 650 + Math.random() * 950;
     }
-    takeDamage() {
+    takeDamage(amt) {
         if (this.dead) return;
-        this.hp = 0;
-        this.dead = true;
-        for (let i = 0; i < 14; i++) {
-            game.particles.push(new Particle(this.x + this.w/2, this.y + this.h/2, "#9ad8c0", (Math.random()-0.5)*10, (Math.random()-0.5)*10, 350, 3));
+        this.hp -= Math.max(0, amt || 0);
+        if (this.hp <= 0) {
+            this.dead = true;
+            for (let i = 0; i < 14; i++) {
+                game.particles.push(new Particle(this.x + this.w/2, this.y + this.h/2, "#9ad8c0", (Math.random()-0.5)*10, (Math.random()-0.5)*10, 350, 3));
+            }
         }
     }
     update(dt) {
         this.life -= dt;
-        if (this.life <= 0) this.dead = true;
+        if (this.life <= 0) {
+            this.dead = true;
+            return;
+        }
+
+        this.moveTimer -= dt;
+        if (this.moveTimer <= 0) {
+            const movementRoll = Math.random();
+            this.moveDirection = movementRoll < 0.16 ? 0 : (movementRoll < 0.58 ? -1 : 1);
+            this.moveTimer = 450 + Math.random() * 850;
+        }
+
+        this.jumpTimer -= dt;
+        if (this.isGrounded && this.jumpTimer <= 0) {
+            if (Math.random() < 0.62) {
+                this.vy = -(this.owner.baseJump || 14) * 0.82;
+                this.isGrounded = false;
+            }
+            this.jumpTimer = 650 + Math.random() * 1100;
+        }
+
+        if (this.moveDirection) {
+            this.vx = this.moveDirection * this.speed;
+            this.facing = this.moveDirection;
+        } else {
+            this.vx *= 0.72;
+            if (Math.abs(this.vx) < 0.2) this.vx = 0;
+        }
+
+        this.x += this.vx;
+        if (this.x <= 0 || this.x + this.w >= CANVAS_W) {
+            this.x = Math.max(0, Math.min(CANVAS_W - this.w, this.x));
+            this.moveDirection = this.x <= 0 ? 1 : -1;
+            this.facing = this.moveDirection;
+        }
+
+        const previousBottom = this.y + this.h;
+        this.vy += GRAVITY;
+        this.y += this.vy;
+        this.isGrounded = false;
+        if (this.vy >= 0) {
+            for (const platform of PLATFORMS) {
+                if (previousBottom <= platform.y && this.y + this.h >= platform.y && this.x + this.w > platform.x && this.x < platform.x + platform.w) {
+                    this.y = platform.y - this.h;
+                    this.vy = 0;
+                    this.isGrounded = true;
+                    break;
+                }
+            }
+        }
+        if (this.y + this.h >= GROUND_Y) {
+            this.y = GROUND_Y - this.h;
+            this.vy = 0;
+            this.isGrounded = true;
+        }
     }
     draw(ctx) {
         ctx.save();
@@ -127,6 +187,16 @@ class KuroDecoy extends Entity {
         ctx.fillRect(this.w/2 - 4, 25, 62, 5);
         ctx.fillStyle = "#ffffff";
         ctx.fillRect(this.w/2 + 35, 22, 4, 4);
+        ctx.restore();
+
+        ctx.save();
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = "#080d0b";
+        ctx.fillRect(this.x - 1, this.y - 13, this.w + 2, 7);
+        ctx.fillStyle = "#9b1c2e";
+        ctx.fillRect(this.x, this.y - 12, this.w, 5);
+        ctx.fillStyle = "#4caf50";
+        ctx.fillRect(this.x, this.y - 12, this.w * Math.max(0, this.hp / this.maxHp), 5);
         ctx.restore();
     }
 }
@@ -392,6 +462,7 @@ class Projectile extends Entity {
         this.color = color; this.type = type; this.timer = 0;
         this.hitTargets = new Set();
         this.phantomDizzyApplied = false;
+        this.returning = false;
     }
     update(dt) {
         this.x += this.vx; this.y += this.vy;
@@ -403,6 +474,25 @@ class Projectile extends Entity {
             if (this.timer >= 1500) {
                 this.dead = true;
                 game.createExplosion(this.x + this.w/2, this.y + this.h/2, 120, 153, this.owner);
+            }
+        } else if (this.type === "chakram" || this.type === "chakram_super") {
+            this.timer += dt;
+            const returnDelay = this.type === "chakram_super" ? 750 : 600;
+            if (!this.returning && this.timer >= returnDelay) {
+                this.returning = true;
+                this.hitTargets.clear();
+            }
+            if (this.returning && this.owner && !this.owner.dead) {
+                const dx = this.owner.x + this.owner.w/2 - (this.x + this.w/2);
+                const dy = this.owner.y + this.owner.h/2 - (this.y + this.h/2);
+                const distance = Math.hypot(dx, dy);
+                if (distance < 34) {
+                    this.dead = true;
+                } else {
+                    const speed = this.type === "chakram_super" ? 19 : 21;
+                    this.vx += (dx / Math.max(1, distance) * speed - this.vx) * 0.2;
+                    this.vy += (dy / Math.max(1, distance) * speed - this.vy) * 0.2;
+                }
             }
         } else if (this.type === "homing_bullet" || this.type === "magic_burst" || this.type === "volt_laser") {
             let target = game.getEnemyOf(this.owner);
@@ -444,6 +534,24 @@ class Projectile extends Entity {
                 if (!t || t.untargetable) continue;
 
                 if (!t.dead && !(t.invincible > 0) && checkAABB(this, t) && !this.hitTargets.has(t)) {
+                    const canDeflect = t.heroName === 'Sola'
+                        && (t.attackState === 'windup' || t.attackState === 'active')
+                        && t.isMeleeAttack?.()
+                        && this.type !== 'tidal_wave';
+                    if (canDeflect) {
+                        this.owner = t;
+                        this.hitTargets.clear();
+                        this.hitTargets.add(t);
+                        this.vx = Math.abs(this.vx) < 1 ? t.facing * 16 : -this.vx * 1.15;
+                        this.vy = -this.vy;
+                        this.x = t.facing === 1 ? t.x + t.w + 4 : t.x - this.w - 4;
+                        t.solaFocus = Math.min(3, (t.solaFocus || 0) + 1);
+                        for (let i = 0; i < 14; i++) {
+                            game.particles.push(new Particle(this.x, this.y, '#8ffcff', (Math.random()-0.5)*18, (Math.random()-0.5)*18, 280, 4));
+                        }
+                        return;
+                    }
+
                     let isBlocked = false;
                     if (t.attackState === 'active' && t.isMeleeAttack() && (t.heroName === 'Artu' || (t.heroName === 'Duke' && !t.isMounted))) {
                         if (Math.random() < 0.5) isBlocked = true;
@@ -504,7 +612,7 @@ class Projectile extends Entity {
 
                     this.hitTargets.add(t);
                     const piercesMinion = this.type === "sniper_round_full" && !t.heroName;
-                    const piercesEverything = this.type === "phantom_round";
+                    const piercesEverything = this.type === "phantom_round" || this.type === "chakram" || this.type === "chakram_super";
                     if (this.type !== "blue_paper_plane" && this.type !== "tidal_wave" && !piercesMinion && !piercesEverything) {
                         this.dead = true;
                         break;
@@ -601,6 +709,22 @@ class Projectile extends Entity {
         } else if (this.type === "bullet" || this.type === "homing_bullet") {
             ctx.fillStyle = this.type === "homing_bullet" ? "#ff5500" : "#fff";
             ctx.fillRect(this.x, this.y, this.w, this.h);
+        } else if (this.type === "chakram" || this.type === "chakram_super") {
+            ctx.save();
+            ctx.translate(this.x + this.w/2, this.y + this.h/2);
+            ctx.rotate(this.timer * 0.025);
+            ctx.strokeStyle = this.type === "chakram_super" ? "#ffd166" : this.color;
+            ctx.lineWidth = 4;
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = ctx.strokeStyle;
+            ctx.beginPath();
+            ctx.arc(0, 0, this.w/2 - 2, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.fillStyle = "#f4f4f4";
+            ctx.fillRect(-2, -this.h/2, 4, 7);
+            ctx.fillRect(-2, this.h/2 - 7, 4, 7);
+            ctx.shadowBlur = 0;
+            ctx.restore();
         } else if (this.type === "sniper_round" || this.type === "sniper_round_full" || this.type === "phantom_round") {
             ctx.save();
             ctx.translate(this.x + this.w/2, this.y + this.h/2);
@@ -613,6 +737,71 @@ class Projectile extends Entity {
         } else {
             ctx.fillRect(this.x, this.y, this.w, this.h);
         }
+    }
+}
+
+class GravityWell extends Entity {
+    constructor(owner, x, y) {
+        super(x - 30, y - 30, 60, 60);
+        this.owner = owner;
+        this.type = "gravity_well";
+        this.life = 4000;
+        this.maxLife = this.life;
+        this.tickTimer = 0;
+        this.untargetable = true;
+    }
+
+    update(dt) {
+        this.life -= dt;
+        this.tickTimer += dt;
+        if (this.life <= 0) {
+            this.dead = true;
+            return;
+        }
+
+        const centerX = this.x + this.w/2;
+        const centerY = this.y + this.h/2;
+        const shouldDamage = this.tickTimer >= 1000;
+        if (shouldDamage) this.tickTimer %= 1000;
+        const targets = [
+            ...game.getOpponentsOf(this.owner),
+            ...game.minions.filter(minion => minion && minion !== this && minion.owner !== this.owner && !minion.untargetable)
+        ];
+
+        for (const target of targets) {
+            if (!target || target.dead || target.invincible > 0) continue;
+            const dx = centerX - (target.x + target.w/2);
+            const dy = centerY - (target.y + target.h/2);
+            const distance = Math.hypot(dx, dy);
+            if (distance > 230) continue;
+            const strength = 1 - distance / 230;
+            target.vx += dx / Math.max(1, distance) * (0.45 + strength * 0.75);
+            target.vy += dy / Math.max(1, distance) * (0.08 + strength * 0.2);
+            if (shouldDamage) target.takeDamage(10, this.owner, false, true);
+        }
+
+        if (Math.random() < 0.35) {
+            const angle = Math.random() * Math.PI * 2;
+            const radius = 20 + Math.random() * 70;
+            game.particles.push(new Particle(centerX + Math.cos(angle)*radius, centerY + Math.sin(angle)*radius, '#a8b8ff', -Math.cos(angle)*2, -Math.sin(angle)*2, 300, 3));
+        }
+    }
+
+    draw(ctx) {
+        const progress = Math.max(0, this.life / this.maxLife);
+        const pulse = 1 + Math.sin(Date.now() * 0.012) * 0.08;
+        ctx.save();
+        ctx.translate(this.x + this.w/2, this.y + this.h/2);
+        ctx.scale(pulse, pulse);
+        ctx.fillStyle = `rgba(10, 12, 28, ${0.7 * progress + 0.15})`;
+        ctx.beginPath(); ctx.arc(0, 0, 28, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = `rgba(168, 184, 255, ${0.85 * progress})`;
+        ctx.lineWidth = 4;
+        ctx.beginPath(); ctx.arc(0, 0, 42, 0, Math.PI * 2); ctx.stroke();
+        ctx.strokeStyle = `rgba(216, 75, 120, ${0.65 * progress})`;
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(0, 0, 62, 0, Math.PI * 2); ctx.stroke();
+        ctx.restore();
     }
 }
 

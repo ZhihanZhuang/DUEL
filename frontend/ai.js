@@ -49,7 +49,10 @@ const HERO_TACTICS = {
     Gensan:  { role: 'trickster', aggression: 1.02, caution: 0.72, burst: 1.28, kite: 0.25, setup: 1.00, highGround: 0.50, retreatHp: 0.28, retreatFireChance: 0.18 },
     Noae:    { role: 'trapper', aggression: 0.52, caution: 0.92, burst: 0.78, kite: 1.05, setup: 1.60, highGround: 1.05, retreatHp: 0.36, retreatFireChance: 0.30 },
     Wolf:    { role: 'hunter', aggression: 1.30, caution: 0.35, burst: 1.38, kite: 0.08, setup: 0.08, highGround: 0.45, retreatHp: 0.18, retreatFireChance: 0.10 },
-    Kuro:    { role: 'sniper', aggression: 0.48, caution: 1.42, burst: 1.70, kite: 1.55, setup: 1.25, highGround: 1.65, retreatHp: 0.44, retreatFireChance: 0.18 }
+    Kuro:    { role: 'sniper', aggression: 0.48, caution: 1.42, burst: 1.70, kite: 1.55, setup: 1.25, highGround: 1.65, retreatHp: 0.44, retreatFireChance: 0.18 },
+    Sola:    { role: 'sentinel', aggression: 1.02, caution: 0.82, burst: 1.18, kite: 0.12, setup: 0.18, highGround: 0.45, retreatHp: 0.27, retreatFireChance: 0.12 },
+    Nyra:    { role: 'skirmisher', aggression: 0.74, caution: 1.12, burst: 1.30, kite: 1.28, setup: 0.42, highGround: 1.05, retreatHp: 0.38, retreatFireChance: 0.48 },
+    Orion:   { role: 'gravity', aggression: 1.12, caution: 0.55, burst: 1.25, kite: 0.08, setup: 0.95, highGround: 0.38, retreatHp: 0.24, retreatFireChance: 0.10 }
 };
 
 function getHeroTactic(ai) {
@@ -164,20 +167,24 @@ function pickTarget(game, ai, brain, dt) {
         return null;
     }
 
-    brain.targetTimer -= dt;
-    if (ai.lastAttacker && !ai.lastAttacker.dead && ai.lastAttackerTimer > 0) {
-        ai.aiTarget = ai.lastAttacker;
-        brain.targetTimer = Math.max(brain.targetTimer, 900);
-        return ai.aiTarget;
-    }
-
     const canPerceive = candidate => {
         if (!candidate?.kuroCloaked) return true;
         const hasDecoy = game.minions?.some(minion => minion.type === 'kuro_decoy' && minion.owner === candidate && !minion.dead);
         if (hasDecoy) return true;
+        const fullyInvisible = typeof candidate.isKuroFullyInvisible === 'function'
+            ? candidate.isKuroFullyInvisible()
+            : candidate.kuroAbsoluteCloakTimer > 0 || Math.hypot(candidate.vx || 0, candidate.vy || 0) <= 1.2;
+        if (fullyInvisible) return false;
         const distance = distanceBetween(ai, candidate);
-        return distance < 125 || (Math.abs(candidate.vx || 0) > 2.2 && distance < 340);
+        return Math.abs(candidate.vx || 0) > 2.2 && distance < 340;
     };
+
+    brain.targetTimer -= dt;
+    if (ai.lastAttacker && !ai.lastAttacker.dead && ai.lastAttackerTimer > 0 && canPerceive(ai.lastAttacker)) {
+        ai.aiTarget = ai.lastAttacker;
+        brain.targetTimer = Math.max(brain.targetTimer, 900);
+        return ai.aiTarget;
+    }
 
     if (ai.aiTarget && !ai.aiTarget.dead && brain.targetTimer > 0 && canPerceive(ai.aiTarget)) return ai.aiTarget;
 
@@ -415,6 +422,9 @@ function getCombatProfile(ai, source = ai) {
         case 'Noae': range = 330; preferred = 220; break;
         case 'Wolf': range = 62; preferred = 38; break;
         case 'Kuro': range = 920; preferred = 610; break;
+        case 'Sola': range = 86; preferred = 58; break;
+        case 'Nyra': range = 390; preferred = 255; break;
+        case 'Orion': range = 82; preferred = 54; break;
     }
     return { range, preferred, ranged: !ai.isMeleeAttack(), tactics };
 }
@@ -601,6 +611,12 @@ function chooseDefensiveAction(game, ai, target, threat) {
         case 'Kuro':
             if (ai.kuroDecoyCooldown <= 0) return 'switch';
             break;
+        case 'Sola':
+            if (ai.solaDashCooldown <= 0) return 'switch';
+            break;
+        case 'Nyra':
+            if (ai.nyraShiftCooldown <= 0 && game.projectiles.some(projectile => projectile.owner === ai && (projectile.type === 'chakram' || projectile.type === 'chakram_super'))) return 'switch';
+            break;
     }
     return null;
 }
@@ -710,6 +726,20 @@ function chooseHeroAction(game, ai, target, targetEntity, dist, verticalDistance
             if (!decoy && ai.kuroDecoyCooldown <= 0 && (combatState === 'setup' || combatState === 'retreat' || combatState === 'evade' || dist < 210)) return 'switch';
             break;
         }
+        case 'Sola':
+            if (superReady && dist < 520 && (ai.solaFocus > 0 || isVulnerableTarget(target) || target.hp < target.maxHp * 0.45)) return 'super';
+            if (ai.solaDashCooldown <= 0 && aligned && dist > 155 && dist < 430 && combatState === 'pressure') return 'switch';
+            break;
+        case 'Nyra': {
+            const activeChakram = game.projectiles.some(projectile => projectile.owner === ai && !projectile.dead && (projectile.type === 'chakram' || projectile.type === 'chakram_super'));
+            if (superReady && dist < 520 && Math.abs(verticalDistance) < 240) return 'super';
+            if (activeChakram && ai.nyraShiftCooldown <= 0 && (dist < 115 || combatState === 'evade')) return 'switch';
+            break;
+        }
+        case 'Orion':
+            if (ai.orionCharges > 0 && ai.orionPulseCooldown <= 0 && dist < 205) return 'switch';
+            if (superReady && dist < 680) return 'super';
+            break;
     }
     return null;
 }

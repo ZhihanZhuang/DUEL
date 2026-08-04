@@ -286,7 +286,22 @@ var HEROES = {
     Kuro: {
         name: "Kuro", desc: "Invisible Phantom Marksman",
         color: "#244d3b", maxHp: 600, speed: 5.2, jump: 14, width: 38, height: 70, superCD: 26000,
-        ui: { hp: "60 WRD", atk: "2 / 5 / 8 WRD (Charged Rifle)", passive: "<span class='skill-tag'>Optical Veil</span> Cloaks after 1.25s without attacking or taking damage. Hold Attack to charge Longshot; full charge pierces minions and slows. Moving leaves visible distortion. Press [Switch] to leave a 1 HP decoy and recloak (8s CD).", super: "<span class='skill-tag'>Phantom Round</span> Loads one 13 WRD execution shot for 7s. It pierces every target; the first fighter hit is dizzied for 1s. Charging exposes a bright scope glint." }
+        ui: { hp: "60 WRD", atk: "2 / 5 / 8 WRD (Charged Rifle)", passive: "<span class='skill-tag'>Optical Veil</span> After 1.25s without attacking or taking damage, standing still conceals Kuro and his HP completely; moving leaves visible distortion. Hold Attack to charge Longshot; full charge pierces minions and slows. Press [Switch] to leave a moving 1 HP shade and vanish completely for 5.5s, even while moving or attacking (10s CD).", super: "<span class='skill-tag'>Phantom Round</span> Loads one 13 WRD execution shot for 7s. It pierces every target; the first fighter hit is dizzied for 1s. Charging exposes a bright scope glint." }
+    },
+    Sola: {
+        name: "Sola", desc: "Lightsaber Sentinel",
+        color: "#167d8d", maxHp: 780, speed: 5.8, jump: 15, width: 40, height: 70, superCD: 22000,
+        ui: { hp: "78 WRD", atk: "2.8 WRD (Lightsaber)", passive: "<span class='skill-tag'>Luminous Guard</span> Lightsaber attacks deflect most projectiles. Each deflection stores 1 Focus (max 3), adding 0.8 WRD to the next saber hit. Press [Switch] for an invincible short Force Step (6s CD).", super: "<span class='skill-tag'>Singularity Slash</span> Pulls nearby enemies into saber range and strikes for 8.5 WRD + 1.5 WRD per stored Focus, then dizzies them for 0.7s." }
+    },
+    Nyra: {
+        name: "Nyra", desc: "Chakram Rift Dancer",
+        color: "#d84b78", maxHp: 680, speed: 6.2, jump: 16, width: 36, height: 66, superCD: 24000,
+        ui: { hp: "68 WRD", atk: "2.2 WRD Out + 2.2 WRD Return (Chakram)", passive: "Thrown chakrams reverse after 0.6s and can hit again on the way back. Press [Switch] to Rift Shift to one of your active chakrams and destroy it (7s CD).", super: "<span class='skill-tag'>Halo Storm</span> Launches six returning chakrams in every direction. Each deals 2 WRD on the outward and return paths." }
+    },
+    Orion: {
+        name: "Orion", desc: "Gravity Gauntlet Warden",
+        color: "#4056a1", maxHp: 900, speed: 4.6, jump: 13.5, width: 46, height: 74, superCD: 28000,
+        ui: { hp: "90 WRD", atk: "3.0 WRD (Gravity Gauntlets)", passive: "Melee hits build Gravity Charges (max 3). Press [Switch] to consume every charge in a close Gravity Pulse, dealing 1 WRD + 1.5 WRD per charge and briefly pulling enemies inward (5s CD).", super: "<span class='skill-tag'>Event Horizon</span> Creates a 4s gravity well at the enemy's position. It drags enemies toward its core and deals 1 WRD each second." }
     }
 };
 
