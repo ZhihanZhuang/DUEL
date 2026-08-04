@@ -1042,7 +1042,9 @@ test('D2F-1 drones predict projectile paths, hold range, and cycle damage-only l
 
     drone.update(16);
     assert.equal(drone.evading, true);
+    assert.equal(drone.moveSpeedMultiplier, 0.6);
     assert.ok(Math.abs(drone.vy) > 0, 'drone did not leave the predicted projectile path');
+    assert.ok(Math.abs(drone.vy) < 1.4, 'drone evasion remained at its previous high speed');
 
     context.game.projectiles = [];
     drone.cycleTimer = 0;

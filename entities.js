@@ -1004,6 +1004,7 @@ class D2FDrone extends Entity {
         this.laserEndX = x;
         this.laserEndY = y;
         this.evading = false;
+        this.moveSpeedMultiplier = 0.6;
         this.buffs = { dizzy: 0, slow: 0, burn: 0 };
         this.invincible = 0;
     }
@@ -1117,6 +1118,8 @@ class D2FDrone extends Entity {
             desiredVy = Math.max(-5, Math.min(5, this.owner.y - 80 - this.y)) * 0.08;
         }
 
+        desiredVx *= this.moveSpeedMultiplier;
+        desiredVy *= this.moveSpeedMultiplier;
         this.vx += (desiredVx - this.vx) * 0.22 * frameScale;
         this.vy += (desiredVy - this.vy) * 0.22 * frameScale;
         this.x += this.vx * frameScale;
