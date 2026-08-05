@@ -208,6 +208,11 @@ class Fighter extends Entity {
             this.raigoChargeHitTargets = new Set();
             this.raigoArmorTimer = 0;
         }
+        if (this.heroName === 'Gelann') {
+            this.gelannBreathCooldown = 0;
+            this.gelannBreathWindup = 0;
+            this.gelannBreathTimer = 0;
+        }
     }
 
     takeDamage(amt, attacker, isDoT = false, noKnockback = false, noHitReaction = false) {
@@ -244,6 +249,7 @@ class Fighter extends Entity {
 
         if (this.heroName === 'Duke' && this.isMounted) {
             this.horseHp -= amt;
+            window.audioManager?.playHit(this, attacker, amt, isDoT);
             for(let i=0; i<6; i++) game.particles.push(new Particle(this.x+this.w/2, this.y+this.h/2, "#FFF", (Math.random()-0.5)*12, (Math.random()-0.5)*12, 250));
             if (this.horseHp <= 0) {
                 this.isMounted = false; this.horseHp = 0; this.buffs.dizzy = 5000;
@@ -254,6 +260,7 @@ class Fighter extends Entity {
         }
 
         this.hp -= amt;
+        window.audioManager?.playHit(this, attacker, amt, isDoT);
         if (!noHitReaction && !itanSuperDebuffImmune) this.stunTimer = 150;
         this.timeSinceLastDamage = 0;
 
@@ -339,6 +346,8 @@ class Fighter extends Entity {
 
     fireKuroLongshot() {
         if (this.heroName !== 'Kuro' || this.attackState !== 'charging') return;
+
+        window.audioManager?.playAttack(this);
 
         const chargeRatio = Math.max(0, Math.min(1, this.kuroCharge / this.kuroChargeMax));
         const empowered = this.kuroEmpoweredShot && this.kuroEmpoweredTimer > 0;
@@ -656,6 +665,19 @@ class Fighter extends Entity {
                 game.particles.push(new Particle(this.x+Math.random()*this.w,this.y+Math.random()*this.h,'#ffd84d',(Math.random()-.5)*5,-2-Math.random()*4,260,3));
             }
         }
+        if (this.heroName === 'Gelann') {
+            this.gelannBreathCooldown = Math.max(0, this.gelannBreathCooldown - dt);
+            if (this.gelannBreathWindup > 0) {
+                this.gelannBreathWindup = Math.max(0, this.gelannBreathWindup - dt);
+                this.vx *= 0.35;
+                if (this.gelannBreathWindup <= 0) {
+                    this.gelannBreathTimer = 1200;
+                    game.hazards.push(new GelannFlameCone(this));
+                }
+            } else if (this.gelannBreathTimer > 0) {
+                this.gelannBreathTimer = Math.max(0, this.gelannBreathTimer - dt);
+            }
+        }
 
         if (this.heroName === 'Archor') {
             if (this.archorSpeedCooldown > 0) this.archorSpeedCooldown = Math.max(0, this.archorSpeedCooldown - dt);
@@ -764,7 +786,7 @@ class Fighter extends Entity {
         const isUkonUltimateLocked = this.heroName === 'Ukon' && !!this.ukonUltimatePhase;
         const isMoriGrappling = this.heroName === 'Mori' && this.moriGrappleTimer > 0;
         const isRaigoCharging = this.heroName === 'Raigo' && this.raigoChargeTimer > 0;
-        let canAct = (this.stunTimer <= 0 && this.buffs.dizzy <= 0 && this.grapplePhase !== 1 && this.superWindupTimer <= 0 && this.euclidSwitchTimer <= 0 && !(this.itanSuperWindupTimer > 0) && !(this.veyraReversalTimer > 0) && !(this.axeronRushTimer > 0) && !isKilaSwitching && !isSolaForceLocked && !isSolaCharging && !isUkonBursting && !isUkonUltimateLocked && !isMoriGrappling && !isRaigoCharging);
+        let canAct = (this.stunTimer <= 0 && this.buffs.dizzy <= 0 && this.grapplePhase !== 1 && this.superWindupTimer <= 0 && this.euclidSwitchTimer <= 0 && !(this.itanSuperWindupTimer > 0) && !(this.veyraReversalTimer > 0) && !(this.axeronRushTimer > 0) && !(this.gelannBreathWindup > 0) && !isKilaSwitching && !isSolaForceLocked && !isSolaCharging && !isUkonBursting && !isUkonUltimateLocked && !isMoriGrappling && !isRaigoCharging);
         let canMoveAndAttack = canAct && !hasPuppet;
 
         if (this.heroName === 'Gensan') {
@@ -864,6 +886,7 @@ class Fighter extends Entity {
 
         if (this.buffs.msBoost > 0) currentSpeed *= (this.heroName === 'Wolf' ? 1.3 : 1.2);
         if (this.heroName === 'Itan' && this.buffs.nuMode > 0) currentSpeed *= 1.35;
+        if (this.heroName === 'Gelann' && this.gelannBreathTimer > 0) currentSpeed *= 0.35;
 
         if (this.buffs.dizzy > 0) {
             this.buffs.dizzy -= dt;
@@ -880,6 +903,14 @@ class Fighter extends Entity {
             this.buffs.gravitySlow -= dt;
             slowMultiplier = Math.min(slowMultiplier, 0.3);
             if(Math.random()<0.16) game.particles.push(new Particle(this.x+this.w/2, this.y+this.h/2, "#6f78ad", (Math.random()-0.5)*2, (Math.random()-0.5)*2, 260));
+        }
+        if (this.buffs.gelannFlameSlow > 0) {
+            this.buffs.gelannFlameSlow = Math.max(0, this.buffs.gelannFlameSlow - dt);
+            slowMultiplier = Math.min(slowMultiplier, 0.72);
+        }
+        if (this.buffs.gelannArrowSlow > 0) {
+            this.buffs.gelannArrowSlow = Math.max(0, this.buffs.gelannArrowSlow - dt);
+            slowMultiplier = Math.min(slowMultiplier, 0.55);
         }
         currentSpeed *= slowMultiplier;
         if (this.buffs.burn > 0) {
@@ -1219,6 +1250,7 @@ class Fighter extends Entity {
                         targetsHit.forEach(t => {
                             if (this.heroName === 'Macu' && this.buffs.battleCry > 0 && t.buffs) t.buffs.poison = 3000;
                             if (this.heroName === 'Duke' && this.isMounted && t.buffs) t.buffs.dizzy = 3000;
+                            if (this.heroName === 'Gelann' && t.buffs) t.buffs.dizzy = Math.max(t.buffs.dizzy || 0, 140);
 
                             if (this.heroName === 'Lique' && this.buffs.bloodFrenzy > 0 && t.heroName) {
                                 this.hp = Math.min(this.maxHp, this.hp + 5);
@@ -1319,6 +1351,7 @@ class Fighter extends Entity {
                     if (this.heroName === 'Roka') recTime = this.rokaArtilleryTimer > 0 ? 120 : 340;
                     if (this.heroName === 'Voss') recTime = 210;
                     if (this.heroName === 'Raigo') recTime = 115;
+                    if (this.heroName === 'Gelann') recTime = 130;
 
                     this.attackState = 'recovery';
                     this.stateTimer = recTime;
@@ -1331,6 +1364,7 @@ class Fighter extends Entity {
 
             const mirrorCopiedSwitch = this.vossCopyActive && keysPressed[this.controls.switch];
             if (keysPressed[this.controls.switch]) {
+                window.audioManager?.playSkill(this, 'switch');
                 if (this.heroName === 'Hunter') {
                     this.hunterWeapon = this.hunterWeapon === 'musket' ? 'sword' : 'musket';
                     this.hunterMusketCD = 0;
@@ -1482,6 +1516,8 @@ class Fighter extends Entity {
                     this.startVossCopy();
                 } else if (this.heroName === 'Raigo' && this.attackState === 'idle') {
                     this.startRaigoCharge();
+                } else if (this.heroName === 'Gelann' && this.attackState === 'idle') {
+                    this.startGelannFlameBreath();
                 }
             }
             if (mirrorCopiedSwitch) {
@@ -1588,6 +1624,7 @@ class Fighter extends Entity {
         if (this.heroName === 'Axeron') { range = 76; yOffset = 0; h = 62; }
         if (this.heroName === 'Voss') { range = 78; yOffset = 2; h = 58; }
         if (this.heroName === 'Raigo') { range = 92; yOffset = -3; h = 68; }
+        if (this.heroName === 'Gelann') { range = 74; yOffset = 3; h = 58; }
 
         if (this.heroName === 'Macu') {
             range = 110;
@@ -1623,6 +1660,7 @@ class Fighter extends Entity {
             const damage = this.raigoEmpoweredAttack ? 50 : 22;
             return this.raigoArmorTimer > 0 ? damage * 1.5 : damage;
         }
+        if (this.heroName === 'Gelann') return 20;
         return 13;
     }
 
@@ -1688,6 +1726,7 @@ class Fighter extends Entity {
         if (this.heroName === 'Roka') this.stateTimer = this.rokaArtilleryTimer > 0 ? 280 : 800;
         if (this.heroName === 'Voss') this.stateTimer = this.vossCopyTimer > 0 ? 90 : 120;
         if (this.heroName === 'Raigo') this.stateTimer = 70;
+        if (this.heroName === 'Gelann') this.stateTimer = 70;
         if (this.heroName === 'Wolf') {
             this.stateTimer = 50;
             this.wolfPassiveReady = this.wolfAttackTimer >= 1500;
@@ -1702,6 +1741,7 @@ class Fighter extends Entity {
     }
 
     executeActiveAttack() {
+        window.audioManager?.playAttack(this);
         const combatTarget = this.isCPU && this.aiCombatTarget && !this.aiCombatTarget.dead && !this.aiCombatTarget.untargetable
             ? this.aiCombatTarget
             : null;
@@ -1878,6 +1918,15 @@ class Fighter extends Entity {
         const length=Math.max(1,Math.hypot(dx,dy));if(dx)this.facing=dx>0?1:-1;return{x:dx/length,y:dy/length};
     }
 
+    startGelannFlameBreath() {
+        if (this.heroName !== 'Gelann' || this.gelannBreathCooldown > 0 || this.gelannBreathWindup > 0 || this.gelannBreathTimer > 0) return false;
+        this.gelannBreathCooldown = 6000;
+        this.gelannBreathWindup = 350;
+        this.vx *= 0.3;
+        for (let i=0;i<10;i++) game.particles.push(new Particle(this.x+this.w/2+this.facing*18,this.y+this.h*.38,i%2?'#ff7a18':'#ffd166',this.facing*(1+Math.random()*3),(Math.random()-.5)*3,220,3));
+        return true;
+    }
+
     getRokaWeaponAimAngle() {
         const direction = this.getRokaAimVector();
         return Math.atan2(direction.y, Math.abs(direction.x));
@@ -1893,7 +1942,7 @@ class Fighter extends Entity {
 
     getVossCopiedDamage() {
         if(!this.vossCopiedHero)return 15;
-        const values={Hason:28,Hunter:20,Macu:22,Willi:23,Artu:73,Duke:33,Kadaxi:33,Euclid:35,Lique:18,Kae:25,Ugo:17,Kila:35,Volt:12,Gensan:32,Noae:19,Wolf:20,Kuro:35,Sola:56,Nyra:22,Orion:30,Archor:24,Itan:32,D2F1:15,Laegon:30,Veyra:30,Brom:45,Axeron:30,Ukon:40,Mori:25,Roka:40,Raigo:22};
+        const values={Hason:28,Hunter:20,Macu:22,Willi:23,Artu:73,Duke:33,Kadaxi:33,Euclid:35,Lique:18,Kae:25,Ugo:17,Kila:35,Volt:12,Gensan:32,Noae:19,Wolf:20,Kuro:35,Sola:56,Nyra:22,Orion:30,Archor:24,Itan:32,D2F1:15,Laegon:30,Veyra:30,Brom:45,Axeron:30,Ukon:40,Mori:25,Roka:40,Raigo:22,Gelann:20};
         return values[this.vossCopiedHero]||30;
     }
 
@@ -2093,6 +2142,7 @@ class Fighter extends Entity {
     startUkonRodCharge() {
         if (this.heroName !== 'Ukon' || this.dead || this.attackState !== 'idle' || this.ukonDashTimer > 0
             || this.ukonChargeTimer > 0 || this.ukonUltimatePhase || this.ukonRodCooldown > 0) return false;
+        window.audioManager?.playAttack(this);
         const target = this.getUkonTarget();
         const originX = this.x + this.w/2;
         const originY = this.y + this.h/2;
@@ -2558,6 +2608,18 @@ class Fighter extends Entity {
     }
 
     performSuper() {
+        window.audioManager?.playSkill(this, 'super');
+        if (this.heroName === 'Gelann') {
+            if (this.superCooldown <= 0) {
+                const target = game.getEnemyOf(this);
+                const targetX = target && !target.dead ? target.x + target.w/2 + (target.vx || 0) * 18 : this.x + this.w/2 + this.facing*260;
+                this.superCooldown = this.superCooldownMax;
+                game.hazards.push(new GelannArrowRain(this, targetX));
+                this.vx *= 0.2;
+                for(let i=0;i<24;i++)game.particles.push(new Particle(this.x+this.w/2,this.y+8,i%2?'#ffd166':'#b6422b',(Math.random()-.5)*10,-5-Math.random()*10,420,4));
+            }
+            return;
+        }
         if (this.heroName === 'Roka') {
             if(this.superCooldown<=0){this.superCooldown=this.superCooldownMax;this.rokaArtilleryTimer=10000;for(let i=0;i<34;i++)game.particles.push(new Particle(this.x+this.w/2,this.y+this.h/2,i%2?'#ffe066':'#9ed6e5',(Math.random()-.5)*15,(Math.random()-.5)*15,520,5));}
             return;
@@ -3496,6 +3558,16 @@ class Fighter extends Entity {
             ctx.save();ctx.translate(hw-4,31);let angle=.65;
             if(this.attackState==='windup')angle=.65-1.25*phaseProg;else if(this.attackState==='active')angle=-.6+2.8*phaseProg;else if(this.attackState==='recovery')angle=2.2-1.55*phaseProg;
             ctx.rotate(angle);ctx.fillStyle='#5b646a';ctx.fillRect(-3,-14,6,24);ctx.fillStyle='#ffd166';ctx.beginPath();ctx.moveTo(0,-12);ctx.arc(0,-12,34,-2.7,-.44);ctx.closePath();ctx.fill();ctx.strokeStyle='#31383c';ctx.lineWidth=2;for(let rib=-2.5;rib<-.55;rib+=.38){ctx.beginPath();ctx.moveTo(0,-12);ctx.lineTo(Math.cos(rib)*32,Math.sin(rib)*32-12);ctx.stroke();}ctx.restore();
+        }
+        else if (this.heroName === 'Gelann') {
+            ctx.save();ctx.translate(hw-2,29);
+            let angle=-.42+Math.sin(Date.now()*.004)*.035;
+            if(this.attackState==='windup')angle=-.42-1.2*phaseProg;else if(this.attackState==='active')angle=-1.62+3.05*phaseProg;else if(this.attackState==='recovery')angle=1.43-1.85*phaseProg;
+            if(this.gelannBreathWindup>0)angle=-1.25+Math.sin(Date.now()*.012)*.05;
+            if(this.attackState==='active'){ctx.strokeStyle='rgba(255,157,72,.48)';ctx.lineWidth=13;ctx.beginPath();ctx.arc(0,0,76,-1.62,angle);ctx.stroke();ctx.strokeStyle='rgba(255,225,155,.35)';ctx.lineWidth=4;ctx.beginPath();ctx.arc(0,0,83,-1.62,angle);ctx.stroke();}
+            ctx.rotate(angle);ctx.fillStyle='#3d2417';ctx.fillRect(-5,-2,10,27);ctx.fillStyle='#d6a44b';ctx.fillRect(-13,-7,26,6);ctx.fillStyle='#eef0e4';ctx.strokeStyle='#71766f';ctx.lineWidth=2;
+            ctx.beginPath();ctx.moveTo(-5,-6);ctx.quadraticCurveTo(13,-55,4,-86);ctx.quadraticCurveTo(28,-64,18,-27);ctx.quadraticCurveTo(13,-10,-5,-6);ctx.fill();ctx.stroke();ctx.fillStyle='#ff8a2a';ctx.beginPath();ctx.moveTo(3,-82);ctx.lineTo(9,-65);ctx.lineTo(1,-69);ctx.closePath();ctx.fill();ctx.restore();
+            if(this.gelannBreathWindup>0||this.gelannBreathTimer>0){const breathProgress=this.gelannBreathWindup>0?1-this.gelannBreathWindup/350:1;ctx.save();ctx.translate(hw+4,17);ctx.fillStyle=`rgba(255,122,24,${.3+.5*breathProgress})`;ctx.beginPath();ctx.moveTo(0,-5);ctx.lineTo(20+breathProgress*18,-11);ctx.lineTo(12+breathProgress*30,0);ctx.lineTo(20+breathProgress*18,11);ctx.lineTo(0,5);ctx.closePath();ctx.fill();ctx.restore();}
         }
         else if (this.heroName === 'Roka') {
             ctx.save();

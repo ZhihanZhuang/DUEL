@@ -57,7 +57,7 @@ function loadProjectileContext() {
     };
     vm.createContext(context);
     const source = fs.readFileSync(path.join(__dirname, '..', 'entities.js'), 'utf8');
-    vm.runInContext(`${source}\nwindow.Projectile = Projectile; window.KuroDecoy = KuroDecoy; window.UkonShadow = UkonShadow; window.PeachTree = PeachTree; window.GiantSword = GiantSword; window.GravityWell = GravityWell; window.ChiqPath = ChiqPath; window.D2FDrone = D2FDrone; window.D2FTargetBeacon = D2FTargetBeacon; window.D2FGiantRobot = D2FGiantRobot; window.TimeAnchor = TimeAnchor; window.TemporalEcho = TemporalEcho; window.LaegonLightning = LaegonLightning; window.LaegonHammer = LaegonHammer; window.LaegonHammerStrike = LaegonHammerStrike; window.BromBlastCharge = BromBlastCharge; window.BromStickyBomb = BromStickyBomb; window.DemolitionZone = DemolitionZone; window.TitanAxe = TitanAxe; window.MechanismNode = MechanismNode; window.MoriEnergyWire = MoriEnergyWire; window.MechanicFanBlade = MechanicFanBlade; window.MoriTrap = MoriTrap; window.ThousandMechanisms = ThousandMechanisms; window.RokaCannonball = RokaCannonball; window.RokaMortarShell = RokaMortarShell; window.TemporalBolt = TemporalBolt; window.VossTemporalDouble = VossTemporalDouble;`, context, { filename: 'entities.js' });
+    vm.runInContext(`${source}\nwindow.Projectile = Projectile; window.KuroDecoy = KuroDecoy; window.UkonShadow = UkonShadow; window.PeachTree = PeachTree; window.GiantSword = GiantSword; window.GravityWell = GravityWell; window.ChiqPath = ChiqPath; window.D2FDrone = D2FDrone; window.D2FTargetBeacon = D2FTargetBeacon; window.D2FGiantRobot = D2FGiantRobot; window.TimeAnchor = TimeAnchor; window.TemporalEcho = TemporalEcho; window.LaegonLightning = LaegonLightning; window.LaegonHammer = LaegonHammer; window.LaegonHammerStrike = LaegonHammerStrike; window.BromBlastCharge = BromBlastCharge; window.BromStickyBomb = BromStickyBomb; window.DemolitionZone = DemolitionZone; window.TitanAxe = TitanAxe; window.MechanismNode = MechanismNode; window.MoriEnergyWire = MoriEnergyWire; window.MechanicFanBlade = MechanicFanBlade; window.MoriTrap = MoriTrap; window.ThousandMechanisms = ThousandMechanisms; window.GelannFlameCone = GelannFlameCone; window.GelannArrowRain = GelannArrowRain; window.RokaCannonball = RokaCannonball; window.RokaMortarShell = RokaMortarShell; window.TemporalBolt = TemporalBolt; window.VossTemporalDouble = VossTemporalDouble;`, context, { filename: 'entities.js' });
     return context;
 }
 
@@ -158,6 +158,7 @@ function makeFighter(heroName, id = 'cpu') {
         vossCopiedMelee: false,
         raigoEnergy: 100,
         raigoArmorTimer: 0,
+        gelannBreathCooldown: 0,
         isMeleeAttack() {
             if (this.heroName === 'Laegon') return this.thunderGodTimer > 0;
             if (this.heroName === 'Voss') return this.vossCopyTimer > 0 && this.vossCopiedMelee;
@@ -294,6 +295,8 @@ function loadPhysicsGame(heroName = 'Hunter') {
     class MoriEnergyWire extends Entity { constructor(owner,first,second){super(first.x,first.y,100,8);Object.assign(this,{owner,first,second,type:'mori_wire',life:5000});} }
     class MechanicFanBlade extends Entity { constructor(owner,x,y,vx,vy){super(x,y,28,12);Object.assign(this,{owner,vx,vy,type:'mori_fan'});} }
     class ThousandMechanisms extends Entity { constructor(owner){super(0,0,1280,660);Object.assign(this,{owner,type:'thousand_mechanisms',life:8000});} }
+    class GelannFlameCone extends Entity { constructor(owner){super(owner.x,owner.y,190,120);Object.assign(this,{owner,type:'gelann_flame_cone',life:1200});} }
+    class GelannArrowRain extends Entity { constructor(owner,targetX){super(targetX-280,0,560,660);Object.assign(this,{owner,type:'gelann_arrow_rain',warning:750,duration:2500});} }
     class RokaCannonball extends Entity { constructor(owner,x,y,vx,vy,artillery){super(x,y,28,28);Object.assign(this,{owner,vx,vy,artillery,type:'roka_cannonball',damage:artillery?50:40,radius:artillery?165:110});} }
     class RokaMortarShell extends Entity { constructor(owner,x,y){super(x,y,20,26);Object.assign(this,{owner,targetX:x,targetY:y,type:'roka_mortar'});} }
     class TemporalBolt extends Entity { constructor(owner,x,y,vx,vy,damage,kind){super(x,y,18,14);Object.assign(this,{owner,vx,vy,damage,kind,type:kind==='copy'?'voss_copy_bolt':'temporal_shard'});} }
@@ -323,6 +326,8 @@ function loadPhysicsGame(heroName = 'Hunter') {
         MoriEnergyWire,
         MechanicFanBlade,
         ThousandMechanisms,
+        GelannFlameCone,
+        GelannArrowRain,
         RokaCannonball,
         RokaMortarShell,
         TemporalBolt,
@@ -352,7 +357,8 @@ function loadPhysicsGame(heroName = 'Hunter') {
             Mori: { maxHp: 800, speed: 5.4, jump: 15, width: 40, height: 70, color: '#c58a32', superCD: 26000 },
             Roka: { maxHp: 600, speed: 4.6, jump: 14, width: 42, height: 70, color: '#496d7b', superCD: 24000 },
             Voss: { maxHp: 750, speed: 5.6, jump: 15, width: 40, height: 70, color: '#5660a8', superCD: 22000 },
-            Raigo: { maxHp: 800, speed: 6.4, jump: 16, width: 42, height: 72, color: '#287b8f', superCD: 22000 }
+            Raigo: { maxHp: 800, speed: 6.4, jump: 16, width: 42, height: 72, color: '#287b8f', superCD: 22000 },
+            Gelann: { maxHp: 750, speed: 6.1, jump: 15.5, width: 40, height: 70, color: '#b6422b', superCD: 24000 }
         },
         keys: {},
         keysPressed: {},
@@ -600,7 +606,7 @@ test('every hero with a direct super can decide to use it', () => {
     const context = loadAI();
     const directSuperHeroes = [
         'Hason', 'Willi', 'Hunter', 'Macu', 'Artu', 'Duke', 'Kadaxi', 'Euclid',
-        'Lique', 'Kae', 'Kila', 'Volt', 'Gensan', 'Noae', 'Wolf', 'Kuro', 'Sola', 'Nyra', 'Orion', 'Archor', 'Itan', 'D2F1', 'Laegon', 'Veyra', 'Brom', 'Axeron', 'Ukon', 'Mori', 'Roka', 'Voss', 'Raigo'
+        'Lique', 'Kae', 'Kila', 'Volt', 'Gensan', 'Noae', 'Wolf', 'Kuro', 'Sola', 'Nyra', 'Orion', 'Archor', 'Itan', 'D2F1', 'Laegon', 'Veyra', 'Brom', 'Axeron', 'Ukon', 'Mori', 'Roka', 'Voss', 'Raigo', 'Gelann'
     ];
 
     for (const heroName of directSuperHeroes) {
@@ -2567,4 +2573,56 @@ test('Raigo builds Energy, spends Thunder Strike, and lifesteals from actual arm
     assert.equal(target.hp, hpBefore - 45);
     assert.equal(ai.hp, raigoHpBefore + 11.25);
     assert.ok(target.vx < 0);
+});
+
+test('Gelann uses a fast 2 WRD scimitar and deploys both zone-control skills', () => {
+    const simulation = loadPhysicsGame('Gelann');
+    const { ai, context, target } = simulation;
+    ai.attackState = 'idle';
+    ai.superCooldown = 0;
+    target.x = ai.x + 120;
+    target.y = ai.y;
+
+    assert.equal(ai.getMeleeDamage(), 20);
+    assert.equal(ai.getMeleeHitbox().w, 74);
+    assert.equal(ai.startGelannFlameBreath(), true);
+    assert.equal(ai.gelannBreathCooldown, 6000);
+    ai.gelannBreathWindup = 1;
+    ai.update(16);
+    assert.equal(context.game.hazards.at(-1).type, 'gelann_flame_cone');
+
+    ai.performSuper();
+    assert.equal(ai.superCooldown, ai.superCooldownMax);
+    assert.equal(context.game.hazards.at(-1).type, 'gelann_arrow_rain');
+});
+
+test('Gelann Flame Breath is a capped cone that burns and slows targets', () => {
+    const context = loadProjectileContext();
+    const owner = { id: 'gelann', heroName: 'Gelann', x: 100, y: 500, w: 40, h: 70, facing: 1, dead: false };
+    const target = { id: 'target', heroName: 'Hunter', x: 185, y: 500, w: 40, h: 70, hp: 100, buffs: {}, dead: false, invincible: 0, takeDamage(amount) { this.hp -= amount; } };
+    const behind = { id: 'behind', heroName: 'Hunter', x: 35, y: 500, w: 40, h: 70, hp: 100, buffs: {}, dead: false, invincible: 0, takeDamage(amount) { this.hp -= amount; } };
+    context.game.opponents = [target, behind];
+    const cone = new context.window.GelannFlameCone(owner);
+
+    cone.update(300); cone.update(300); cone.update(300); cone.update(300);
+
+    assert.equal(target.hp, 85);
+    assert.equal(behind.hp, 100);
+    assert.equal(target.buffs.burn, 2000);
+    assert.ok(target.buffs.gelannFlameSlow > 0);
+});
+
+test('Gelann Rain of Arrows telegraphs then deals 6 WRD with an exact 45% slow', () => {
+    const context = loadProjectileContext();
+    const owner = { id: 'gelann', heroName: 'Gelann', x: 100, y: 500, w: 40, h: 70, facing: 1, dead: false };
+    const target = { id: 'target', heroName: 'Hunter', x: 350, y: 500, w: 40, h: 70, hp: 100, buffs: {}, dead: false, invincible: 0, takeDamage(amount) { this.hp -= amount; } };
+    context.game.opponents = [target];
+    const rain = new context.window.GelannArrowRain(owner, target.x + target.w/2);
+
+    rain.update(750);
+    assert.equal(target.hp, 100, 'warning phase dealt damage');
+    for (let hit = 0; hit < 5; hit++) rain.update(500);
+
+    assert.equal(target.hp, 40);
+    assert.equal(target.buffs.gelannArrowSlow, 2000);
 });

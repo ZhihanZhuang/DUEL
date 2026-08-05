@@ -31,6 +31,7 @@ class Game {
         this.settingsReturnToPause = false;
         this.screenShakeTimer = 0;
         this.screenShakeMagnitude = 0;
+        this.audio = window.audioManager || null;
 
         this.setupMenu();
         updateControlsDisplay();
@@ -291,6 +292,7 @@ class Game {
 
     handleLoopError(error) {
         console.error('Match stopped after an unrecoverable game-loop error:', error);
+        this.audio?.stopMusic();
         this.releaseAIControls();
         this.stopLoop();
         this.state = 'GAMEOVER';
@@ -332,6 +334,7 @@ class Game {
         this.stopLoop();
         this.clearMatchInputs();
         this.state = 'PAUSED';
+        this.audio?.pauseMusic();
         document.getElementById('pause-screen').classList.remove('hidden');
     }
 
@@ -344,6 +347,7 @@ class Game {
         if (this.p2 && this.p2 !== this.p1) this.p2.controls = currentBinds.p2;
         this.clearMatchInputs();
         this.state = 'PLAYING';
+        this.audio?.resumeMusic();
         this.lastTime = performance.now();
         const generation = this.loopGeneration;
         this.animationFrameId = requestAnimationFrame(timestamp => this.loop(timestamp, generation));
@@ -351,6 +355,7 @@ class Game {
 
     returnToMenu() {
         this.stopLoop();
+        this.audio?.stopMusic();
         if (this.endGameTimer) clearTimeout(this.endGameTimer);
         this.endGameTimer = null;
         this.clearMatchInputs();
@@ -462,6 +467,7 @@ class Game {
         document.getElementById('p2-horse-container').classList.toggle('hidden', !['Duke', 'Volt', 'Laegon'].includes(this.p2Choice));
 
         this.state = 'PLAYING';
+        this.audio?.startMusic(this.activeArenaId);
         this.lastTime = performance.now();
         this.updateCamera(1000);
         const generation = this.loopGeneration;
@@ -525,6 +531,7 @@ class Game {
         this.updateBossHUD();
 
         this.state = 'PLAYING';
+        this.audio?.startMusic(this.activeArenaId);
         this.lastTime = performance.now();
         this.updateCamera(1000);
         const generation = this.loopGeneration;
@@ -587,6 +594,7 @@ class Game {
     }
 
     createExplosion(x, y, radius, damage, owner, friendlyFire = true, stunDuration = 0) {
+        this.audio?.playExplosion(radius, damage);
         for(let i=0; i<30; i++) this.particles.push(new Particle(x, y, i%2===0 ? "#ff5500" : "#555", (Math.random()-0.5)*15, (Math.random()-0.5)*15, 600));
         let targets = [...this.getFighters(), ...this.minions];
         for (let t of targets) {
@@ -744,6 +752,7 @@ class Game {
         if (this.p1.heroName === 'Roka') p1Stat += `${this.p1.rokaArtilleryTimer>0?`[ARTILLERY ${(this.p1.rokaArtilleryTimer/1000).toFixed(1)}s] `:''}${this.p1.rokaMortarCooldown>0?`[MORTAR ${(this.p1.rokaMortarCooldown/1000).toFixed(1)}s]`:'[MORTAR READY]'}`;
         if (this.p1.heroName === 'Voss' || this.p1.vossCopyActive) p1Stat += `${this.p1.vossCopyActive?`[COPIED: ${this.p1.vossCopiedHero} ${(this.p1.vossCopyTimer/1000).toFixed(1)}s] `:''}${this.p1.vossCopyCooldown>0?`[COPY ${(this.p1.vossCopyCooldown/1000).toFixed(1)}s]`:'[COPY READY]'}${this.p1.vossDouble&&!this.p1.vossDouble.dead?' [DOUBLE]':''}`;
         if (this.p1.heroName === 'Raigo') p1Stat += `[ENERGY: ${Math.floor(this.p1.raigoEnergy)}/100]${this.p1.raigoEnergy>=100?' [THUNDER STRIKE]':''}${this.p1.raigoArmorTimer>0?` [GOLDEN ARMOR ${(this.p1.raigoArmorTimer/1000).toFixed(1)}s]`:''}`;
+        if (this.p1.heroName === 'Gelann') p1Stat += this.p1.gelannBreathCooldown>0?`[FLAME ${(this.p1.gelannBreathCooldown/1000).toFixed(1)}s]`:'[FLAME READY]';
 
         if (this.p1.buffs.poison > 0) p1Stat += " [POISONED]";
         if (this.p1.buffs.burn > 0) p1Stat += " [BURN]";
@@ -891,6 +900,7 @@ class Game {
         if (this.p2.heroName === 'Roka') p2Stat += `${this.p2.rokaArtilleryTimer>0?`[ARTILLERY ${(this.p2.rokaArtilleryTimer/1000).toFixed(1)}s] `:''}${this.p2.rokaMortarCooldown>0?`[MORTAR ${(this.p2.rokaMortarCooldown/1000).toFixed(1)}s]`:'[MORTAR READY]'}`;
         if (this.p2.heroName === 'Voss' || this.p2.vossCopyActive) p2Stat += `${this.p2.vossCopyActive?`[COPIED: ${this.p2.vossCopiedHero} ${(this.p2.vossCopyTimer/1000).toFixed(1)}s] `:''}${this.p2.vossCopyCooldown>0?`[COPY ${(this.p2.vossCopyCooldown/1000).toFixed(1)}s]`:'[COPY READY]'}${this.p2.vossDouble&&!this.p2.vossDouble.dead?' [DOUBLE]':''}`;
         if (this.p2.heroName === 'Raigo') p2Stat += `[ENERGY: ${Math.floor(this.p2.raigoEnergy)}/100]${this.p2.raigoEnergy>=100?' [THUNDER STRIKE]':''}${this.p2.raigoArmorTimer>0?` [GOLDEN ARMOR ${(this.p2.raigoArmorTimer/1000).toFixed(1)}s]`:''}`;
+        if (this.p2.heroName === 'Gelann') p2Stat += this.p2.gelannBreathCooldown>0?`[FLAME ${(this.p2.gelannBreathCooldown/1000).toFixed(1)}s]`:'[FLAME READY]';
 
         if (this.p2.buffs.poison > 0) p2Stat += " [POISONED]";
         if (this.p2.buffs.burn > 0) p2Stat += " [BURN]";
@@ -998,6 +1008,8 @@ class Game {
     endGame(winnerText) {
         if (this.state === 'GAMEOVER') return;
         this.state = 'GAMEOVER';
+        this.audio?.stopMusic();
+        this.audio?.playVictory();
         this.stopLoop();
         if (this.endGameTimer) clearTimeout(this.endGameTimer);
         this.endGameTimer = setTimeout(() => {

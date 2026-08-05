@@ -379,6 +379,11 @@ var HEROES = {
         name: "Raigo", desc: "Golden Thunder Rider",
         color: "#287b8f", maxHp: 800, speed: 6.4, jump: 16, width: 42, height: 72, superCD: 22000,
         ui: { hp: "80 WRD", atk: "2.2 WRD (Lightning Spear)", passive: "<span class='skill-tag'>Static Energy</span> Basic hits generate 10 Energy. At 100, the next attack becomes a 5 WRD Thunder Strike with a brief stun and consumes all Energy. Press [Switch] to spend 30 Energy on a directional 3 WRD Thunder Charge.", super: "<span class='skill-tag'>Golden Thunder Armor</span> For 8s, all attacks deal 150% damage and heal Raigo for 25% of actual damage dealt. Golden lightning makes the empowered state unmistakable." }
+    },
+    Gelann: {
+        name: "Gelann", desc: "Flameblade Archer",
+        color: "#b6422b", maxHp: 750, speed: 6.1, jump: 15.5, width: 40, height: 70, superCD: 24000,
+        ui: { hp: "75 WRD", atk: "2 WRD (Fast Scimitar)", passive: "<span class='skill-tag'>Flame Breath</span> Press [Switch] for a short wind-up, then breathe a close cone of fire for 1.5 WRD. The flame burns for 2s and slows enemies while they remain inside (6s CD).", super: "<span class='skill-tag'>Rain of Arrows</span> Telegraphs a large target area, then rains arrows for 2.5s. The full volley deals 6 WRD per target and refreshes a 45% slow for 2s." }
     }
 };
 

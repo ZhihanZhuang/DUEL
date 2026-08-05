@@ -106,6 +106,23 @@ test('single-player pause freezes one loop and resume starts exactly one new fra
     assert.equal(harness.getElement('pause-screen').classList.contains('hidden'), true);
 });
 
+test('match lifecycle pauses, resumes, and stops arena music', () => {
+    const harness = loadGameClass();
+    const game = makeLifecycleGame(harness);
+    const audioEvents = [];
+    game.audio = {
+        pauseMusic: () => audioEvents.push('pause'),
+        resumeMusic: () => audioEvents.push('resume'),
+        stopMusic: () => audioEvents.push('stop')
+    };
+
+    game.pauseGame();
+    game.resumeGame();
+    game.returnToMenu();
+
+    assert.deepEqual(audioEvents, ['pause', 'resume', 'stop']);
+});
+
 test('pause is ignored for local multiplayer and outside an active match', () => {
     const harness = loadGameClass();
     const game = makeLifecycleGame(harness);

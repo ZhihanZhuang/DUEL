@@ -50,6 +50,7 @@ class SwordShadow extends Entity {
         this.buffs = {};
     }
     takeDamage(amt, attacker) {
+        window.audioManager?.playEntityHit(this, attacker, amt);
         this.hp -= amt;
         if (this.hp <= 0) {
             this.dead = true;
@@ -104,8 +105,9 @@ class KuroDecoy extends Entity {
         this.moveTimer = 450 + Math.random() * 750;
         this.jumpTimer = 650 + Math.random() * 950;
     }
-    takeDamage(amt) {
+    takeDamage(amt, attacker) {
         if (this.dead) return;
+        window.audioManager?.playEntityHit(this, attacker, amt);
         this.hp -= Math.max(0, amt || 0);
         if (this.hp <= 0) {
             this.dead = true;
@@ -236,8 +238,9 @@ class UkonShadow extends Entity {
             return best;
         }, null);
     }
-    takeDamage(amt) {
+    takeDamage(amt, attacker) {
         if (this.dead) return;
+        window.audioManager?.playEntityHit(this, attacker, amt);
         this.hp -= Math.max(0, amt || 0);
         if (this.hp > 0) return;
         this.dead = true;
@@ -501,6 +504,7 @@ class LandMine extends Entity {
     }
     takeDamage(amt, attacker) {
         if (this.dead) return;
+        window.audioManager?.playEntityHit(this, attacker, amt);
         this.explode();
     }
     explode() {
@@ -543,6 +547,7 @@ class Minecart extends Entity {
         this.hitTargets = new Map();
     }
     takeDamage(amt, attacker) {
+        window.audioManager?.playEntityHit(this, attacker, amt);
         this.hp -= amt;
         if (this.hp <= 0) {
             this.dead = true;
@@ -673,6 +678,7 @@ class FireDragon extends Entity {
         this.speed = 12;
     }
     takeDamage(amt, attacker) {
+        window.audioManager?.playEntityHit(this, attacker, amt);
         this.hp -= amt;
         if (this.hp <= 0) {
             this.dead = true;
@@ -1301,6 +1307,120 @@ class ThousandMechanisms extends Entity {
     draw(ctx){ctx.save();ctx.fillStyle='rgba(240,163,59,.035)';ctx.fillRect(0,0,CANVAS_W,GROUND_Y);ctx.strokeStyle='rgba(255,209,102,.16)';ctx.lineWidth=1;for(let x=0;x<CANVAS_W;x+=80){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x+80,GROUND_Y);ctx.stroke();}ctx.restore();}
 }
 
+class GelannFlameCone extends Entity {
+    constructor(owner) {
+        super(owner.x, owner.y, 190, 120);
+        this.owner = owner;
+        this.type = 'gelann_flame_cone';
+        this.life = 1200;
+        this.tickTimer = 0;
+        this.hitTicks = new Map();
+        this.untargetable = true;
+    }
+    contains(target) {
+        const originX = this.owner.x + this.owner.w/2 + this.owner.facing * 18;
+        const originY = this.owner.y + this.owner.h * 0.4;
+        const dx = (target.x + target.w/2 - originX) * this.owner.facing;
+        const dy = target.y + target.h/2 - originY;
+        return dx >= 0 && dx <= 190 && Math.abs(dy) <= 24 + dx * 0.38;
+    }
+    update(dt) {
+        if (!this.owner || this.owner.dead || this.life <= 0) { this.dead = true; return; }
+        this.life -= dt;
+        this.x = this.owner.facing > 0 ? this.owner.x + this.owner.w : this.owner.x - this.w;
+        this.y = this.owner.y - 20;
+        this.tickTimer -= dt;
+        if (this.tickTimer <= 0) {
+            this.tickTimer += 300;
+            for (const target of getHostileTargets(this.owner, this)) {
+                if (!this.contains(target)) continue;
+                const ticks = this.hitTicks.get(target) || 0;
+                if (ticks >= 3) continue;
+                target.takeDamage(5, this.owner, true, true);
+                target.buffs = target.buffs || {};
+                target.buffs.burn = Math.max(target.buffs.burn || 0, 2000);
+                target.buffs.gelannFlameSlow = Math.max(target.buffs.gelannFlameSlow || 0, 350);
+                this.hitTicks.set(target, ticks + 1);
+            }
+        }
+        const originX = this.owner.x + this.owner.w/2 + this.owner.facing * 22;
+        const originY = this.owner.y + this.owner.h * 0.4;
+        for (let i = 0; i < 3; i++) {
+            const distance = 35 + Math.random() * 145;
+            game.particles.push(new Particle(originX + this.owner.facing * distance, originY + (Math.random()-.5) * (20 + distance*.45), i % 2 ? '#ff7a18' : '#ffd166', this.owner.facing * (4 + Math.random()*5), (Math.random()-.5)*2, 180, 4 + Math.random()*5));
+        }
+    }
+    draw(ctx) {
+        const originX = this.owner.x + this.owner.w/2 + this.owner.facing * 18;
+        const originY = this.owner.y + this.owner.h * 0.4;
+        ctx.save();
+        ctx.translate(originX, originY);
+        if (this.owner.facing < 0) ctx.scale(-1, 1);
+        const pulse = 0.13 + Math.sin(Date.now()*.025)*0.04;
+        ctx.fillStyle = `rgba(255,92,22,${pulse})`;
+        ctx.beginPath();ctx.moveTo(0,-18);ctx.lineTo(190,-88);ctx.lineTo(190,88);ctx.lineTo(0,18);ctx.closePath();ctx.fill();
+        ctx.strokeStyle = 'rgba(255,205,92,.7)';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(0,-18);ctx.quadraticCurveTo(100,-70,190,-88);ctx.moveTo(0,18);ctx.quadraticCurveTo(100,70,190,88);ctx.stroke();
+        ctx.restore();
+    }
+}
+
+class GelannArrowRain extends Entity {
+    constructor(owner, targetX) {
+        const width = Math.min(560, Math.max(360, CANVAS_W * 0.44));
+        super(Math.max(0, Math.min(CANVAS_W - width, targetX - width/2)), 0, width, GROUND_Y);
+        this.owner = owner;
+        this.type = 'gelann_arrow_rain';
+        this.warning = 750;
+        this.duration = 2500;
+        this.tickTimer = 0;
+        this.hitCooldowns = new Map();
+        this.untargetable = true;
+        this.arrows = Array.from({ length: 34 }, (_, index) => ({ x: (index * 83) % width, delay: (index * 97) % 520, speed: 18 + index % 6 }));
+    }
+    update(dt) {
+        if (!this.owner || this.owner.dead) { this.dead = true; return; }
+        if (this.warning > 0) { this.warning = Math.max(0, this.warning - dt); return; }
+        this.duration -= dt;
+        for (const [target, cooldown] of this.hitCooldowns) {
+            const next = cooldown - dt;
+            if (next <= 0 || !target || target.dead) this.hitCooldowns.delete(target);
+            else this.hitCooldowns.set(target, next);
+        }
+        this.tickTimer -= dt;
+        if (this.tickTimer <= 0) {
+            this.tickTimer += 500;
+            for (const target of getHostileTargets(this.owner, this)) {
+                const centerX = target.x + target.w/2;
+                if (centerX < this.x || centerX > this.x + this.w || this.hitCooldowns.has(target)) continue;
+                target.takeDamage(12, this.owner, false, true);
+                target.buffs = target.buffs || {};
+                target.buffs.gelannArrowSlow = Math.max(target.buffs.gelannArrowSlow || 0, 2000);
+                this.hitCooldowns.set(target, 450);
+            }
+        }
+        if (this.duration <= 0) this.dead = true;
+    }
+    draw(ctx) {
+        ctx.save();
+        if (this.warning > 0) {
+            const blink = .12 + Math.sin(Date.now()*.025)*.07;
+            ctx.fillStyle = `rgba(215,53,38,${blink})`;ctx.fillRect(this.x,0,this.w,GROUND_Y);
+            ctx.strokeStyle = '#ffcf66';ctx.lineWidth=3;ctx.setLineDash([14,9]);ctx.strokeRect(this.x+2,2,this.w-4,GROUND_Y-4);
+        } else {
+            ctx.fillStyle = 'rgba(84,20,18,.09)';ctx.fillRect(this.x,0,this.w,GROUND_Y);
+            const elapsed = 2500 - this.duration;
+            for (const arrow of this.arrows) {
+                const y = ((elapsed - arrow.delay) * arrow.speed * .1) % (GROUND_Y + 100) - 70;
+                if (y < -60) continue;
+                const ax = this.x + arrow.x;
+                ctx.strokeStyle = '#34302b';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(ax,y);ctx.lineTo(ax-5,y-34);ctx.stroke();
+                ctx.fillStyle='#d8b45d';ctx.beginPath();ctx.moveTo(ax,y+8);ctx.lineTo(ax-6,y-3);ctx.lineTo(ax+3,y-1);ctx.closePath();ctx.fill();
+            }
+        }
+        ctx.restore();
+    }
+}
+
 class RokaCannonball extends Entity {
     constructor(owner, x, y, vx, vy, artillery = false) {
         super(x - 14, y - 14, 28, 28);
@@ -1625,8 +1745,9 @@ class D2FDrone extends Entity {
         this.invincible = 0;
     }
 
-    takeDamage(amount) {
+    takeDamage(amount, attacker) {
         if (this.dead || this.invincible > 0) return;
+        window.audioManager?.playEntityHit(this, attacker, amount);
         this.hp -= Math.max(0, amount || 0);
         if (this.hp <= 0) {
             this.dead = true;
@@ -1878,8 +1999,9 @@ class D2FGiantRobot extends Entity {
         this.invincible = 0;
     }
 
-    takeDamage(amount) {
+    takeDamage(amount, attacker) {
         if (this.dead || this.invincible > 0) return;
+        window.audioManager?.playEntityHit(this, attacker, amount);
         this.hp -= Math.max(0, amount || 0);
         if (this.hp <= 0) {
             this.dead = true;
@@ -2076,6 +2198,7 @@ class BossBase extends Entity {
 
     takeDamage(amount, attacker) {
         if (this.dead || this.invincible > 0) return;
+        window.audioManager?.playEntityHit(this, attacker, amount);
         this.hp -= Math.max(0, Number(amount) || 0);
         if (this.hp > 0) return;
         this.hp = 0;
@@ -2233,8 +2356,9 @@ class BossFireDemon extends Entity {
         this.invincible = 0;
     }
 
-    takeDamage(amount) {
+    takeDamage(amount, attacker) {
         if (this.dead || this.invincible > 0) return;
+        window.audioManager?.playEntityHit(this, attacker, amount);
         this.hp -= Math.max(0, amount || 0);
         if (this.hp <= 0) this.dead = true;
     }
@@ -2478,8 +2602,9 @@ class BossKnight extends Entity {
         this.invincible = 0;
     }
 
-    takeDamage(amount) {
+    takeDamage(amount, attacker) {
         if (this.dead || this.invincible > 0) return;
+        window.audioManager?.playEntityHit(this, attacker, amount);
         this.hp -= Math.max(0, amount || 0);
         if (this.hp <= 0) this.dead = true;
     }
@@ -2648,6 +2773,7 @@ class Minion extends Entity {
     }
     takeDamage(amt, attacker) {
         if (this.grappledBy) return;
+        window.audioManager?.playEntityHit(this, attacker, amt);
         this.hp -= amt;
         if (this.hp <= 0) {
             this.dead = true;
@@ -2725,6 +2851,7 @@ class Skeleton extends Entity {
     }
     takeDamage(amt, attacker) {
         if (this.grappledBy) return;
+        window.audioManager?.playEntityHit(this, attacker, amt);
         this.hp -= amt;
         if (this.hp <= 0) {
             this.dead = true;
@@ -2825,6 +2952,7 @@ class Puppet extends Entity {
     }
     takeDamage(amt, attacker) {
         if (this.grappledBy) return;
+        window.audioManager?.playEntityHit(this, attacker, amt);
         this.hp -= amt;
         if (this.hp <= 0) {
             this.dead = true;

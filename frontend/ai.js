@@ -64,7 +64,8 @@ const HERO_TACTICS = {
     Mori:    { role: 'mechanist', aggression: 0.46, caution: 1.22, burst: 0.72, kite: 1.34, setup: 1.92, highGround: 1.28, retreatHp: 0.40, retreatFireChance: 0.42 },
     Roka:    { role: 'recoil_artillery', aggression: 0.62, caution: 1.35, burst: 1.65, kite: 1.55, setup: 0.85, highGround: 1.42, retreatHp: 0.42, retreatFireChance: 0.72 },
     Voss:    { role: 'copycat', aggression: 0.72, caution: 1.05, burst: 1.38, kite: 0.92, setup: 1.45, highGround: 0.85, retreatHp: 0.36, retreatFireChance: 0.48 },
-    Raigo:   { role: 'thunder_bruiser', aggression: 1.28, caution: 0.58, burst: 1.55, kite: 0.18, setup: 0.32, highGround: 0.65, retreatHp: 0.27, retreatFireChance: 0.10 }
+    Raigo:   { role: 'thunder_bruiser', aggression: 1.28, caution: 0.58, burst: 1.55, kite: 0.18, setup: 0.32, highGround: 0.65, retreatHp: 0.27, retreatFireChance: 0.10 },
+    Gelann:  { role: 'flame_zoner', aggression: 1.08, caution: 0.72, burst: 1.24, kite: 0.52, setup: 1.18, highGround: 0.78, retreatHp: 0.32, retreatFireChance: 0.18 }
 };
 
 function getHeroTactic(ai) {
@@ -478,6 +479,7 @@ function getCombatProfile(ai, source = ai) {
         case 'Roka': range = 650; preferred = 410; break;
         case 'Voss': range = ai.vossCopyTimer > 0 && ai.vossCopiedMelee ? 92 : 430; preferred = ai.vossCopyTimer > 0 && ai.vossCopiedMelee ? 62 : 275; break;
         case 'Raigo': range = 112; preferred = 72; break;
+        case 'Gelann': range = 96; preferred = 66; break;
     }
     return { range, preferred, ranged: !ai.isMeleeAttack(), tactics };
 }
@@ -516,6 +518,7 @@ function hasSetupOpportunity(game, ai) {
         case 'Roka': return ai.rokaMortarCooldown <= 0;
         case 'Voss': return ai.vossCopyTimer <= 0 && ai.vossCopyCooldown <= 0;
         case 'Raigo': return ai.raigoEnergy >= 30;
+        case 'Gelann': return ai.gelannBreathCooldown <= 0;
         default: return false;
     }
 }
@@ -896,6 +899,10 @@ function chooseHeroAction(game, ai, target, targetEntity, dist, verticalDistance
         case 'Raigo':
             if(superReady&&dist<520)return 'super';
             if(ai.raigoEnergy>=30&&(dist>105||Math.abs(verticalDistance)>65||combatState==='pressure'))return 'switch';
+            break;
+        case 'Gelann':
+            if(superReady&&dist<700&&(combatState==='setup'||combatState==='pressure'||combatState==='burst'||isVulnerableTarget(target)))return 'super';
+            if(ai.gelannBreathCooldown<=0&&dist<220&&Math.abs(verticalDistance)<105)return 'switch';
             break;
     }
     return null;

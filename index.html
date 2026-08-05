@@ -174,6 +174,19 @@
         }
         .key-btn.listening { background: #FFD700; color: black; border-color: white; }
 
+        .audio-settings {
+            border-top: 1px solid #44515a;
+            padding-top: 18px;
+            margin-top: 4px;
+        }
+
+        .audio-settings h3 { margin: 0 0 14px; color: #FFD700; }
+        .audio-row { display: grid; grid-template-columns: 92px minmax(150px, 1fr) 48px; gap: 12px; align-items: center; margin: 10px 0; }
+        .audio-row input[type="range"] { width: 100%; accent-color: #68c97a; }
+        .audio-row output { color: #b9c4ca; text-align: right; font-family: monospace; }
+        .audio-toggle { display: flex; align-items: center; gap: 10px; margin-top: 14px; cursor: pointer; }
+        .audio-toggle input { width: 20px; height: 20px; accent-color: #68c97a; }
+
         .pause-panel {
             box-sizing: border-box;
             width: min(360px, calc(100vw - 32px));
@@ -942,7 +955,7 @@
         <button id="btn-mp">Local Multiplayer (1 Keyboard)</button>
         <button id="btn-boss-mode" style="background:#3b2415; border-color:#ffd93d">Boss Mode</button>
         <button id="btn-online" style="background:#004080; border-color:#00bfff">Online Play</button>
-        <button id="btn-open-settings" style="background:#333; border-color:#888">Controls</button>
+        <button id="btn-open-settings" style="background:#333; border-color:#888">Settings</button>
     </div>
 </div>
 
@@ -979,7 +992,7 @@
 <!-- Settings Overlay -->
 <div id="settings-screen" class="overlay hidden">
     <div class="settings-panel">
-        <h2 style="text-align:center; color:#FFD700; margin-top:0;">Key Bindings</h2>
+        <h2 style="text-align:center; color:#FFD700; margin-top:0;">Settings</h2>
         <div class="bind-grid">
             <div class="bind-col">
                 <h3>Player 1</h3>
@@ -989,6 +1002,13 @@
                 <h3>Player 2</h3>
                 <div id="p2-bindings"></div>
             </div>
+        </div>
+        <div class="audio-settings" aria-labelledby="audio-settings-title">
+            <h3 id="audio-settings-title">Audio</h3>
+            <label class="audio-row" for="audio-master"><span>Master</span><input id="audio-master" type="range" min="0" max="100" step="1"><output id="audio-master-value">72%</output></label>
+            <label class="audio-row" for="audio-music"><span>Music</span><input id="audio-music" type="range" min="0" max="100" step="1"><output id="audio-music-value">42%</output></label>
+            <label class="audio-row" for="audio-sfx"><span>Effects</span><input id="audio-sfx" type="range" min="0" max="100" step="1"><output id="audio-sfx-value">78%</output></label>
+            <label class="audio-toggle" for="audio-muted"><input id="audio-muted" type="checkbox"><span id="audio-muted-label">Sound On</span></label>
         </div>
         <div style="display:flex; justify-content:space-between; margin-top:30px;">
             <button id="btn-reset-bindings" style="background:#8b0000; border-color:#ff5252; padding:10px 20px; font-size:1rem;">Reset Default</button>
@@ -1145,7 +1165,7 @@
         <h2 id="pause-title" class="pause-title">Paused</h2>
         <div class="pause-actions">
             <button id="btn-pause-resume" type="button">Resume</button>
-            <button id="btn-pause-options" type="button">Option</button>
+            <button id="btn-pause-options" type="button">Settings</button>
             <button id="btn-pause-back" type="button">Back to Menu</button>
         </div>
     </div>
@@ -1160,6 +1180,7 @@
 <!-- Scripts (Strict Loading Order Required) -->
 <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
 <script src="config.js"></script>
+<script src="audio.js"></script>
 <script src="entities.js"></script>
 <script src="fighter.js"></script>
 <script src="frontend/ai.js"></script>
