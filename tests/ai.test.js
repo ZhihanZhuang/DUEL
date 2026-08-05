@@ -57,7 +57,7 @@ function loadProjectileContext() {
     };
     vm.createContext(context);
     const source = fs.readFileSync(path.join(__dirname, '..', 'entities.js'), 'utf8');
-    vm.runInContext(`${source}\nwindow.Projectile = Projectile; window.KuroDecoy = KuroDecoy; window.GiantSword = GiantSword; window.GravityWell = GravityWell; window.ChiqPath = ChiqPath; window.D2FDrone = D2FDrone; window.D2FTargetBeacon = D2FTargetBeacon; window.D2FGiantRobot = D2FGiantRobot; window.TimeAnchor = TimeAnchor; window.TemporalEcho = TemporalEcho; window.LaegonLightning = LaegonLightning; window.LaegonHammer = LaegonHammer; window.LaegonHammerStrike = LaegonHammerStrike; window.BromBlastCharge = BromBlastCharge; window.BromStickyBomb = BromStickyBomb; window.DemolitionZone = DemolitionZone; window.TitanAxe = TitanAxe;`, context, { filename: 'entities.js' });
+    vm.runInContext(`${source}\nwindow.Projectile = Projectile; window.KuroDecoy = KuroDecoy; window.UkonShadow = UkonShadow; window.PeachTree = PeachTree; window.GiantSword = GiantSword; window.GravityWell = GravityWell; window.ChiqPath = ChiqPath; window.D2FDrone = D2FDrone; window.D2FTargetBeacon = D2FTargetBeacon; window.D2FGiantRobot = D2FGiantRobot; window.TimeAnchor = TimeAnchor; window.TemporalEcho = TemporalEcho; window.LaegonLightning = LaegonLightning; window.LaegonHammer = LaegonHammer; window.LaegonHammerStrike = LaegonHammerStrike; window.BromBlastCharge = BromBlastCharge; window.BromStickyBomb = BromStickyBomb; window.DemolitionZone = DemolitionZone; window.TitanAxe = TitanAxe;`, context, { filename: 'entities.js' });
     return context;
 }
 
@@ -146,6 +146,9 @@ function makeFighter(heroName, id = 'cpu') {
         axeronCombo: 0,
         axeronMarks: [],
         axeronRushTimer: 0,
+        ukonDashCooldown: 0,
+        ukonShadowCooldown: 0,
+        ukonUltimatePhase: null,
         isMeleeAttack() {
             if (this.heroName === 'Laegon') return this.thunderGodTimer > 0;
             return !['Hason', 'Willi', 'Ugo', 'Kila', 'Volt', 'Noae', 'Kuro', 'Nyra', 'Archor', 'D2F1', 'Veyra', 'Brom'].includes(this.heroName)
@@ -265,6 +268,18 @@ function loadPhysicsGame(heroName = 'Hunter') {
         }
     }
     class D2FGiantRobot extends Entity {}
+    class UkonShadow extends Entity {
+        constructor(owner, target) {
+            super(target.x, target.y, owner.w, owner.h);
+            Object.assign(this, { owner, targetId: target.id, type: 'ukon_shadow', hp: 18, maxHp: 18, buffs: {} });
+        }
+    }
+    class PeachTree extends Entity {
+        constructor(owner, centerX) {
+            super(centerX - 88, 34, 176, 626);
+            Object.assign(this, { owner, type: 'peach_tree', life: 18000, untargetable: true });
+        }
+    }
 
     const platforms = [
         { x: 300, y: 480, w: 400, h: 20, type: 'center' },
@@ -282,6 +297,8 @@ function loadPhysicsGame(heroName = 'Hunter') {
         D2FDrone,
         D2FTargetBeacon,
         D2FGiantRobot,
+        UkonShadow,
+        PeachTree,
         Minion,
         CANVAS_W: 1280,
         CANVAS_H: 760,
@@ -300,7 +317,8 @@ function loadPhysicsGame(heroName = 'Hunter') {
             Itan: { maxHp: 820, speed: 5, jump: 14.5, width: 42, height: 72, color: '#9f3347', superCD: 3000 },
             D2F1: { maxHp: 520, speed: 7.2, jump: 16, width: 40, height: 66, color: '#35d5e8', superCD: 35000 },
             Veyra: { maxHp: 700, speed: 6.2, jump: 14.5, width: 39, height: 69, color: '#9d5cff', superCD: 18000 },
-            Axeron: { maxHp: 700, speed: 6.5, jump: 16, width: 39, height: 68, color: '#2468c9', superCD: 22000 }
+            Axeron: { maxHp: 700, speed: 6.5, jump: 16, width: 39, height: 68, color: '#2468c9', superCD: 22000 },
+            Ukon: { maxHp: 850, speed: 7.4, jump: 17, width: 42, height: 72, color: '#b94b3f', superCD: 28000 }
         },
         keys: {},
         keysPressed: {},
@@ -548,7 +566,7 @@ test('every hero with a direct super can decide to use it', () => {
     const context = loadAI();
     const directSuperHeroes = [
         'Hason', 'Willi', 'Hunter', 'Macu', 'Artu', 'Duke', 'Kadaxi', 'Euclid',
-        'Lique', 'Kae', 'Kila', 'Volt', 'Gensan', 'Noae', 'Wolf', 'Kuro', 'Sola', 'Nyra', 'Orion', 'Archor', 'Itan', 'D2F1', 'Laegon', 'Veyra', 'Brom', 'Axeron'
+        'Lique', 'Kae', 'Kila', 'Volt', 'Gensan', 'Noae', 'Wolf', 'Kuro', 'Sola', 'Nyra', 'Orion', 'Archor', 'Itan', 'D2F1', 'Laegon', 'Veyra', 'Brom', 'Axeron', 'Ukon'
     ];
 
     for (const heroName of directSuperHeroes) {
@@ -563,6 +581,7 @@ test('every hero with a direct super can decide to use it', () => {
         if (heroName === 'Veyra') { ai.veyraHistory = [{ x: ai.x, y: ai.y, hp: ai.hp, age: 3000 }]; ai.hp *= 0.5; }
         if (heroName === 'Brom') target.buffs.dizzy = 1000;
         if (heroName === 'Axeron') target.hp = target.maxHp * 0.35;
+        if (heroName === 'Ukon') target.hp = target.maxHp * 0.35;
         const game = makeGame(ai, target);
         if (heroName === 'Noae') {
             game.minions.push(
@@ -811,7 +830,8 @@ test('hero archetypes expose distinct tactical roles and low-health priorities',
         { hero: 'Laegon', role: 'thunder_mage' },
         { hero: 'Veyra', role: 'chronomancer' },
         { hero: 'Brom', role: 'demolitionist' },
-        { hero: 'Axeron', role: 'power_assassin' }
+        { hero: 'Axeron', role: 'power_assassin' },
+        { hero: 'Ukon', role: 'dash_assassin' }
     ];
 
     for (const testCase of cases) {
@@ -2049,4 +2069,141 @@ test('Titan Descent heals Axeron from actual damage and grants nothing on invuln
     const secondAxe = new context.window.TitanAxe(owner, 200, 170);
     secondAxe.update(1450);
     assert.equal(owner.hp, 412.5);
+});
+
+test('Ukon replaces walking with discrete dashes that stop at platforms', () => {
+    const simulation = loadPhysicsGame('Ukon');
+    const { ai, context } = simulation;
+    ai.isCPU = false;
+    ai.attackState = 'idle';
+    ai.stateTimer = 0;
+    ai.x = 230;
+    ai.y = 480;
+    ai.vx = 0;
+    ai.vy = 0;
+
+    context.keysPressed[ai.controls.right] = true;
+    ai.update(16);
+    delete context.keysPressed[ai.controls.right];
+    assert.ok(ai.ukonDashTimer > 0, JSON.stringify({
+        heroName: ai.heroName, attackState: ai.attackState, dashTimer: ai.ukonDashTimer,
+        dashCooldown: ai.ukonDashCooldown, x: ai.x, y: ai.y, vx: ai.vx, vy: ai.vy,
+        pressed: context.keysPressed[ai.controls.right]
+    }));
+    assert.ok(ai.vx > 20);
+
+    ai.update(16);
+    ai.update(16);
+    assert.equal(ai.x, 300 - ai.w, 'right dash passed through the platform edge');
+    assert.equal(ai.ukonDashTimer, 0);
+
+    ai.x = 100;
+    ai.y = context.GROUND_Y - ai.h;
+    ai.vx = 0;
+    ai.vy = 0;
+    ai.ukonDashCooldown = 100;
+    context.keys[ai.controls.right] = true;
+    ai.update(16);
+    assert.equal(ai.x, 100, 'held movement produced ordinary walking during dash cooldown');
+});
+
+test('Ukon Iron Rod Charge hits only when the target begins within reach', () => {
+    const close = loadPhysicsGame('Ukon');
+    close.ai.isCPU = false;
+    close.ai.attackState = 'idle';
+    close.ai.stateTimer = 0;
+    close.ai.x = 100;
+    close.ai.y = close.context.GROUND_Y - close.ai.h;
+    close.target.x = 250;
+    close.target.y = close.context.GROUND_Y - close.target.h;
+    const closeHp = close.target.hp;
+    close.ai.performAttack();
+    for (let frame = 0; frame < 12 && close.target.hp === closeHp; frame++) close.ai.update(16);
+
+    assert.equal(close.target.hp, closeHp - 40, JSON.stringify({
+        x: close.ai.x, y: close.ai.y, chargeTimer: close.ai.ukonChargeTimer,
+        chargeCanStrike: close.ai.ukonChargeCanStrike, attackState: close.ai.attackState,
+        targetX: close.target.x, targetY: close.target.y
+    }));
+    assert.ok(close.target.buffs.dizzy >= 320);
+    assert.ok(Math.abs(close.target.vx) >= 19);
+
+    const far = loadPhysicsGame('Ukon');
+    far.ai.isCPU = false;
+    far.ai.attackState = 'idle';
+    far.ai.stateTimer = 0;
+    far.ai.x = 100;
+    far.ai.y = far.context.GROUND_Y - far.ai.h;
+    far.target.x = 900;
+    far.target.y = far.context.GROUND_Y - far.target.h;
+    const farHp = far.target.hp;
+    far.ai.performAttack();
+    for (let frame = 0; frame < 30; frame++) far.ai.update(16);
+
+    assert.equal(far.target.hp, farHp, 'mobility-only charge damaged an initially distant target');
+    assert.ok(far.ai.x > 250, 'mobility-only charge did not move Ukon');
+    assert.ok(far.ai.x < 430, 'mobility-only charge exceeded its travel cap');
+});
+
+test('Ukon Iron Shadow chases once, controls its target, and disappears', () => {
+    const context = loadProjectileContext();
+    const owner = { id: 'ukon', heroName: 'Ukon', x: 100, y: 500, w: 42, h: 72, facing: 1, dead: false };
+    const target = {
+        id: 'target', heroName: 'Hunter', x: 500, y: 500, w: 45, h: 70, hp: 300,
+        dead: false, untargetable: false, buffs: {}, vx: 0, vy: 0,
+        takeDamage(amount) { this.hp -= amount; }
+    };
+    context.game.opponents = [target];
+    const shadow = new context.window.UkonShadow(owner, target);
+    shadow.update(16);
+    assert.equal(target.hp, 300, 'shadow attacked before its materialization window ended');
+    for (let frame = 0; frame < 20 && !shadow.dead; frame++) shadow.update(16);
+
+    assert.equal(target.hp, 285);
+    assert.ok(target.buffs.dizzy >= 280);
+    assert.ok(target.buffs.slow >= 900);
+    assert.equal(shadow.dead, true);
+});
+
+test('Heavenly Peach Tree requires a second press and scales Heavenly Drop by actual fall distance', () => {
+    const longFall = loadPhysicsGame('Ukon');
+    longFall.ai.isCPU = false;
+    longFall.ai.attackState = 'idle';
+    longFall.ai.stateTimer = 0;
+    longFall.ai.superCooldown = 0;
+    assert.equal(longFall.ai.startUkonUltimate(), true);
+    assert.equal(longFall.ai.ukonUltimatePhase, 'climb');
+    assert.equal(longFall.context.game.minions.some(minion => minion.type === 'peach_tree'), true);
+
+    longFall.ai.updateUkonUltimate(4000);
+    assert.equal(longFall.ai.ukonUltimatePhase, 'ready');
+    assert.equal(longFall.ai.startUkonHeavenlyDrop(), true);
+    assert.equal(longFall.ai.ukonUltimatePhase, 'aim');
+    longFall.ai.updateUkonUltimate(320);
+    assert.equal(longFall.ai.ukonUltimatePhase, 'drop');
+
+    longFall.ai.x = longFall.target.x;
+    longFall.ai.y = longFall.context.GROUND_Y - longFall.ai.h;
+    longFall.target.y = longFall.context.GROUND_Y - longFall.target.h;
+    longFall.ai.isGrounded = true;
+    longFall.ai.ukonDropStartY = 54;
+    const longHp = longFall.target.hp;
+    assert.equal(longFall.ai.resolveUkonDropImpact(), true);
+    assert.equal(longFall.ai.ukonLastDropDamage, 160);
+    assert.equal(longFall.target.hp, longHp - 160);
+    assert.equal(longFall.ai.ukonUltimatePhase, null);
+    assert.ok(longFall.context.game.screenShakeTimer >= 480);
+
+    const shortFall = loadPhysicsGame('Ukon');
+    shortFall.ai.isCPU = false;
+    shortFall.ai.ukonUltimatePhase = 'drop';
+    shortFall.ai.ukonDropStartY = 500;
+    shortFall.ai.x = shortFall.target.x;
+    shortFall.ai.y = shortFall.context.GROUND_Y - shortFall.ai.h;
+    shortFall.target.y = shortFall.context.GROUND_Y - shortFall.target.h;
+    shortFall.ai.isGrounded = true;
+    const shortHp = shortFall.target.hp;
+    assert.equal(shortFall.ai.resolveUkonDropImpact(), true);
+    assert.ok(shortFall.ai.ukonLastDropDamage >= 60 && shortFall.ai.ukonLastDropDamage < 100);
+    assert.equal(shortFall.target.hp, shortHp - shortFall.ai.ukonLastDropDamage);
 });

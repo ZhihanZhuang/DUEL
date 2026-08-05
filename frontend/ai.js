@@ -59,7 +59,8 @@ const HERO_TACTICS = {
     Laegon:  { role: 'thunder_mage', aggression: 0.86, caution: 0.90, burst: 1.42, kite: 1.20, setup: 0.72, highGround: 1.18, retreatHp: 0.34, retreatFireChance: 0.55 },
     Veyra:   { role: 'chronomancer', aggression: 0.48, caution: 1.42, burst: 0.72, kite: 1.38, setup: 1.75, highGround: 1.30, retreatHp: 0.45, retreatFireChance: 0.35 },
     Brom:    { role: 'demolitionist', aggression: 0.52, caution: 1.08, burst: 1.55, kite: 1.18, setup: 1.85, highGround: 0.92, retreatHp: 0.36, retreatFireChance: 0.30 },
-    Axeron:  { role: 'power_assassin', aggression: 1.32, caution: 0.62, burst: 1.75, kite: 0.32, setup: 0.85, highGround: 0.48, retreatHp: 0.30, retreatFireChance: 0.08 }
+    Axeron:  { role: 'power_assassin', aggression: 1.32, caution: 0.62, burst: 1.75, kite: 0.32, setup: 0.85, highGround: 0.48, retreatHp: 0.30, retreatFireChance: 0.08 },
+    Ukon:    { role: 'dash_assassin', aggression: 1.38, caution: 0.58, burst: 1.82, kite: 0.36, setup: 1.05, highGround: 0.84, retreatHp: 0.27, retreatFireChance: 0.06 }
 };
 
 function getHeroTactic(ai) {
@@ -456,6 +457,7 @@ function getCombatProfile(ai, source = ai) {
         case 'Veyra': range = 430; preferred = 285; break;
         case 'Brom': range = 390; preferred = 255; break;
         case 'Axeron': range = 96; preferred = 62; break;
+        case 'Ukon': range = 365; preferred = 88; break;
     }
     return { range, preferred, ranged: !ai.isMeleeAttack(), tactics };
 }
@@ -489,6 +491,7 @@ function hasSetupOpportunity(game, ai) {
         case 'Brom': return !ai.bromStickyBomb || ai.bromStickyBomb.dead;
         case 'Laegon': return ai.laegonSwitchCooldown <= 0;
         case 'Axeron': return (ai.axeronMarks || []).some(mark => mark.life > 0 && mark.target && !mark.target.dead);
+        case 'Ukon': return ai.ukonShadowCooldown <= 0 && owned('ukon_shadow') === 0;
         default: return false;
     }
 }
@@ -529,7 +532,7 @@ function selectCombatState(game, ai, source, target, targetEntity, brain, profil
         scores.pressure += 3.5;
         scores.retreat *= 0.2;
     }
-    if (tactics.role === 'assassin' && (target.attackState !== 'idle' || vulnerable)) scores.burst += 2.5;
+    if (['assassin', 'power_assassin', 'dash_assassin'].includes(tactics.role) && (target.attackState !== 'idle' || vulnerable)) scores.burst += 2.5;
     if (tactics.role === 'trapper' && setupReady) scores.setup += 2.2;
     if (tactics.role === 'puppeteer' && source !== ai) scores.kite += 1.6;
     if (tactics.role === 'aerial' && !brain.voltRecovering) scores.kite += 1.2;
@@ -668,6 +671,9 @@ function chooseDefensiveAction(game, ai, target, threat) {
         case 'Veyra':
             if (ai.superCooldown <= 0 && (ai.hp < ai.maxHp * 0.65 || threat.kind === 'melee')) return 'super';
             break;
+        case 'Ukon':
+            if (ai.ukonShadowCooldown <= 0) return 'switch';
+            break;
     }
     return null;
 }
@@ -689,6 +695,8 @@ function chooseHeroAction(game, ai, target, targetEntity, dist, verticalDistance
     const minions = game.minions;
 
     if (ai.grapplePhase === 1 && ai.grappleTimer <= 4500) return 'super';
+    if (ai.heroName === 'Ukon' && ai.ukonUltimatePhase === 'ready') return 'super';
+    if (ai.heroName === 'Ukon' && ai.ukonUltimatePhase) return null;
     if (ai.heroName === 'Hason' && ai.hasonSuperCharges > 0 && dist < 560) return 'super';
     if (ai.heroName === 'Willi' && ai.williSuperCharges > 0 && ai.williDashCooldown <= 0 && dist < 600 && combatState !== 'burst') return 'super';
 
@@ -829,6 +837,12 @@ function chooseHeroAction(game, ai, target, targetEntity, dist, verticalDistance
             const marked = (ai.axeronMarks || []).some(mark => mark.life > 0 && mark.target && !mark.target.dead);
             if (marked && (dist > 105 || isVulnerableTarget(target))) return 'switch';
             if (superReady && dist < 720 && (combatState === 'burst' || isVulnerableTarget(target) || target.hp < target.maxHp*.42)) return 'super';
+            break;
+        }
+        case 'Ukon': {
+            const shadow = minions.find(minion => minion && minion.owner === ai && minion.type === 'ukon_shadow' && !minion.dead);
+            if (superReady && (combatState === 'burst' || combatState === 'pressure' || target.hp < target.maxHp * 0.48)) return 'super';
+            if (!shadow && ai.ukonShadowCooldown <= 0 && (combatState === 'setup' || combatState === 'pressure' || dist < 240)) return 'switch';
             break;
         }
     }

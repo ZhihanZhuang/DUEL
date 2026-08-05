@@ -29,6 +29,8 @@ class Game {
         this.endGameTimer = null;
         this.lastPromptsHTML = '';
         this.settingsReturnToPause = false;
+        this.screenShakeTimer = 0;
+        this.screenShakeMagnitude = 0;
 
         this.setupMenu();
         updateControlsDisplay();
@@ -725,6 +727,11 @@ class Game {
             p1Stat += `[AXE HIT COUNT: ${this.p1.axeronCombo}/3] [MARKS: ${this.p1.axeronMarks.length}]`;
             if (this.p1.axeronRushTimer > 0) p1Stat += ' [AXE RUSH]';
         }
+        if (this.p1.heroName === 'Ukon') {
+            p1Stat += this.p1.ukonDashCooldown > 0 ? `[DASH ${(this.p1.ukonDashCooldown/1000).toFixed(1)}s]` : '[DASH READY]';
+            p1Stat += this.p1.ukonShadowCooldown > 0 ? ` [SHADOW ${(this.p1.ukonShadowCooldown/1000).toFixed(1)}s]` : ' [SHADOW READY]';
+            if (this.p1.ukonUltimatePhase) p1Stat += ` [TREE: ${this.p1.ukonUltimatePhase.toUpperCase()}]`;
+        }
 
         if (this.p1.buffs.poison > 0) p1Stat += " [POISONED]";
         if (this.p1.buffs.burn > 0) p1Stat += " [BURN]";
@@ -855,6 +862,11 @@ class Game {
             p2Stat += `[AXE HIT COUNT: ${this.p2.axeronCombo}/3] [MARKS: ${this.p2.axeronMarks.length}]`;
             if (this.p2.axeronRushTimer > 0) p2Stat += ' [AXE RUSH]';
         }
+        if (this.p2.heroName === 'Ukon') {
+            p2Stat += this.p2.ukonDashCooldown > 0 ? `[DASH ${(this.p2.ukonDashCooldown/1000).toFixed(1)}s]` : '[DASH READY]';
+            p2Stat += this.p2.ukonShadowCooldown > 0 ? ` [SHADOW ${(this.p2.ukonShadowCooldown/1000).toFixed(1)}s]` : ' [SHADOW READY]';
+            if (this.p2.ukonUltimatePhase) p2Stat += ` [TREE: ${this.p2.ukonUltimatePhase.toUpperCase()}]`;
+        }
 
         if (this.p2.buffs.poison > 0) p2Stat += " [POISONED]";
         if (this.p2.buffs.burn > 0) p2Stat += " [BURN]";
@@ -866,6 +878,8 @@ class Game {
         let promptsHTML = '';
         if (this.p1.grapplePhase === 1) promptsHTML += `<div class="prompt-text" style="left:${this.p1.x - this.camera.x}px; top:${this.p1.y - 40}px">Press ${formatKey(this.p1.controls.super)} to THROW!</div>`;
         if (this.p2.grapplePhase === 1) promptsHTML += `<div class="prompt-text" style="left:${this.p2.x - this.camera.x}px; top:${this.p2.y - 40}px">Press ${formatKey(this.p2.controls.super)} to THROW!</div>`;
+        if (this.p1.heroName === 'Ukon' && this.p1.ukonUltimatePhase === 'ready') promptsHTML += `<div class="prompt-text" style="left:${this.p1.x - this.camera.x - 35}px; top:${this.p1.y - 30}px">Press ${formatKey(this.p1.controls.super)} to DROP!</div>`;
+        if (this.p2.heroName === 'Ukon' && this.p2.ukonUltimatePhase === 'ready' && !this.p2.isCPU) promptsHTML += `<div class="prompt-text" style="left:${this.p2.x - this.camera.x - 35}px; top:${this.p2.y - 30}px">Press ${formatKey(this.p2.controls.super)} to DROP!</div>`;
         if (promptsHTML !== this.lastPromptsHTML) {
             document.getElementById('dynamic-prompts').innerHTML = promptsHTML;
             this.lastPromptsHTML = promptsHTML;
@@ -1283,6 +1297,10 @@ class Game {
     }
 
     update(dt) {
+        if (this.screenShakeTimer > 0) {
+            this.screenShakeTimer = Math.max(0, this.screenShakeTimer - dt);
+            if (this.screenShakeTimer <= 0) this.screenShakeMagnitude = 0;
+        }
         this.getFighters().forEach(fighter => fighter.update(dt));
         if (this.hurricane && !this.hurricane.dead) this.hurricane.update(dt);
 
@@ -1379,7 +1397,10 @@ class Game {
     draw() {
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
         this.ctx.save();
-        this.ctx.translate(-Math.round(this.camera.x), 0);
+        const shakeStrength = this.screenShakeTimer > 0 ? this.screenShakeMagnitude * Math.min(1, this.screenShakeTimer / 180) : 0;
+        const shakeX = shakeStrength > 0 ? (Math.random()-0.5) * shakeStrength * 2 : 0;
+        const shakeY = shakeStrength > 0 ? (Math.random()-0.5) * shakeStrength * 1.2 : 0;
+        this.ctx.translate(-Math.round(this.camera.x) + shakeX, shakeY);
         this.drawArenaBackground();
 
         if (this.hurricane && !this.hurricane.dead) this.hurricane.draw(this.ctx);

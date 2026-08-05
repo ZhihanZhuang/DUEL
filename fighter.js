@@ -153,12 +153,33 @@ class Fighter extends Entity {
             this.axeronCombo = 0; this.axeronMarks = []; this.axeronRushTarget = null;
             this.axeronRushTimer = 0; this.axeronRushMax = 180; this.axeronRushHit = false;
         }
+        if (this.heroName === 'Ukon') {
+            this.ukonDashCooldown = 0;
+            this.ukonDashTimer = 0;
+            this.ukonDashDuration = 175;
+            this.ukonBurstOriginX = this.x;
+            this.ukonBurstOriginY = this.y;
+            this.ukonBurstMaxDistance = 0;
+            this.ukonChargeTimer = 0;
+            this.ukonChargeTargetId = null;
+            this.ukonChargeCanStrike = false;
+            this.ukonShadowCooldown = 0;
+            this.ukonUltimatePhase = null;
+            this.ukonTree = null;
+            this.ukonClimbTargetY = 54;
+            this.ukonDropWarningTimer = 0;
+            this.ukonDropTargetX = this.x + this.w/2;
+            this.ukonDropTargetY = GROUND_Y;
+            this.ukonDropStartY = this.y;
+            this.ukonLastDropDamage = 0;
+        }
     }
 
     takeDamage(amt, attacker, isDoT = false, noKnockback = false, noHitReaction = false) {
         if (this.dead || this.invincible > 0 || (this.heroName === 'Sola' && this.solaChargeTimer > 0)) return;
 
         if (this.heroName === 'Sola' && this.solaForceActive) this.endSolaForce();
+        if (this.heroName === 'Ukon' && (this.ukonDashTimer > 0 || this.ukonChargeTimer > 0)) this.finishUkonBurst(true);
 
         if (this.heroName === 'Kuro') {
             this.revealKuro(2000);
@@ -542,6 +563,21 @@ class Fighter extends Entity {
             this.axeronMarks = this.axeronMarks.filter(mark => mark.life > 0 && mark.target && !mark.target.dead);
             if (this.axeronRushTimer > 0) this.updateAxeronRush(dt);
         }
+        if (this.heroName === 'Ukon') {
+            if (this.ukonDashCooldown > 0) this.ukonDashCooldown = Math.max(0, this.ukonDashCooldown - dt);
+            if (this.ukonShadowCooldown > 0) this.ukonShadowCooldown = Math.max(0, this.ukonShadowCooldown - dt);
+            this.updateUkonBurst(dt);
+            this.updateUkonUltimate(dt);
+            const ukonCanDash = this.stunTimer <= 0 && this.buffs.dizzy <= 0 && this.attackState === 'idle'
+                && !this.ukonUltimatePhase && this.ukonDashTimer <= 0 && this.ukonChargeTimer <= 0 && this.ukonDashCooldown <= 0;
+            if (ukonCanDash) {
+                const cpuHeld = action => this.isCPU && keys[this.controls[action]];
+                if (keysPressed[this.controls.jump] || cpuHeld('jump')) this.startUkonDirectionalDash(0, -1);
+                else if (keysPressed[this.controls.down] || cpuHeld('down')) this.startUkonDirectionalDash(0, 1);
+                else if (keysPressed[this.controls.left] || cpuHeld('left')) this.startUkonDirectionalDash(-1, 0);
+                else if (keysPressed[this.controls.right] || cpuHeld('right')) this.startUkonDirectionalDash(1, 0);
+            }
+        }
 
         if (this.heroName === 'Archor') {
             if (this.archorSpeedCooldown > 0) this.archorSpeedCooldown = Math.max(0, this.archorSpeedCooldown - dt);
@@ -645,7 +681,9 @@ class Fighter extends Entity {
         let hasPuppet = this.heroName === 'Ugo' && game.minions.some(m => m.type === 'puppet' && m.owner === this && !m.dead);
         const isSolaForceLocked = !!(this.solaForceActive || this.solaForceHeld);
         const isSolaCharging = this.heroName === 'Sola' && this.solaChargeTimer > 0;
-        let canAct = (this.stunTimer <= 0 && this.buffs.dizzy <= 0 && this.grapplePhase !== 1 && this.superWindupTimer <= 0 && this.euclidSwitchTimer <= 0 && !(this.itanSuperWindupTimer > 0) && !(this.veyraReversalTimer > 0) && !(this.axeronRushTimer > 0) && !isKilaSwitching && !isSolaForceLocked && !isSolaCharging);
+        const isUkonBursting = this.heroName === 'Ukon' && (this.ukonDashTimer > 0 || this.ukonChargeTimer > 0);
+        const isUkonUltimateLocked = this.heroName === 'Ukon' && !!this.ukonUltimatePhase;
+        let canAct = (this.stunTimer <= 0 && this.buffs.dizzy <= 0 && this.grapplePhase !== 1 && this.superWindupTimer <= 0 && this.euclidSwitchTimer <= 0 && !(this.itanSuperWindupTimer > 0) && !(this.veyraReversalTimer > 0) && !(this.axeronRushTimer > 0) && !isKilaSwitching && !isSolaForceLocked && !isSolaCharging && !isUkonBursting && !isUkonUltimateLocked);
         let canMoveAndAttack = canAct && !hasPuppet;
 
         if (this.heroName === 'Gensan') {
@@ -834,7 +872,7 @@ class Fighter extends Entity {
 
         let applyGravity = true;
 
-        if (isSolaForceLocked || (this.heroName === 'Axeron' && this.axeronRushTimer > 0)) {
+        if (isSolaForceLocked || (this.heroName === 'Axeron' && this.axeronRushTimer > 0) || isUkonBursting || isUkonUltimateLocked) {
             applyGravity = false;
             if (isSolaForceLocked) { this.vx = 0; this.vy = 0; }
             this.jumpBuffer = 0;
@@ -847,7 +885,7 @@ class Fighter extends Entity {
                 if (!this.isGrounded && Math.random() < 0.3) game.particles.push(new Particle(this.x+this.w/2, this.y+this.h, "#00FFFF", (Math.random()-0.5)*2, Math.random()*2, 200, 3));
             }
         } else {
-            if (keysPressed[this.controls.jump]) {
+            if (keysPressed[this.controls.jump] && this.heroName !== 'Ukon') {
                 if (hasPuppet && canAct) {
                     activePuppet.doJump();
                 } else {
@@ -979,6 +1017,10 @@ class Fighter extends Entity {
         let targetVx = 0;
         if (isSolaCharging) {
             targetVx = this.solaChargeDirection * 18;
+        } else if (isUkonBursting || (this.heroName === 'Ukon' && this.ukonUltimatePhase === 'drop')) {
+            targetVx = this.vx;
+        } else if (this.heroName === 'Ukon') {
+            targetVx = 0;
         } else if (this.heroName === 'Willi' && this.invincible > 0) {
             targetVx = this.facing * 40;
         } else if (canMoveAndAttack && this.flipActive <= 0) {
@@ -1007,6 +1049,7 @@ class Fighter extends Entity {
         if (this.currentPlatform && this.currentPlatform.type === 'center') friction = 0.03;
         if (!canAct || ((this.heroName === 'Euclid' || this.heroName === 'Kae' || this.heroName === 'Ugo' || this.heroName === 'Volt' || this.heroName === 'Gensan' || this.heroName === 'Wolf') && this.attackState === 'windup') || hasPuppet) friction = 0.1;
         if (isSolaCharging) friction = 1;
+        if (isUkonBursting || (this.heroName === 'Ukon' && this.ukonUltimatePhase === 'drop')) friction = 1;
 
         this.vx += (targetVx - this.vx) * friction;
 
@@ -1334,6 +1377,8 @@ class Fighter extends Entity {
                     }
                 } else if (this.heroName === 'Axeron' && this.attackState === 'idle') {
                     this.startAxeronRush();
+                } else if (this.heroName === 'Ukon' && this.attackState === 'idle') {
+                    this.summonUkonShadow();
                 }
             }
             if (keysPressed[this.controls.attack] && this.attackState === 'idle') {
@@ -1345,10 +1390,11 @@ class Fighter extends Entity {
             }
         }
 
-        if (canAct || this.grapplePhase === 1) {
+        const ukonDropFollowup = this.heroName === 'Ukon' && this.ukonUltimatePhase === 'ready';
+        if (canAct || this.grapplePhase === 1 || ukonDropFollowup) {
             const superActivated = keysPressed[this.controls.super]
                 || (this.heroName === 'Sola' && keys[this.controls.super] && !this.solaForceActive);
-            if (superActivated && (this.superCooldown <= 0 || (this.heroName === 'Hason' && this.hasonSuperCharges > 0) || (this.heroName === 'Willi' && this.williSuperCharges > 0) || this.grapplePhase === 1)) {
+            if (superActivated && (this.superCooldown <= 0 || ukonDropFollowup || (this.heroName === 'Hason' && this.hasonSuperCharges > 0) || (this.heroName === 'Willi' && this.williSuperCharges > 0) || this.grapplePhase === 1)) {
                 this.performSuper();
             }
         }
@@ -1371,6 +1417,8 @@ class Fighter extends Entity {
             }
         }
 
+        const previousX = this.x;
+        const previousY = this.y;
         this.x += this.vx;
         this.y += this.vy;
 
@@ -1378,6 +1426,9 @@ class Fighter extends Entity {
         if (this.x + this.w > CANVAS_W) { this.x = CANVAS_W - this.w; }
 
         this.isGrounded = false; this.currentPlatform = null;
+
+        this.resolveUkonRodHit();
+        this.resolveUkonBurstCollision(previousX, previousY);
 
         if (this.y + this.h >= GROUND_Y) { this.y = GROUND_Y - this.h; this.vy = 0; this.isGrounded = true; }
 
@@ -1394,6 +1445,7 @@ class Fighter extends Entity {
             }
         }
 
+        this.resolveUkonDropImpact();
         this.applySolaForceFallDamage();
     }
 
@@ -1476,6 +1528,10 @@ class Fighter extends Entity {
             this.stateTimer = 0;
             this.maxStateTimer = this.kuroChargeMax;
             this.hasHit = false;
+            return;
+        }
+        if (this.heroName === 'Ukon') {
+            this.startUkonRodCharge();
             return;
         }
 
@@ -1661,6 +1717,316 @@ class Fighter extends Entity {
         else if (this.heroName === 'Brom') {
             game.projectiles.push(new BromBlastCharge(this, px, py, Math.cos(aimAngle)*10, Math.sin(aimAngle)*10));
         }
+    }
+
+    getUkonTarget() {
+        const opponents = typeof game.getOpponentsOf === 'function'
+            ? game.getOpponentsOf(this).filter(target => target && !target.dead && !target.untargetable)
+            : [];
+        const preferred = this.aiTarget && opponents.includes(this.aiTarget) ? this.aiTarget : null;
+        if (preferred) return preferred;
+        return opponents.reduce((best, target) => {
+            if (!best) return target;
+            const targetDistance = Math.hypot(target.x + target.w/2 - (this.x + this.w/2), target.y + target.h/2 - (this.y + this.h/2));
+            const bestDistance = Math.hypot(best.x + best.w/2 - (this.x + this.w/2), best.y + best.h/2 - (this.y + this.h/2));
+            return targetDistance < bestDistance ? target : best;
+        }, null);
+    }
+
+    startUkonDirectionalDash(dx, dy) {
+        if (this.heroName !== 'Ukon' || this.dead || this.ukonDashCooldown > 0 || this.ukonDashTimer > 0
+            || this.ukonChargeTimer > 0 || this.ukonUltimatePhase || this.attackState !== 'idle') return false;
+        const distance = Math.hypot(dx, dy);
+        if (distance <= 0) return false;
+        this.ukonDashTimer = this.ukonDashDuration;
+        this.ukonDashCooldown = 275;
+        this.ukonBurstOriginX = this.x;
+        this.ukonBurstOriginY = this.y;
+        this.ukonBurstMaxDistance = 250;
+        this.vx = dx / distance * 23;
+        this.vy = dy / distance * 23;
+        if (dx) this.facing = dx > 0 ? 1 : -1;
+        this.isGrounded = false;
+        this.jumpBuffer = 0;
+        for (let i = 0; i < 12; i++) {
+            game.particles.push(new Particle(this.x + this.w/2, this.y + this.h/2, i % 2 ? '#ef8d78' : '#5c2425', -this.vx*(0.18 + Math.random()*0.16), -this.vy*(0.18 + Math.random()*0.16), 320, 5));
+        }
+        return true;
+    }
+
+    startUkonRodCharge() {
+        if (this.heroName !== 'Ukon' || this.dead || this.attackState !== 'idle' || this.ukonDashTimer > 0
+            || this.ukonChargeTimer > 0 || this.ukonUltimatePhase) return false;
+        const target = this.getUkonTarget();
+        const originX = this.x + this.w/2;
+        const originY = this.y + this.h/2;
+        const targetX = target ? target.x + target.w/2 : originX + this.facing * 300;
+        const targetY = target ? target.y + target.h/2 : originY;
+        const dx = targetX - originX;
+        const dy = targetY - originY;
+        const distance = Math.max(1, Math.hypot(dx, dy));
+        this.ukonChargeTargetId = target?.id || null;
+        this.ukonChargeCanStrike = !!target && distance <= 365;
+        this.ukonChargeTimer = 235;
+        this.ukonBurstOriginX = this.x;
+        this.ukonBurstOriginY = this.y;
+        this.ukonBurstMaxDistance = 295;
+        this.vx = dx / distance * 25;
+        this.vy = dy / distance * 25;
+        this.facing = dx >= 0 ? 1 : -1;
+        this.attackState = 'ukon_charge';
+        this.stateTimer = this.ukonChargeTimer;
+        this.maxStateTimer = this.ukonChargeTimer;
+        this.hasHit = true;
+        this.isGrounded = false;
+        this.jumpBuffer = 0;
+        for (let i = 0; i < 16; i++) {
+            game.particles.push(new Particle(originX, originY, i % 3 ? '#d65a4a' : '#d7c1ae', -this.vx*(0.12 + Math.random()*0.2), -this.vy*(0.12 + Math.random()*0.2), 360, 5));
+        }
+        return true;
+    }
+
+    finishUkonBurst(interrupted = false) {
+        if (this.heroName !== 'Ukon') return;
+        const wasCharge = this.ukonChargeTimer > 0 || this.attackState === 'ukon_charge';
+        this.ukonDashTimer = 0;
+        this.ukonChargeTimer = 0;
+        this.ukonChargeTargetId = null;
+        this.ukonChargeCanStrike = false;
+        this.ukonBurstMaxDistance = 0;
+        this.vx *= interrupted ? 0.12 : 0.24;
+        this.vy *= interrupted ? 0.12 : 0.24;
+        if (wasCharge) {
+            this.attackState = 'recovery';
+            this.stateTimer = interrupted ? 360 : 260;
+            this.maxStateTimer = this.stateTimer;
+        }
+    }
+
+    updateUkonBurst(dt) {
+        if (this.heroName !== 'Ukon') return;
+        if (this.ukonDashTimer > 0) this.ukonDashTimer = Math.max(0, this.ukonDashTimer - dt);
+        if (this.ukonChargeTimer > 0) {
+            this.ukonChargeTimer = Math.max(0, this.ukonChargeTimer - dt);
+            this.stateTimer = this.ukonChargeTimer;
+        }
+        if (this.ukonDashTimer <= 0 && this.ukonChargeTimer <= 0 && this.attackState === 'ukon_charge') {
+            this.finishUkonBurst(false);
+            return;
+        }
+        if (this.ukonDashTimer <= 0 && this.ukonChargeTimer <= 0) return;
+
+        if (Math.random() < 0.9) {
+            const color = this.ukonChargeTimer > 0 ? '#f4a080' : '#a7433d';
+            game.particles.push(new Particle(this.x + this.w/2 - this.vx*1.2, this.y + this.h/2 - this.vy*1.2, color, -this.vx*0.16, -this.vy*0.16, 260, 7));
+        }
+        const traveled = Math.hypot(this.x - this.ukonBurstOriginX, this.y - this.ukonBurstOriginY);
+        if (this.ukonBurstMaxDistance > 0 && traveled >= this.ukonBurstMaxDistance) this.finishUkonBurst(false);
+    }
+
+    resolveUkonRodHit() {
+        if (this.heroName !== 'Ukon' || this.ukonChargeTimer <= 0 || !this.ukonChargeCanStrike) return false;
+        const fighters = typeof game.getFighters === 'function' ? game.getFighters() : [];
+        const target = fighters.find(fighter => fighter && fighter.id === this.ukonChargeTargetId && !fighter.dead);
+        if (!target) return false;
+        const distance = Math.hypot(target.x + target.w/2 - (this.x + this.w/2), target.y + target.h/2 - (this.y + this.h/2));
+        if (distance > 72 && !checkAABB(this, target)) return false;
+
+        target.takeDamage(40, this);
+        if (target.buffs) target.buffs.dizzy = Math.max(target.buffs.dizzy || 0, 320);
+        const direction = target.x + target.w/2 >= this.x + this.w/2 ? 1 : -1;
+        target.vx = direction * 19;
+        target.vy = -9;
+        game.hitstop = Math.max(game.hitstop || 0, 90);
+        for (let i = 0; i < 26; i++) {
+            game.particles.push(new Particle(target.x + target.w/2, target.y + target.h/2, i % 3 ? '#d9d1c5' : '#ff765f', direction*(3 + Math.random()*12), (Math.random()-0.5)*16, 430, 5));
+        }
+        this.finishUkonBurst(false);
+        return true;
+    }
+
+    resolveUkonBurstCollision(previousX, previousY) {
+        if (this.heroName !== 'Ukon' || (this.ukonDashTimer <= 0 && this.ukonChargeTimer <= 0)) return false;
+        const movingX = this.vx;
+        const movingY = this.vy;
+        const crossedGround = movingY > 2 && previousY + this.h < GROUND_Y - 1 && this.y + this.h >= GROUND_Y;
+        if (this.x <= 0 || this.x + this.w >= CANVAS_W || this.y <= 0 || crossedGround) {
+            this.x = Math.max(0, Math.min(CANVAS_W - this.w, this.x));
+            this.y = Math.max(0, Math.min(GROUND_Y - this.h, this.y));
+            if (this.y + this.h >= GROUND_Y) this.isGrounded = true;
+            this.finishUkonBurst(false);
+            this.vx = 0;
+            this.vy = 0;
+            return true;
+        }
+
+        for (const platform of PLATFORMS) {
+            const verticalOverlap = this.y + this.h > platform.y && this.y < platform.y + platform.h;
+            const horizontalOverlap = this.x + this.w > platform.x && this.x < platform.x + platform.w;
+            if (movingX > 0 && previousX + this.w <= platform.x && this.x + this.w >= platform.x && verticalOverlap) {
+                this.x = platform.x - this.w;
+                this.finishUkonBurst(false);
+                this.vx = 0; this.vy = 0;
+                return true;
+            }
+            if (movingX < 0 && previousX >= platform.x + platform.w && this.x <= platform.x + platform.w && verticalOverlap) {
+                this.x = platform.x + platform.w;
+                this.finishUkonBurst(false);
+                this.vx = 0; this.vy = 0;
+                return true;
+            }
+            if (movingY > 0 && previousY + this.h <= platform.y && this.y + this.h >= platform.y && horizontalOverlap) {
+                this.y = platform.y - this.h;
+                this.isGrounded = true;
+                this.currentPlatform = platform;
+                this.finishUkonBurst(false);
+                this.vx = 0; this.vy = 0;
+                return true;
+            }
+            if (movingY < 0 && previousY >= platform.y + platform.h && this.y <= platform.y + platform.h && horizontalOverlap) {
+                this.y = platform.y + platform.h;
+                this.finishUkonBurst(false);
+                this.vx = 0; this.vy = 0;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    summonUkonShadow() {
+        if (this.heroName !== 'Ukon' || this.ukonShadowCooldown > 0 || this.attackState !== 'idle'
+            || this.ukonDashTimer > 0 || this.ukonChargeTimer > 0 || this.ukonUltimatePhase) return false;
+        const target = this.getUkonTarget();
+        if (!target) return false;
+        const existing = game.minions.find(minion => minion && minion.owner === this && minion.type === 'ukon_shadow' && !minion.dead);
+        if (existing) existing.dead = true;
+        game.minions.push(new UkonShadow(this, target));
+        this.ukonShadowCooldown = 8000;
+        for (let i = 0; i < 20; i++) {
+            game.particles.push(new Particle(target.x + target.w/2, target.y + target.h/2, i % 2 ? '#f2a999' : '#702936', (Math.random()-0.5)*13, (Math.random()-0.5)*13, 450, 5));
+        }
+        return true;
+    }
+
+    startUkonUltimate() {
+        if (this.heroName !== 'Ukon' || this.dead || this.superCooldown > 0 || this.ukonUltimatePhase
+            || this.attackState !== 'idle' || this.ukonDashTimer > 0 || this.ukonChargeTimer > 0) return false;
+        const centerX = Math.max(88, Math.min(CANVAS_W - 88, this.x + this.w/2));
+        this.ukonTree = new PeachTree(this, centerX);
+        game.minions.push(this.ukonTree);
+        this.ukonUltimatePhase = 'climb';
+        this.ukonClimbTargetY = 54;
+        this.superCooldown = this.superCooldownMax;
+        this.attackState = 'idle';
+        this.vx = 0;
+        this.vy = 0;
+        for (let i = 0; i < 32; i++) {
+            game.particles.push(new Particle(centerX + (Math.random()-0.5)*140, GROUND_Y - 8, i % 3 ? '#75503b' : '#ff9faa', (Math.random()-0.5)*12, -Math.random()*14, 650, 6));
+        }
+        return true;
+    }
+
+    startUkonHeavenlyDrop() {
+        if (this.heroName !== 'Ukon' || this.ukonUltimatePhase !== 'ready') return false;
+        const target = this.getUkonTarget();
+        if (!target) return false;
+        const predictedX = target.x + target.w/2 + (target.vx || 0) * 9;
+        const predictedY = Math.min(GROUND_Y, target.y + target.h);
+        this.ukonDropTargetX = Math.max(25, Math.min(CANVAS_W - 25, predictedX));
+        this.ukonDropTargetY = Math.max(50, predictedY);
+        this.ukonDropWarningTimer = 320;
+        this.ukonUltimatePhase = 'aim';
+        this.vx = 0;
+        this.vy = 0;
+        return true;
+    }
+
+    updateUkonUltimate(dt) {
+        if (this.heroName !== 'Ukon' || !this.ukonUltimatePhase) return;
+        const treeCenter = this.ukonTree && !this.ukonTree.dead ? this.ukonTree.x + this.ukonTree.w/2 : this.x + this.w/2;
+        if (this.ukonUltimatePhase === 'climb') {
+            const targetX = treeCenter - this.w/2;
+            this.x += (targetX - this.x) * Math.min(1, dt * 0.0045);
+            this.y = Math.max(this.ukonClimbTargetY, this.y - dt * 0.19);
+            this.vx = 0;
+            this.vy = 0;
+            if (Math.random() < 0.65) game.particles.push(new Particle(this.x + this.w/2 + (Math.random()-0.5)*36, this.y + this.h, '#ffb6c1', (Math.random()-0.5)*3, 2 + Math.random()*3, 430, 4));
+            if (this.y <= this.ukonClimbTargetY + 0.5) {
+                this.y = this.ukonClimbTargetY;
+                this.ukonUltimatePhase = 'ready';
+            }
+            return;
+        }
+        if (this.ukonUltimatePhase === 'ready') {
+            this.x += (treeCenter - this.w/2 - this.x) * Math.min(1, dt * 0.006);
+            this.vx = 0;
+            this.vy = 0;
+            return;
+        }
+        if (this.ukonUltimatePhase === 'aim') {
+            this.ukonDropWarningTimer = Math.max(0, this.ukonDropWarningTimer - dt);
+            this.vx = 0;
+            this.vy = 0;
+            if (this.ukonDropWarningTimer <= 0) {
+                this.ukonUltimatePhase = 'drop';
+                this.ukonDropStartY = this.y;
+                const horizontalDistance = this.ukonDropTargetX - (this.x + this.w/2);
+                this.vx = Math.max(-15, Math.min(15, horizontalDistance / 14));
+                this.vy = 8;
+            }
+            return;
+        }
+        if (this.ukonUltimatePhase === 'drop') {
+            const horizontalError = this.ukonDropTargetX - (this.x + this.w/2);
+            const desiredVx = Math.max(-15, Math.min(15, horizontalError / 9));
+            this.vx += (desiredVx - this.vx) * Math.min(0.35, dt * 0.006);
+            this.vy = Math.min(32, this.vy + dt * 0.042);
+            if (Math.random() < 0.95) game.particles.push(new Particle(this.x + this.w/2 + (Math.random()-0.5)*18, this.y, Math.random() < 0.25 ? '#ffb6c1' : '#ded7c9', -this.vx*0.1, -4 - Math.random()*5, 330, 6));
+        }
+    }
+
+    resolveUkonDropImpact() {
+        if (this.heroName !== 'Ukon' || this.ukonUltimatePhase !== 'drop') return false;
+        const targets = [
+            ...(typeof game.getOpponentsOf === 'function' ? game.getOpponentsOf(this) : []),
+            ...game.minions.filter(minion => minion && minion.owner !== this && !minion.dead && !minion.untargetable)
+        ].filter(target => target && !target.dead && !target.untargetable);
+        const directContact = targets.some(target => checkAABB(this, target));
+        if (!directContact && !this.isGrounded) return false;
+
+        const fallDistance = Math.max(0, this.y - this.ukonDropStartY);
+        const damage = Math.round(Math.min(160, 60 + fallDistance * 0.22));
+        this.ukonLastDropDamage = damage;
+        const impactX = this.x + this.w/2;
+        const impactY = this.y + this.h;
+        for (const target of targets) {
+            const dx = target.x + target.w/2 - impactX;
+            const dy = target.y + target.h/2 - impactY;
+            const distance = Math.hypot(dx, dy);
+            if (distance > 150) continue;
+            target.takeDamage(damage, this, false, true);
+            if (target.buffs) target.buffs.dizzy = Math.max(target.buffs.dizzy || 0, 1100);
+            const direction = dx >= 0 ? 1 : -1;
+            target.vx = direction * (17 + Math.max(0, 1 - distance/150) * 8);
+            target.vy = -10;
+        }
+        for (let i = 0; i < 68; i++) {
+            const dust = i % 4 !== 0;
+            game.particles.push(new Particle(impactX + (Math.random()-0.5)*70, impactY - Math.random()*18, dust ? '#8a674c' : '#ff9aaa', (Math.random()-0.5)*(dust ? 24 : 14), -Math.random()*(dust ? 18 : 12), 500 + Math.random()*420, dust ? 7 : 5));
+        }
+        game.hitstop = Math.max(game.hitstop || 0, 130);
+        game.screenShakeTimer = Math.max(game.screenShakeTimer || 0, 480);
+        game.screenShakeMagnitude = Math.max(game.screenShakeMagnitude || 0, 14);
+        if (this.ukonTree) this.ukonTree.dead = true;
+        this.ukonTree = null;
+        this.ukonUltimatePhase = null;
+        this.ukonDropWarningTimer = 0;
+        this.attackState = 'recovery';
+        this.stateTimer = 650;
+        this.maxStateTimer = 650;
+        this.vx *= 0.18;
+        this.vy = 0;
+        return true;
     }
 
     addAxeronMark(target) {
@@ -1853,6 +2219,11 @@ class Fighter extends Entity {
     }
 
     performSuper() {
+        if (this.heroName === 'Ukon') {
+            if (this.ukonUltimatePhase === 'ready') this.startUkonHeavenlyDrop();
+            else if (!this.ukonUltimatePhase && this.superCooldown <= 0) this.startUkonUltimate();
+            return;
+        }
         if (this.heroName === 'Axeron') {
             const target = game.getEnemyOf(this);
             if (this.superCooldown <= 0 && target) {
@@ -2212,6 +2583,18 @@ class Fighter extends Entity {
             }
             ctx.restore();
         }
+        if (this.heroName === 'Ukon' && (this.ukonDashTimer > 0 || this.ukonChargeTimer > 0 || this.ukonUltimatePhase === 'drop')) {
+            const speed = Math.max(1, Math.hypot(this.vx || 0, this.vy || 0));
+            const nx = (this.vx || this.facing) / speed;
+            const ny = (this.vy || 0) / speed;
+            ctx.save();
+            for (let trail = 4; trail >= 1; trail--) {
+                ctx.globalAlpha = 0.07 + trail * 0.055;
+                ctx.fillStyle = trail % 2 ? '#f29a82' : '#5b2528';
+                ctx.fillRect(this.x - nx*trail*22, this.y - ny*trail*22, this.w, this.h);
+            }
+            ctx.restore();
+        }
         const kuroFullyInvisible = this.isKuroFullyInvisible();
         const revealOwnedKuro = kuroFullyInvisible && view.revealOwnedKuro === true;
         if (kuroFullyInvisible && !revealOwnedKuro) return;
@@ -2464,6 +2847,13 @@ class Fighter extends Entity {
             ctx.fillStyle='#62b7ff';ctx.fillRect(-hw+5,7,this.w-10,14);ctx.fillStyle='#102a52';ctx.fillRect(-hw,29,this.w,9);
             ctx.fillStyle='#ffcf5a';ctx.fillRect(-hw,25,this.w,4);ctx.fillRect(-hw+3,38,5,20);ctx.fillRect(hw-8,38,5,20);
             ctx.shadowBlur=9;ctx.shadowColor='#ffcf5a';ctx.fillRect(hw-11,11,7,4);ctx.fillRect(-5,44,10,8);ctx.shadowBlur=0;
+        } else if (this.heroName === 'Ukon') {
+            ctx.fillStyle = '#421f24'; ctx.fillRect(-hw-3, -3, this.w+6, h+6);
+            ctx.fillStyle = this.color; ctx.fillRect(-hw, 0, this.w, h);
+            ctx.fillStyle = '#f0b5a1'; ctx.fillRect(-hw+6, 8, this.w-12, 14);
+            ctx.fillStyle = '#2b2020'; ctx.fillRect(-hw, 29, this.w, 10);
+            ctx.fillStyle = '#d7c1ae'; ctx.fillRect(-hw+4, 42, this.w-8, 4);
+            ctx.fillStyle = '#6c272d'; ctx.fillRect(-hw+4, 50, 7, 17); ctx.fillRect(hw-11, 50, 7, 17);
         } else if (this.heroName === 'Wolf') {
             ctx.fillStyle = "#404040"; ctx.fillRect(-hw - 2, -2, this.w + 4, h + 4);
             ctx.fillStyle = this.color; ctx.fillRect(-hw, 0, this.w, h);
@@ -2696,6 +3086,29 @@ class Fighter extends Entity {
             ctx.fillStyle='#2468c9';ctx.strokeStyle='#ffcf5a';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(-4,-66);ctx.lineTo(-31,-60);ctx.lineTo(-36,-42);ctx.lineTo(-25,-25);ctx.lineTo(-4,-34);ctx.closePath();ctx.fill();ctx.stroke();
             ctx.beginPath();ctx.moveTo(4,-66);ctx.lineTo(31,-60);ctx.lineTo(36,-42);ctx.lineTo(25,-25);ctx.lineTo(4,-34);ctx.closePath();ctx.fill();ctx.stroke();
             ctx.fillStyle='#ffcf5a';ctx.fillRect(-9,-48,18,11);ctx.fillRect(-3,-68,6,34);ctx.restore();
+        }
+        else if (this.heroName === 'Ukon') {
+            ctx.save();
+            ctx.translate(hw - 4, 31);
+            let angle = 0.78;
+            if (this.attackState === 'ukon_charge') angle = -1.15 + Math.sin(Date.now()*0.03)*0.12;
+            else if (this.ukonUltimatePhase === 'drop') angle = -0.15;
+            else if (this.attackState === 'recovery') angle = 2.15 - phaseProg*1.35;
+            ctx.rotate(angle);
+            if (this.attackState === 'ukon_charge' || this.ukonUltimatePhase === 'drop') {
+                ctx.strokeStyle = 'rgba(255, 201, 174, 0.42)';
+                ctx.lineWidth = 18;
+                ctx.beginPath(); ctx.arc(0, 0, 76, -1.4, 0.8); ctx.stroke();
+            }
+            ctx.fillStyle = '#202124';
+            ctx.fillRect(-5, -75, 10, 96);
+            ctx.fillStyle = '#91959a';
+            ctx.fillRect(-8, -78, 16, 9);
+            ctx.fillStyle = '#4b4e52';
+            ctx.fillRect(-6, -44, 12, 7);
+            ctx.fillStyle = '#5c2425';
+            ctx.fillRect(-7, 8, 14, 16);
+            ctx.restore();
         }
         else if (this.heroName === 'Volt') {
             ctx.save(); ctx.translate(hw, 25);

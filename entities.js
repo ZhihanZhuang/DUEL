@@ -201,6 +201,209 @@ class KuroDecoy extends Entity {
     }
 }
 
+class UkonShadow extends Entity {
+    constructor(owner, target) {
+        const targetX = target ? target.x + target.w/2 - owner.w/2 : owner.x;
+        const targetY = target ? target.y : owner.y;
+        super(Math.max(0, Math.min(CANVAS_W - owner.w, targetX)), targetY, owner.w, owner.h);
+        this.owner = owner;
+        this.type = 'ukon_shadow';
+        this.targetId = target?.id || null;
+        this.hp = 18;
+        this.maxHp = 18;
+        this.life = 4200;
+        this.maxLife = this.life;
+        this.speed = 11.5;
+        this.facing = owner.facing;
+        this.spawnTimer = 220;
+        this.buffs = {};
+    }
+    getTarget() {
+        const fighters = typeof game.getFighters === 'function' ? game.getFighters() : [];
+        const locked = fighters.find(fighter => fighter && fighter.id === this.targetId && !fighter.dead && fighter !== this.owner);
+        if (locked) return locked;
+        const candidates = typeof game.getOpponentsOf === 'function'
+            ? game.getOpponentsOf(this.owner).filter(target => target && !target.dead && !target.untargetable)
+            : [];
+        return candidates.reduce((best, target) => {
+            if (!best) return target;
+            const targetDistance = Math.hypot(target.x - this.x, target.y - this.y);
+            const bestDistance = Math.hypot(best.x - this.x, best.y - this.y);
+            return targetDistance < bestDistance ? target : best;
+        }, null);
+    }
+    takeDamage(amt) {
+        if (this.dead) return;
+        this.hp -= Math.max(0, amt || 0);
+        if (this.hp > 0) return;
+        this.dead = true;
+        for (let i = 0; i < 16; i++) {
+            game.particles.push(new Particle(this.x + this.w/2, this.y + this.h/2, i % 2 ? '#ffc0a8' : '#7a2430', (Math.random()-0.5)*12, (Math.random()-0.5)*12, 360, 4));
+        }
+    }
+    update(dt) {
+        this.life -= dt;
+        if (this.life <= 0 || this.owner?.dead) {
+            this.dead = true;
+            return;
+        }
+        const target = this.getTarget();
+        if (!target) {
+            this.dead = true;
+            return;
+        }
+
+        if (this.spawnTimer > 0) {
+            this.spawnTimer = Math.max(0, this.spawnTimer - dt);
+            if (Math.random() < 0.8) {
+                game.particles.push(new Particle(this.x + Math.random()*this.w, this.y + Math.random()*this.h, '#a33a45', (Math.random()-0.5)*3, -2-Math.random()*2, 250, 4));
+            }
+            return;
+        }
+
+        const dx = target.x + target.w/2 - (this.x + this.w/2);
+        const dy = target.y + target.h/2 - (this.y + this.h/2);
+        const distance = Math.max(1, Math.hypot(dx, dy));
+        this.facing = dx >= 0 ? 1 : -1;
+        this.vx = dx / distance * this.speed;
+        this.vy = dy / distance * this.speed;
+        this.x = Math.max(0, Math.min(CANVAS_W - this.w, this.x + this.vx));
+        this.y = Math.max(25, Math.min(GROUND_Y - this.h, this.y + this.vy));
+
+        if (distance <= 58 || checkAABB(this, target)) {
+            target.takeDamage(15, this.owner);
+            if (target.buffs) {
+                target.buffs.dizzy = Math.max(target.buffs.dizzy || 0, 280);
+                target.buffs.slow = Math.max(target.buffs.slow || 0, 900);
+            }
+            target.vx = this.facing * 7;
+            target.vy = Math.min(target.vy || 0, -3);
+            for (let i = 0; i < 18; i++) {
+                game.particles.push(new Particle(target.x + target.w/2, target.y + target.h/2, i % 2 ? '#ffe0ca' : '#a33a45', (Math.random()-0.5)*14, (Math.random()-0.5)*14, 380, 4));
+            }
+            this.dead = true;
+        } else if (Math.random() < 0.55) {
+            game.particles.push(new Particle(this.x + this.w/2 - this.vx*1.4, this.y + this.h/2 - this.vy*1.4, '#a33a45', -this.vx*0.18, -this.vy*0.18, 260, 5));
+        }
+    }
+    draw(ctx) {
+        const alpha = Math.max(0.22, Math.min(0.62, this.life / this.maxLife));
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.translate(this.x + this.w/2, this.y);
+        if (this.facing < 0) ctx.scale(-1, 1);
+        ctx.fillStyle = '#6f2632';
+        ctx.fillRect(-this.w/2, 8, this.w, this.h - 8);
+        ctx.fillStyle = '#f3b5a5';
+        ctx.fillRect(-this.w/2 + 7, 9, this.w - 14, 13);
+        ctx.fillStyle = '#2b1719';
+        ctx.fillRect(-this.w/2, 27, this.w, 10);
+        ctx.save();
+        ctx.translate(8, 31);
+        ctx.rotate(0.72);
+        ctx.fillStyle = '#242424';
+        ctx.fillRect(-4, -58, 8, 82);
+        ctx.fillStyle = '#a4a4a4';
+        ctx.fillRect(-6, -60, 12, 7);
+        ctx.restore();
+        ctx.restore();
+
+        ctx.save();
+        ctx.globalAlpha = 0.9;
+        ctx.fillStyle = '#190b0d';
+        ctx.fillRect(this.x - 1, this.y - 13, this.w + 2, 7);
+        ctx.fillStyle = '#4caf50';
+        ctx.fillRect(this.x, this.y - 12, this.w * Math.max(0, this.hp / this.maxHp), 5);
+        ctx.restore();
+    }
+}
+
+class PeachTree extends Entity {
+    constructor(owner, centerX) {
+        const width = 176;
+        const top = 34;
+        super(Math.max(0, Math.min(CANVAS_W - width, centerX - width/2)), top, width, GROUND_Y - top);
+        this.owner = owner;
+        this.type = 'peach_tree';
+        this.life = 18000;
+        this.maxLife = this.life;
+        this.age = 0;
+        this.untargetable = true;
+        this.seed = Math.random() * Math.PI * 2;
+    }
+    update(dt) {
+        this.age += dt;
+        if (!this.owner || this.owner.dead || !this.owner.ukonUltimatePhase) this.dead = true;
+    }
+    draw(ctx) {
+        const grow = Math.min(1, this.age / 420);
+        const baseY = this.y + this.h;
+        const crownY = this.y + 62;
+        ctx.save();
+        ctx.globalAlpha = Math.min(1, grow * 1.4);
+        ctx.translate(0, baseY);
+        ctx.scale(1, grow);
+        ctx.translate(0, -baseY);
+
+        ctx.strokeStyle = '#4d2b22';
+        ctx.lineCap = 'round';
+        ctx.lineWidth = 34;
+        ctx.beginPath();
+        ctx.moveTo(this.x + this.w/2, baseY);
+        ctx.bezierCurveTo(this.x + this.w*0.42, baseY - 180, this.x + this.w*0.63, crownY + 150, this.x + this.w/2, crownY);
+        ctx.stroke();
+        ctx.strokeStyle = '#84513d';
+        ctx.lineWidth = 11;
+        ctx.beginPath();
+        ctx.moveTo(this.x + this.w/2 - 6, baseY);
+        ctx.bezierCurveTo(this.x + this.w*0.36, baseY - 220, this.x + this.w*0.62, crownY + 120, this.x + this.w/2 - 8, crownY);
+        ctx.stroke();
+
+        const branches = [
+            [-62, 102, -8, 168], [66, 118, 7, 194], [-72, 190, -8, 250], [74, 232, 8, 286]
+        ];
+        ctx.strokeStyle = '#5b3428';
+        ctx.lineWidth = 13;
+        for (const [endX, endOffset, startX, startOffset] of branches) {
+            ctx.beginPath();
+            ctx.moveTo(this.x + this.w/2 + startX, crownY + startOffset);
+            ctx.quadraticCurveTo(this.x + this.w/2 + endX*0.42, crownY + endOffset + 34, this.x + this.w/2 + endX, crownY + endOffset);
+            ctx.stroke();
+        }
+
+        const time = Date.now() * 0.0015 + this.seed;
+        for (let i = 0; i < 22; i++) {
+            const angle = i * 2.4 + this.seed;
+            const radiusX = 34 + (i % 5) * 15;
+            const radiusY = 28 + (i % 4) * 13;
+            const px = this.x + this.w/2 + Math.cos(angle) * radiusX + Math.sin(time + i) * 3;
+            const py = crownY + 58 + Math.sin(angle) * radiusY + (i % 3) * 28;
+            ctx.fillStyle = i % 3 ? '#3f8f52' : '#62ad61';
+            ctx.beginPath(); ctx.arc(px, py, 22 + (i % 4) * 3, 0, Math.PI*2); ctx.fill();
+            if (i % 4 === 0) {
+                ctx.fillStyle = '#ff8f9f';
+                ctx.beginPath(); ctx.arc(px + 8, py + 3, 7, 0, Math.PI*2); ctx.fill();
+                ctx.fillStyle = '#ffd0d6';
+                ctx.fillRect(px + 5, py, 3, 3);
+            }
+        }
+        ctx.restore();
+
+        if (this.owner && (this.owner.ukonUltimatePhase === 'aim' || this.owner.ukonUltimatePhase === 'drop')) {
+            const markerX = this.owner.ukonDropTargetX;
+            const markerY = this.owner.ukonDropTargetY;
+            const pulse = 26 + Math.sin(Date.now() * 0.02) * 7;
+            ctx.save();
+            ctx.strokeStyle = 'rgba(255, 86, 91, 0.9)';
+            ctx.fillStyle = 'rgba(255, 86, 91, 0.16)';
+            ctx.lineWidth = 4;
+            ctx.beginPath(); ctx.arc(markerX, markerY, pulse, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(markerX - 40, markerY); ctx.lineTo(markerX + 40, markerY); ctx.moveTo(markerX, markerY - 40); ctx.lineTo(markerX, markerY + 40); ctx.stroke();
+            ctx.restore();
+        }
+    }
+}
+
 class GiantSword extends Entity {
     constructor(owner, x, y) {
         super(x, y, 60, 150);

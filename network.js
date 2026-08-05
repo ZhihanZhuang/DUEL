@@ -75,6 +75,8 @@ if (window.Game && !window.Game.prototype.socketSyncPatched) {
         Particle,
         SwordShadow,
         KuroDecoy,
+        UkonShadow,
+        PeachTree,
         GiantSword,
         LandMine,
         Minecart,
@@ -115,7 +117,9 @@ if (window.Game && !window.Game.prototype.socketSyncPatched) {
             particles: this.particles.slice(-40).map(cloneEntity),
             hazards: this.hazards.map(cloneEntity),
             hurricane: cloneEntity(this.hurricane),
-            hitstop: this.hitstop
+            hitstop: this.hitstop,
+            screenShakeTimer: this.screenShakeTimer,
+            screenShakeMagnitude: this.screenShakeMagnitude
         };
     };
 
@@ -148,6 +152,8 @@ if (window.Game && !window.Game.prototype.socketSyncPatched) {
         this.hazards = (state.hazards || []).map(hydrate);
         this.hurricane = hydrate(state.hurricane);
         this.hitstop = state.hitstop || 0;
+        this.screenShakeTimer = state.screenShakeTimer || 0;
+        this.screenShakeMagnitude = state.screenShakeMagnitude || 0;
     };
 
     const originalUpdate = window.Game.prototype.update;
