@@ -327,8 +327,8 @@ var HEROES = {
     },
     Itan: {
         name: "Itan", desc: "Naginata Chiq Warrior",
-        color: "#9f3347", maxHp: 820, speed: 5.0, jump: 14.5, width: 42, height: 72, superCD: 3000,
-        ui: { hp: "82 WRD", atk: "3.2 WRD (Wide Naginata Swing)", passive: "Wide sweeping melee attacks control a large area. Press [Switch] for 8s Nu mode: red outline, faster attacks and movement, and empowered red Chiq.", super: "<span class='skill-tag'>Threefold Chiq</span> Invincibly swings for 2s, then releases three fast, blockable blue blades. Each deals 5 WRD, slows, bleeds, and leaves a 5s path that controls enemies and heals Itan. Nu Chiq is red with double damage, slowdown, and path healing. 3s CD." }
+        color: "#9f3347", maxHp: 820, speed: 5.0, jump: 14.5, width: 42, height: 72, superCD: 5000,
+        ui: { hp: "82 WRD", atk: "3.2 WRD (Wide Naginata Swing)", passive: "Wide sweeping melee attacks control a large area. Press [Switch] for 8s Nu mode: red outline, faster attacks and movement, and empowered red Chiq.", super: "<span class='skill-tag'>Threefold Chiq</span> Swings for 2s while ignoring debuffs and control, but still takes damage, then releases three fast, blockable blue blades. Each deals 5 WRD, slows, bleeds, and leaves a 5s path that controls enemies and heals Itan. Nu Chiq is red with double damage, slowdown, and path healing. 5s CD." }
     },
     D2F1: {
         name: "D2F-1", desc: "Autonomous Drone Consciousness",

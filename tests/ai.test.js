@@ -323,7 +323,7 @@ function loadPhysicsGame(heroName = 'Hunter') {
             Nyra: { maxHp: 680, speed: 6.2, jump: 16, width: 36, height: 66, color: '#d84b78', superCD: 24000 },
             Orion: { maxHp: 900, speed: 4.6, jump: 13.5, width: 46, height: 74, color: '#4056a1', superCD: 28000 },
             Archor: { maxHp: 340, speed: 5.8, jump: 15, width: 38, height: 68, color: '#2f8f62', superCD: 18000 },
-            Itan: { maxHp: 820, speed: 5, jump: 14.5, width: 42, height: 72, color: '#9f3347', superCD: 3000 },
+            Itan: { maxHp: 820, speed: 5, jump: 14.5, width: 42, height: 72, color: '#9f3347', superCD: 5000 },
             D2F1: { maxHp: 520, speed: 7.2, jump: 16, width: 40, height: 66, color: '#35d5e8', superCD: 35000 },
             Veyra: { maxHp: 700, speed: 6.2, jump: 14.5, width: 39, height: 69, color: '#9d5cff', superCD: 18000 },
             Axeron: { maxHp: 700, speed: 6.5, jump: 16, width: 39, height: 68, color: '#2468c9', superCD: 22000 },
@@ -919,7 +919,7 @@ test('absolute cloak defeats AI last-attacker tracking while Kuro moves', () => 
     assert.equal(context.keysPressed[ai.controls.attack], undefined);
 });
 
-test('Itan has a wide Naginata swing and an invincible 2s Chiq cast', () => {
+test('Itan has a wide Naginata swing and a damageable, debuff-immune 2s Chiq cast', () => {
     const simulation = loadPhysicsGame('Itan');
     const { ai, target, context } = simulation;
     ai.isCPU = false;
@@ -934,17 +934,26 @@ test('Itan has a wide Naginata swing and an invincible 2s Chiq cast', () => {
 
     ai.performSuper();
     assert.equal(ai.itanSuperWindupTimer, 2000);
-    assert.equal(ai.invincible, 2000);
-    assert.equal(ai.superCooldown, 3000);
+    assert.equal(ai.invincible, 0);
+    assert.equal(ai.superCooldown, 5000);
     assert.equal(context.game.projectiles.length, 0);
 
     ai.update(1000);
     assert.equal(context.game.projectiles.length, 0, 'Chiq released before the 2s cast completed');
     const hpBeforeHit = ai.hp;
     ai.takeDamage(10, target);
-    assert.equal(ai.hp, hpBeforeHit, 'Itan took damage during the invincible Chiq windup');
-    assert.equal(ai.itanSuperWindupTimer, 1000);
-    ai.update(1000);
+    assert.equal(ai.hp, hpBeforeHit - 10, 'Itan did not take damage during the Chiq windup');
+    ai.buffs.dizzy = 900;
+    ai.buffs.slow = 1200;
+    ai.buffs.poison = 1500;
+    ai.stunTimer = 300;
+    ai.update(16);
+    assert.equal(ai.buffs.dizzy, 0);
+    assert.equal(ai.buffs.slow, 0);
+    assert.equal(ai.buffs.poison, 0);
+    assert.equal(ai.stunTimer, 0);
+    assert.equal(ai.itanSuperWindupTimer, 984);
+    ai.update(984);
     const blades = context.game.projectiles.filter(projectile => projectile.type === 'chiq_blade');
     assert.equal(blades.length, 3);
     assert.ok(blades.every(blade => blade.damage === 50));

@@ -186,6 +186,7 @@ class Fighter extends Entity {
 
     takeDamage(amt, attacker, isDoT = false, noKnockback = false, noHitReaction = false) {
         if (this.dead || this.invincible > 0 || (this.heroName === 'Sola' && this.solaChargeTimer > 0)) return;
+        const itanSuperDebuffImmune = this.heroName === 'Itan' && this.itanSuperWindupTimer > 0;
 
         if (this.heroName === 'Sola' && this.solaForceActive) this.endSolaForce();
         if (this.heroName === 'Ukon' && (this.ukonDashTimer > 0 || this.ukonChargeTimer > 0)) this.finishUkonBurst(true);
@@ -227,7 +228,7 @@ class Fighter extends Entity {
         }
 
         this.hp -= amt;
-        if (!noHitReaction) this.stunTimer = 150;
+        if (!noHitReaction && !itanSuperDebuffImmune) this.stunTimer = 150;
         this.timeSinceLastDamage = 0;
 
         if (this.heroName === 'Willi' && this.hp < this.maxHp * 0.5 && !this.williHasTriggeredHeal) {
@@ -470,6 +471,15 @@ class Fighter extends Entity {
         return true;
     }
 
+    clearItanSuperDebuffs() {
+        if (this.heroName !== 'Itan' || this.itanSuperWindupTimer <= 0) return;
+        this.stunTimer = 0;
+        for (const name of ['poison', 'dizzy', 'slow', 'gravitySlow', 'burn', 'bleed']) this.buffs[name] = 0;
+        this.buffs.hurricaneSlow = false;
+        this.buffs.bleedTick = 0;
+        this.burnTick = 0;
+    }
+
     startSolaCharge() {
         if (this.heroName !== 'Sola' || this.dead || this.attackState !== 'idle' || this.solaDashCooldown > 0 || this.solaChargeTimer > 0) return false;
 
@@ -603,6 +613,7 @@ class Fighter extends Entity {
         if (this.heroName === 'Sola' && this.solaChargeTimer > 0) this.updateSolaCharge(dt);
 
         if (this.heroName === 'Itan' && this.itanSuperWindupTimer > 0) {
+            this.clearItanSuperDebuffs();
             this.itanSuperWindupTimer = Math.max(0, this.itanSuperWindupTimer - dt);
             this.vx *= 0.25;
             if (this.itanSuperWindupTimer <= 0) this.releaseItanChiq();
@@ -2377,7 +2388,7 @@ class Fighter extends Entity {
                 this.stateTimer = this.itanSuperWindupMax;
                 this.maxStateTimer = this.itanSuperWindupMax;
                 this.vx = 0;
-                this.invincible = Math.max(this.invincible, this.itanSuperWindupMax);
+                this.clearItanSuperDebuffs();
             }
             return;
         }
