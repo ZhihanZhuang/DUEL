@@ -1228,7 +1228,7 @@ class MoriEnergyWire extends Entity {
         if(this.life<=0||this.first.dead||this.second.dead||!this.owner||this.owner.dead){this.dead=true;return;}
         for(const target of getHostileTargets(this.owner,this)){
             if(this.distanceTo(target)>Math.max(13,Math.min(target.w,target.h)*0.38))continue;
-            target.takeDamage(10,this.owner,false,true);target.buffs=target.buffs||{};target.buffs.slow=Math.max(target.buffs.slow||0,1000);
+            target.takeDamage(20,this.owner,false,true);target.buffs=target.buffs||{};target.buffs.slow=Math.max(target.buffs.slow||0,1000);
             for(let i=0;i<18;i++)game.particles.push(new Particle(target.x+target.w/2,target.y+target.h/2,i%2?'#fff3b0':'#f0a33b',(Math.random()-.5)*10,(Math.random()-.5)*10,300,3));
             this.dead=true;break;
         }
@@ -1241,7 +1241,7 @@ class MechanicFanBlade extends Entity {
     plantNode(){if(this.dead)return;this.dead=true;this.owner?.createMoriNode?.(this.x+this.w/2,this.y+this.h/2);}
     update(dt){
         this.x+=this.vx;this.y+=this.vy;this.life-=dt;
-        for(const target of getHostileTargets(this.owner,this)){if(!checkAABB(this,target))continue;target.takeDamage(15,this.owner,false,true);this.owner?.onMoriFanHit?.(target);this.dead=true;return;}
+        for(const target of getHostileTargets(this.owner,this)){if(!checkAABB(this,target))continue;target.takeDamage(25,this.owner,false,true);this.owner?.onMoriFanHit?.(target);this.dead=true;return;}
         const surface=this.x<=0||this.x+this.w>=CANVAS_W||this.y<=0||this.y+this.h>=GROUND_Y||PLATFORMS.some(platform=>checkAABB(this,platform));
         if(surface)this.plantNode();else if(this.life<=0)this.dead=true;
     }
@@ -1261,10 +1261,10 @@ class MoriTrap extends Entity {
         if(this.warning>0)return;
         for(const target of getHostileTargets(this.owner,this)){
             if(this.hitTargets.has(target)||!checkAABB(this,target))continue;
-            if(this.kind==='spear'){this.hit(target,30);target.vx+=(target.x+target.w/2<this.x+this.w/2?-1:1)*8;target.vy=-9;this.dead=true;}
-            else if(this.kind==='spring'){this.hit(target,10);target.vy=-23;target.vx*=.45;target.attackState='idle';this.dead=true;}
-            else if(this.kind==='blade'){this.hit(target,20);target.buffs=target.buffs||{};target.buffs.dizzy=Math.max(target.buffs.dizzy||0,500);this.dead=true;}
-            else {this.hit(target,40);const direction=target.x+target.w/2<this.x+this.w/2?-1:1;target.vx=direction*16;target.vy=-10;for(let i=0;i<28;i++)game.particles.push(new Particle(this.x+10,this.y+10,i%2?'#ffb13b':'#5c3022',(Math.random()-.5)*16,(Math.random()-.5)*16,480,5));this.dead=true;}
+            if(this.kind==='spear'){this.hit(target,50);target.vx+=(target.x+target.w/2<this.x+this.w/2?-1:1)*8;target.vy=-9;this.dead=true;}
+            else if(this.kind==='spring'){this.hit(target,20);target.vy=-23;target.vx*=.45;target.attackState='idle';this.dead=true;}
+            else if(this.kind==='blade'){this.hit(target,40);target.buffs=target.buffs||{};target.buffs.dizzy=Math.max(target.buffs.dizzy||0,500);this.dead=true;}
+            else {this.hit(target,60);const direction=target.x+target.w/2<this.x+this.w/2?-1:1;target.vx=direction*16;target.vy=-10;for(let i=0;i<28;i++)game.particles.push(new Particle(this.x+10,this.y+10,i%2?'#ffb13b':'#5c3022',(Math.random()-.5)*16,(Math.random()-.5)*16,480,5));this.dead=true;}
             break;
         }
     }
@@ -1287,7 +1287,7 @@ class ThousandMechanisms extends Entity {
         let x=surface.x+surface.w*(.2+Math.random()*.6);const enemies=getHostileTargets(this.owner,this);for(let attempt=0;attempt<4&&enemies.some(target=>Math.abs(target.x+target.w/2-x)<70&&Math.abs(target.y+target.h-surface.y)<90);attempt++)x=surface.x+surface.w*(.12+Math.random()*.76);
         game.hazards.push(new MoriTrap(this.owner,kind,x,surface.y,Math.min(6500,this.life)));this.spawnCount++;
     }
-    update(dt){this.life-=dt;this.spawnTimer-=dt;while(this.spawnTimer<=0&&this.spawnCount<12&&this.life>0){this.spawnTrap();this.spawnTimer+=620;}if(this.life<=0){for(const hazard of game.hazards||[])if(hazard!==this&&hazard.owner===this.owner&&hazard.type==='mori_ultimate_trap')hazard.dead=true;this.dead=true;}}
+    update(dt){this.life-=dt;this.spawnTimer-=dt;while(this.spawnTimer<=0&&this.spawnCount<20&&this.life>0){this.spawnTrap();this.spawnTimer+=380;}if(this.life<=0){for(const hazard of game.hazards||[])if(hazard!==this&&hazard.owner===this.owner&&hazard.type==='mori_ultimate_trap')hazard.dead=true;this.dead=true;}}
     draw(ctx){ctx.save();ctx.fillStyle='rgba(240,163,59,.035)';ctx.fillRect(0,0,CANVAS_W,GROUND_Y);ctx.strokeStyle='rgba(255,209,102,.16)';ctx.lineWidth=1;for(let x=0;x<CANVAS_W;x+=80){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x+80,GROUND_Y);ctx.stroke();}ctx.restore();}
 }
 

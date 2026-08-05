@@ -2263,9 +2263,34 @@ test('Mori Energy Wire triggers once for damage and slow', () => {
     const wire = new context.window.MoriEnergyWire(owner, first, second);
 
     wire.update(16);
-    assert.equal(target.hp, 290);
+    assert.equal(target.hp, 280);
     assert.equal(target.buffs.slow, 1000);
     assert.equal(wire.dead, true);
+});
+
+test('Mori fan and ultimate traps use their augmented damage values', () => {
+    const context = loadProjectileContext();
+    const owner = { id: 'mori', heroName: 'Mori', dead: false, onMoriFanHit() {} };
+    const makeTarget = () => ({
+        id: `target-${Math.random()}`, x: 100, y: 430, w: 40, h: 70, hp: 300, dead: false,
+        buffs: {}, vx: 0, vy: 0, attackState: 'idle', takeDamage(amount) { this.hp -= amount; }
+    });
+
+    const fanTarget = makeTarget();
+    fanTarget.y = 100;
+    context.game.opponents = [fanTarget];
+    const fan = new context.window.MechanicFanBlade(owner, 100, 100, 0, 0);
+    fan.update(16);
+    assert.equal(fanTarget.hp, 275);
+
+    for (const [kind, damage] of [['spear', 50], ['spring', 20], ['blade', 40], ['bomb', 60]]) {
+        const target = makeTarget();
+        context.game.opponents = [target];
+        const trap = new context.window.MoriTrap(owner, kind, 120, 500);
+        trap.warning = 0;
+        trap.update(16);
+        assert.equal(target.hp, 300 - damage, `${kind} trap damage was not augmented`);
+    }
 });
 
 test('Mori Grappling Wire disrupts enemies and Thousand Mechanisms rotates all trap types', () => {
@@ -2285,7 +2310,9 @@ test('Mori Grappling Wire disrupts enemies and Thousand Mechanisms rotates all t
     const field = new entityContext.window.ThousandMechanisms(owner);
     entityContext.game.hazards = [field];
     field.update(2000);
+    const firstKinds = entityContext.game.hazards.filter(item => item.type === 'mori_ultimate_trap').map(item => item.kind);
+    assert.deepEqual(firstKinds.slice(0, 4), ['spear', 'spring', 'blade', 'bomb']);
+    field.update(5500);
     const kinds = entityContext.game.hazards.filter(item => item.type === 'mori_ultimate_trap').map(item => item.kind);
-    assert.deepEqual(kinds.slice(0, 4), ['spear', 'spring', 'blade', 'bomb']);
-    assert.ok(kinds.length <= 12);
+    assert.equal(kinds.length, 20);
 });
