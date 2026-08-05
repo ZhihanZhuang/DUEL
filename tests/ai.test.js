@@ -57,7 +57,7 @@ function loadProjectileContext() {
     };
     vm.createContext(context);
     const source = fs.readFileSync(path.join(__dirname, '..', 'entities.js'), 'utf8');
-    vm.runInContext(`${source}\nwindow.Projectile = Projectile; window.KuroDecoy = KuroDecoy; window.GiantSword = GiantSword; window.GravityWell = GravityWell; window.ChiqPath = ChiqPath; window.D2FDrone = D2FDrone; window.D2FTargetBeacon = D2FTargetBeacon; window.D2FGiantRobot = D2FGiantRobot; window.TimeAnchor = TimeAnchor; window.TemporalEcho = TemporalEcho; window.LaegonLightning = LaegonLightning; window.LaegonHammer = LaegonHammer; window.LaegonHammerStrike = LaegonHammerStrike; window.BromBlastCharge = BromBlastCharge; window.BromStickyBomb = BromStickyBomb; window.DemolitionZone = DemolitionZone;`, context, { filename: 'entities.js' });
+    vm.runInContext(`${source}\nwindow.Projectile = Projectile; window.KuroDecoy = KuroDecoy; window.GiantSword = GiantSword; window.GravityWell = GravityWell; window.ChiqPath = ChiqPath; window.D2FDrone = D2FDrone; window.D2FTargetBeacon = D2FTargetBeacon; window.D2FGiantRobot = D2FGiantRobot; window.TimeAnchor = TimeAnchor; window.TemporalEcho = TemporalEcho; window.LaegonLightning = LaegonLightning; window.LaegonHammer = LaegonHammer; window.LaegonHammerStrike = LaegonHammerStrike; window.BromBlastCharge = BromBlastCharge; window.BromStickyBomb = BromStickyBomb; window.DemolitionZone = DemolitionZone; window.TitanAxe = TitanAxe;`, context, { filename: 'entities.js' });
     return context;
 }
 
@@ -143,6 +143,9 @@ function makeFighter(heroName, id = 'cpu') {
         veyraAnchors: [],
         veyraReversalTimer: 0,
         bromStickyBomb: null,
+        axeronCombo: 0,
+        axeronMarks: [],
+        axeronRushTimer: 0,
         isMeleeAttack() {
             if (this.heroName === 'Laegon') return this.thunderGodTimer > 0;
             return !['Hason', 'Willi', 'Ugo', 'Kila', 'Volt', 'Noae', 'Kuro', 'Nyra', 'Archor', 'D2F1', 'Veyra', 'Brom'].includes(this.heroName)
@@ -296,7 +299,8 @@ function loadPhysicsGame(heroName = 'Hunter') {
             Archor: { maxHp: 340, speed: 5.8, jump: 15, width: 38, height: 68, color: '#2f8f62', superCD: 18000 },
             Itan: { maxHp: 820, speed: 5, jump: 14.5, width: 42, height: 72, color: '#9f3347', superCD: 3000 },
             D2F1: { maxHp: 520, speed: 7.2, jump: 16, width: 40, height: 66, color: '#35d5e8', superCD: 35000 },
-            Veyra: { maxHp: 700, speed: 6.2, jump: 14.5, width: 39, height: 69, color: '#9d5cff', superCD: 18000 }
+            Veyra: { maxHp: 700, speed: 6.2, jump: 14.5, width: 39, height: 69, color: '#9d5cff', superCD: 18000 },
+            Axeron: { maxHp: 700, speed: 6.5, jump: 16, width: 39, height: 68, color: '#2468c9', superCD: 22000 }
         },
         keys: {},
         keysPressed: {},
@@ -544,7 +548,7 @@ test('every hero with a direct super can decide to use it', () => {
     const context = loadAI();
     const directSuperHeroes = [
         'Hason', 'Willi', 'Hunter', 'Macu', 'Artu', 'Duke', 'Kadaxi', 'Euclid',
-        'Lique', 'Kae', 'Kila', 'Volt', 'Gensan', 'Noae', 'Wolf', 'Kuro', 'Sola', 'Nyra', 'Orion', 'Archor', 'Itan', 'D2F1', 'Laegon', 'Veyra', 'Brom'
+        'Lique', 'Kae', 'Kila', 'Volt', 'Gensan', 'Noae', 'Wolf', 'Kuro', 'Sola', 'Nyra', 'Orion', 'Archor', 'Itan', 'D2F1', 'Laegon', 'Veyra', 'Brom', 'Axeron'
     ];
 
     for (const heroName of directSuperHeroes) {
@@ -558,6 +562,7 @@ test('every hero with a direct super can decide to use it', () => {
         if (heroName === 'Laegon') ai.hp = ai.maxHp * 0.4;
         if (heroName === 'Veyra') { ai.veyraHistory = [{ x: ai.x, y: ai.y, hp: ai.hp, age: 3000 }]; ai.hp *= 0.5; }
         if (heroName === 'Brom') target.buffs.dizzy = 1000;
+        if (heroName === 'Axeron') target.hp = target.maxHp * 0.35;
         const game = makeGame(ai, target);
         if (heroName === 'Noae') {
             game.minions.push(
@@ -805,7 +810,8 @@ test('hero archetypes expose distinct tactical roles and low-health priorities',
         { hero: 'Orion', role: 'gravity' },
         { hero: 'Laegon', role: 'thunder_mage' },
         { hero: 'Veyra', role: 'chronomancer' },
-        { hero: 'Brom', role: 'demolitionist' }
+        { hero: 'Brom', role: 'demolitionist' },
+        { hero: 'Axeron', role: 'power_assassin' }
     ];
 
     for (const testCase of cases) {
@@ -1970,4 +1976,69 @@ test('Brom Demolition Zone triples damage and applies field slow and dizzy pulse
 
     assert.ok(target.buffs.dizzy >= 220, 'active field did not apply its dizzy pulse');
     assert.ok(target.hp <= 880, 'outer explosion did not use tripled damage');
+});
+
+test('Axeron applies a five-second mark on the third hit and rushes its target', () => {
+    const simulation = loadPhysicsGame('Axeron');
+    simulation.ai.attackState = 'idle';
+    simulation.ai.stateTimer = 0;
+    simulation.context.checkAABB = () => true;
+
+    for (let hit=0; hit<3; hit++) {
+        simulation.ai.attackState = 'active'; simulation.ai.stateTimer = 100;
+        simulation.ai.maxStateTimer = 100; simulation.ai.hasHit = false;
+        simulation.ai.update(16);
+    }
+
+    assert.equal(simulation.ai.axeronCombo, 0);
+    assert.equal(simulation.ai.axeronMarks.length, 1);
+    assert.equal(simulation.ai.axeronMarks[0].target, simulation.target);
+    assert.ok(simulation.ai.axeronMarks[0].life >= 4900);
+
+    const hpBeforeRush = simulation.target.hp;
+    simulation.target.x = 900;
+    simulation.target.y = 500;
+    simulation.ai.attackState = 'idle';
+    assert.equal(simulation.ai.startAxeronRush(), true);
+    simulation.ai.updateAxeronRush(180);
+
+    assert.equal(simulation.target.hp, hpBeforeRush - 25);
+    assert.ok(simulation.target.buffs.dizzy >= 260);
+    assert.ok(simulation.target.vx > 20);
+    assert.ok(simulation.ai.x < simulation.target.x);
+});
+
+test('Axeron missing a basic attack breaks the consecutive-hit sequence', () => {
+    const simulation = loadPhysicsGame('Axeron');
+    simulation.ai.axeronCombo = 2;
+    simulation.ai.attackState = 'active'; simulation.ai.stateTimer = 1;
+    simulation.ai.maxStateTimer = 100; simulation.ai.hasHit = false;
+    simulation.context.checkAABB = () => false;
+
+    simulation.ai.update(16);
+
+    assert.equal(simulation.ai.axeronCombo, 0);
+    assert.equal(simulation.ai.axeronMarks.length, 0);
+});
+
+test('Titan Descent heals Axeron from actual damage and grants nothing on invulnerability', () => {
+    const context = loadProjectileContext();
+    const owner = { id: 'axeron', heroName: 'Axeron', hp: 400, maxHp: 700, dead: false };
+    const target = {
+        id: 'target', heroName: 'Hunter', x: 180, y: 100, w: 40, h: 70, hp: 50,
+        dead: false, invincible: 0, buffs: {}, takeDamage(amount) { this.hp = Math.max(0, this.hp-amount); }
+    };
+    context.game.opponents = [target];
+    const axe = new context.window.TitanAxe(owner, 200, 170);
+    axe.update(1450);
+
+    assert.equal(target.hp, 0);
+    assert.equal(owner.hp, 412.5, 'lifesteal used theoretical rather than actual damage');
+    assert.ok(Math.abs(target.vx) > 0 || target.vy <= -12);
+
+    const invulnerable = { ...target, id: 'invulnerable', hp: 100, invincible: 100, takeDamage() { throw new Error('invulnerable target was damaged'); } };
+    context.game.opponents = [invulnerable];
+    const secondAxe = new context.window.TitanAxe(owner, 200, 170);
+    secondAxe.update(1450);
+    assert.equal(owner.hp, 412.5);
 });

@@ -721,6 +721,10 @@ class Game {
             if (this.p1.veyraReversalTimer > 0) p1Stat += ` [REVERSING ${(this.p1.veyraReversalTimer/1000).toFixed(1)}s]`;
         }
         if (this.p1.heroName === 'Brom') p1Stat += this.p1.bromStickyBomb && !this.p1.bromStickyBomb.dead ? '[STICKY: DETONATE]' : '[STICKY: READY]';
+        if (this.p1.heroName === 'Axeron') {
+            p1Stat += `[AXE COMBO: ${this.p1.axeronCombo}/3] [MARKS: ${this.p1.axeronMarks.length}]`;
+            if (this.p1.axeronRushTimer > 0) p1Stat += ' [AXE RUSH]';
+        }
 
         if (this.p1.buffs.poison > 0) p1Stat += " [POISONED]";
         if (this.p1.buffs.burn > 0) p1Stat += " [BURN]";
@@ -847,6 +851,10 @@ class Game {
             if (this.p2.veyraReversalTimer > 0) p2Stat += ` [REVERSING ${(this.p2.veyraReversalTimer/1000).toFixed(1)}s]`;
         }
         if (this.p2.heroName === 'Brom') p2Stat += this.p2.bromStickyBomb && !this.p2.bromStickyBomb.dead ? '[STICKY: DETONATE]' : '[STICKY: READY]';
+        if (this.p2.heroName === 'Axeron') {
+            p2Stat += `[AXE COMBO: ${this.p2.axeronCombo}/3] [MARKS: ${this.p2.axeronMarks.length}]`;
+            if (this.p2.axeronRushTimer > 0) p2Stat += ' [AXE RUSH]';
+        }
 
         if (this.p2.buffs.poison > 0) p2Stat += " [POISONED]";
         if (this.p2.buffs.burn > 0) p2Stat += " [BURN]";
@@ -1346,6 +1354,28 @@ class Game {
         }
     }
 
+    drawAxeronMarks() {
+        const grouped = new Map();
+        for (const axeron of this.getFighters().filter(fighter => fighter?.heroName === 'Axeron' && !fighter.dead)) {
+            for (const mark of axeron.axeronMarks || []) {
+                if (!mark.target || mark.target.dead || mark.life <= 0) continue;
+                const entry = grouped.get(mark.target) || { count: 0, life: 0 };
+                entry.count++; entry.life = Math.max(entry.life, mark.life); grouped.set(mark.target, entry);
+            }
+        }
+        for (const [target, mark] of grouped) {
+            const x=target.x+target.w/2,y=target.y-40,pulse=1+Math.sin(Date.now()*.015)*.08;
+            this.ctx.save();this.ctx.translate(x,y);this.ctx.scale(pulse,pulse);this.ctx.strokeStyle='#ffcf5a';this.ctx.fillStyle='#102a52';
+            this.ctx.shadowBlur=12;this.ctx.shadowColor='#62b7ff';this.ctx.lineWidth=3;this.ctx.beginPath();this.ctx.arc(0,0,13,0,Math.PI*2);this.ctx.fill();this.ctx.stroke();
+            for(let tooth=0;tooth<8;tooth++){this.ctx.save();this.ctx.rotate(tooth*Math.PI/4);this.ctx.fillStyle='#2468c9';this.ctx.fillRect(-2,-18,4,7);this.ctx.restore();}
+            this.ctx.rotate(-.55);this.ctx.fillStyle='#ffcf5a';this.ctx.fillRect(-2,-10,4,20);this.ctx.fillStyle='#2468c9';this.ctx.strokeStyle='#ffcf5a';this.ctx.lineWidth=1.5;
+            this.ctx.beginPath();this.ctx.moveTo(-2,-9);this.ctx.lineTo(-10,-7);this.ctx.lineTo(-9,1);this.ctx.lineTo(-2,-1);this.ctx.closePath();this.ctx.fill();this.ctx.stroke();
+            this.ctx.beginPath();this.ctx.moveTo(2,-9);this.ctx.lineTo(10,-7);this.ctx.lineTo(9,1);this.ctx.lineTo(2,-1);this.ctx.closePath();this.ctx.fill();this.ctx.stroke();
+            this.ctx.rotate(.55);this.ctx.shadowBlur=0;if(mark.count>1){this.ctx.font='bold 10px monospace';this.ctx.textAlign='center';this.ctx.fillStyle='#fff';this.ctx.fillText(String(mark.count),18,15);}
+            this.ctx.restore();
+        }
+    }
+
     draw() {
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
         this.ctx.save();
@@ -1372,6 +1402,8 @@ class Game {
                 this.ctx.restore();
             }
         });
+
+        this.drawAxeronMarks();
 
         this.projectiles.forEach(p => p.draw(this.ctx));
         this.particles.forEach(p => p.draw(this.ctx));

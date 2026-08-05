@@ -1006,6 +1006,51 @@ class DemolitionZone extends Entity {
     draw(ctx){ctx.save();const warning=this.elapsed<2000;ctx.fillStyle=warning?'rgba(255,90,30,.16)':'rgba(255,160,40,.09)';ctx.strokeStyle=warning?'#ff6a2a':'#ffb020';ctx.lineWidth=4;ctx.beginPath();ctx.ellipse(this.x+this.w/2,this.y+this.h/2,this.w/2,this.h/2,0,0,Math.PI*2);ctx.fill();ctx.stroke();ctx.restore();}
 }
 
+class TitanAxe extends Entity {
+    constructor(owner,x,impactY){
+        super(x-55,220,110,190);this.owner=owner;this.type='titan_axe';this.targetX=x;this.startY=220;
+        this.impactY=Math.max(100,Math.min(GROUND_Y,impactY));this.elapsed=0;this.warningTime=900;this.fallTime=550;
+        this.impacted=false;this.impactLife=450;this.untargetable=true;
+    }
+    impact(){
+        if(this.impacted)return;this.impacted=true;let totalActualDamage=0;
+        for(const target of getHostileTargets(this.owner,this)){
+            const dx=target.x+target.w/2-this.targetX,dy=target.y+target.h/2-this.impactY,distance=Math.hypot(dx,dy);
+            if(distance>150)continue;
+            const usesHorse=target.heroName==='Duke'&&target.isMounted;
+            const before=usesHorse?target.horseHp:target.hp;
+            target.takeDamage(100,this.owner,false,true);
+            const after=usesHorse?target.horseHp:target.hp;
+            totalActualDamage+=Math.max(0,Math.max(0,before||0)-Math.max(0,after||0));
+            target.vx=dx/Math.max(1,distance)*30;target.vy=-12;
+        }
+        if(totalActualDamage>0&&this.owner&&!this.owner.dead)this.owner.hp=Math.min(this.owner.maxHp,this.owner.hp+totalActualDamage*.25);
+        for(let i=0;i<58;i++)game.particles.push(new Particle(this.targetX,this.impactY,i%3===0?'#c9d0d4':(i%2?'#ffcf5a':'#2468c9'),(Math.random()-.5)*28,-Math.random()*20,700,7));
+        game.hitstop=120;
+    }
+    update(dt){
+        if(!this.owner||this.owner.dead){this.dead=true;return;}
+        if(this.impacted){this.impactLife-=dt;if(this.impactLife<=0)this.dead=true;return;}
+        this.elapsed+=dt;
+        if(this.elapsed>this.warningTime){const progress=Math.min(1,(this.elapsed-this.warningTime)/this.fallTime);this.y=this.startY+(this.impactY-this.h-this.startY)*progress;if(progress>=1)this.impact();}
+    }
+    draw(ctx){
+        ctx.save();
+        if(!this.impacted){
+            const pulse=1+Math.sin(this.elapsed*.025)*.08;ctx.strokeStyle='#ffcf5a';ctx.fillStyle='rgba(36,104,201,.18)';ctx.lineWidth=4;
+            ctx.beginPath();ctx.ellipse(this.targetX,this.impactY,150*pulse,48*pulse,0,0,Math.PI*2);ctx.fill();ctx.stroke();
+            ctx.translate(this.x+this.w/2,this.y+this.h/2);ctx.fillStyle='#102a52';ctx.fillRect(-11,-62,22,135);ctx.fillStyle='#ffcf5a';ctx.fillRect(-16,35,32,20);
+            ctx.fillStyle='#2468c9';ctx.strokeStyle='#ffcf5a';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(-7,-88);ctx.lineTo(-47,-75);ctx.lineTo(-55,-42);ctx.lineTo(-35,0);ctx.lineTo(-7,-18);ctx.closePath();ctx.fill();ctx.stroke();
+            ctx.beginPath();ctx.moveTo(7,-88);ctx.lineTo(47,-75);ctx.lineTo(55,-42);ctx.lineTo(35,0);ctx.lineTo(7,-18);ctx.closePath();ctx.fill();ctx.stroke();
+            ctx.fillStyle='#ffcf5a';ctx.fillRect(-14,-47,28,18);ctx.fillRect(-5,-84,10,54);
+        }else{
+            const progress=1-this.impactLife/450;ctx.strokeStyle=`rgba(255,207,90,${1-progress})`;ctx.lineWidth=12*(1-progress)+2;
+            ctx.beginPath();ctx.ellipse(this.targetX,this.impactY,40+progress*150,14+progress*42,0,0,Math.PI*2);ctx.stroke();
+        }
+        ctx.restore();
+    }
+}
+
 class GravityWell extends Entity {
     constructor(owner, x, y) {
         super(x - 30, y - 30, 60, 60);
