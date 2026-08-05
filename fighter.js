@@ -3179,7 +3179,6 @@ class Fighter extends Entity {
             ctx.fillStyle='#252149';ctx.fillRect(-hw-3,-3,this.w+6,h+6);ctx.fillStyle=this.color;ctx.fillRect(-hw,0,this.w,h);ctx.fillStyle='#d5d0ff';ctx.fillRect(-hw+6,8,this.w-12,14);ctx.fillStyle='#27233f';ctx.fillRect(-hw,29,this.w,9);ctx.strokeStyle='#8be9ff';ctx.lineWidth=2;ctx.beginPath();ctx.arc(0,48,10,0,Math.PI*2);ctx.stroke();
         } else if (this.heroName === 'Raigo') {
             ctx.fillStyle=this.raigoArmorTimer>0?'#5f4b12':'#123b47';ctx.fillRect(-hw-4,-4,this.w+8,h+8);ctx.fillStyle=this.raigoArmorTimer>0?'#d7a928':this.color;ctx.fillRect(-hw,0,this.w,h);ctx.fillStyle='#dffaff';ctx.fillRect(-hw+6,8,this.w-12,14);ctx.fillStyle='#14313b';ctx.fillRect(-hw,29,this.w,10);ctx.fillStyle=this.raigoArmorTimer>0?'#fff3a6':'#58e6ff';ctx.fillRect(-hw+4,43,this.w-8,5);
-            ctx.fillStyle='#d6e9ee';ctx.fillRect(hw-2,25,68,5);ctx.fillStyle=this.raigoArmorTimer>0?'#ffd84d':'#58e6ff';ctx.beginPath();ctx.moveTo(hw+70,27);ctx.lineTo(hw+54,18);ctx.lineTo(hw+57,27);ctx.lineTo(hw+54,36);ctx.closePath();ctx.fill();
         } else if (this.heroName === 'Wolf') {
             ctx.fillStyle = "#404040"; ctx.fillRect(-hw - 2, -2, this.w + 4, h + 4);
             ctx.fillStyle = this.color; ctx.fillRect(-hw, 0, this.w, h);
@@ -3440,6 +3439,83 @@ class Fighter extends Entity {
             ctx.save();ctx.translate(hw-4,31);let angle=.65;
             if(this.attackState==='windup')angle=.65-1.25*phaseProg;else if(this.attackState==='active')angle=-.6+2.8*phaseProg;else if(this.attackState==='recovery')angle=2.2-1.55*phaseProg;
             ctx.rotate(angle);ctx.fillStyle='#5b646a';ctx.fillRect(-3,-14,6,24);ctx.fillStyle='#ffd166';ctx.beginPath();ctx.moveTo(0,-12);ctx.arc(0,-12,34,-2.7,-.44);ctx.closePath();ctx.fill();ctx.strokeStyle='#31383c';ctx.lineWidth=2;for(let rib=-2.5;rib<-.55;rib+=.38){ctx.beginPath();ctx.moveTo(0,-12);ctx.lineTo(Math.cos(rib)*32,Math.sin(rib)*32-12);ctx.stroke();}ctx.restore();
+        }
+        else if (this.heroName === 'Raigo') {
+            ctx.save();
+            ctx.translate(hw - 4, 29);
+            const charged = this.raigoArmorTimer > 0 || this.raigoEmpoweredAttack;
+            const lightningColor = charged ? '#ffd84d' : '#58e6ff';
+            const coreColor = charged ? '#fff7b0' : '#e8fbff';
+            const time = Date.now() * 0.006;
+            let angle = -0.12 + Math.sin(time) * 0.055;
+            let thrust = Math.sin(time * 0.72) * 2;
+            if (this.raigoChargeTimer > 0) {
+                angle = Math.atan2(this.vy || 0, (this.vx || this.facing) * this.facing);
+                thrust = 48 + Math.sin(time * 3.4) * 5;
+            } else if (this.attackState === 'windup') {
+                angle = 0.42 - phaseProg * 0.62;
+                thrust = -18 * phaseProg;
+            } else if (this.attackState === 'active') {
+                angle = -0.2 + Math.sin(phaseProg * Math.PI) * 0.12;
+                thrust = -18 + Math.sin(phaseProg * Math.PI) * 82;
+            } else if (this.attackState === 'recovery') {
+                angle = -0.2 + phaseProg * 0.22;
+                thrust = 22 * (1 - phaseProg);
+            }
+            ctx.rotate(angle);
+
+            if (this.attackState === 'active' || this.raigoChargeTimer > 0) {
+                for (let trail = 3; trail >= 1; trail--) {
+                    ctx.globalAlpha = 0.08 + trail * 0.05;
+                    ctx.strokeStyle = lightningColor;
+                    ctx.lineWidth = 11 - trail * 2;
+                    ctx.beginPath();
+                    ctx.moveTo(-10 + thrust - trail * 13, 0);
+                    ctx.lineTo(102 + thrust - trail * 13, 0);
+                    ctx.stroke();
+                }
+                ctx.globalAlpha = 1;
+            }
+
+            ctx.strokeStyle = lightningColor;
+            ctx.shadowBlur = charged ? 18 : 11;
+            ctx.shadowColor = lightningColor;
+            ctx.lineWidth = charged ? 4 : 3;
+            const arcCount = this.raigoChargeTimer > 0 ? 3 : (this.attackState === 'active' ? 2 : 1);
+            for (let arc = 0; arc < arcCount; arc++) {
+                ctx.beginPath();
+                ctx.moveTo(4 + thrust, -5 + arc * 4);
+                for (let step = 1; step <= 6; step++) {
+                    const boltX = 4 + thrust + step * 16;
+                    const boltY = Math.sin(time * 4 + arc * 2.3 + step * 2.8) * (charged ? 8 : 5);
+                    ctx.lineTo(boltX, boltY);
+                }
+                ctx.stroke();
+            }
+
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = '#35515a';
+            ctx.fillRect(-15 + thrust, -5, 22, 10);
+            ctx.fillStyle = coreColor;
+            ctx.fillRect(4 + thrust, -3, 92, 6);
+            ctx.fillStyle = lightningColor;
+            ctx.fillRect(12 + thrust, -1, 78, 2);
+            ctx.beginPath();
+            ctx.moveTo(118 + thrust, 0);
+            ctx.lineTo(92 + thrust, -14);
+            ctx.lineTo(98 + thrust, 0);
+            ctx.lineTo(92 + thrust, 14);
+            ctx.closePath();
+            ctx.fill();
+            ctx.fillStyle = coreColor;
+            ctx.beginPath();
+            ctx.moveTo(112 + thrust, 0);
+            ctx.lineTo(96 + thrust, -7);
+            ctx.lineTo(101 + thrust, 0);
+            ctx.lineTo(96 + thrust, 7);
+            ctx.closePath();
+            ctx.fill();
+            ctx.restore();
         }
         else if (this.heroName === 'Volt') {
             ctx.save(); ctx.translate(hw, 25);
