@@ -1382,15 +1382,25 @@ class TemporalBolt extends Entity {
 }
 
 class VossTemporalDouble extends Entity {
-    constructor(owner,x,y){super(Math.max(0,Math.min(CANVAS_W-owner.w,x)),Math.max(0,Math.min(GROUND_Y-owner.h,y)),owner.w,owner.h);this.owner=owner;this.type='voss_double';this.life=6000;this.maxLife=6000;this.untargetable=true;this.queue=[];this.facing=owner.facing;}
+    constructor(owner,x,y){super(Math.max(0,Math.min(CANVAS_W-owner.w,x)),Math.max(0,Math.min(GROUND_Y-owner.h,y)),owner.w,owner.h);this.owner=owner;this.type='voss_double';this.life=6000;this.maxLife=6000;this.untargetable=true;this.queue=[];this.facing=-owner.facing;this.moveSpeed=20;}
     mirrorAttack(data){if(!this.dead)this.queue.push({...data,delay:180});}
     fire(data){
-        this.facing=data.facing||this.facing;const px=this.x+this.w/2+this.facing*this.w*.45,py=this.y+this.h*.4;
+        const px=this.x+this.w/2+this.facing*this.w*.45,py=this.y+this.h*.4;
         const dx=data.targetX-px,dy=data.targetY-py,length=Math.max(1,Math.hypot(dx,dy));
         game.projectiles.push(new TemporalBolt(this.owner,px,py,dx/length*18,dy/length*18,Math.max(1,data.damage*.5),data.kind||'copy'));
         for(let i=0;i<9;i++)game.particles.push(new Particle(px,py,'#c9b8ff',(Math.random()-.5)*7,(Math.random()-.5)*7,260,3));
     }
-    update(dt){this.life-=dt;for(const item of this.queue)item.delay-=dt;const ready=this.queue.filter(item=>item.delay<=0);this.queue=this.queue.filter(item=>item.delay>0);ready.forEach(item=>this.fire(item));if(this.life<=0||!this.owner||this.owner.dead)this.dead=true;}
+    update(dt){
+        this.life-=dt;
+        if(this.owner&&!this.owner.dead){
+            const targetX=Math.max(0,Math.min(CANVAS_W-this.w,CANVAS_W-this.owner.x-this.owner.w));
+            const targetY=Math.max(0,Math.min(GROUND_Y-this.h,this.owner.y));
+            const frameScale=Math.max(0,dt/16.667),dx=targetX-this.x,dy=targetY-this.y,distance=Math.hypot(dx,dy),step=this.moveSpeed*frameScale;
+            if(distance<=step){this.x=targetX;this.y=targetY;}else if(distance>0){this.x+=dx/distance*step;this.y+=dy/distance*step;}
+            this.facing=-this.owner.facing;
+        }
+        for(const item of this.queue)item.delay-=dt;const ready=this.queue.filter(item=>item.delay<=0);this.queue=this.queue.filter(item=>item.delay>0);ready.forEach(item=>this.fire(item));if(this.life<=0||!this.owner||this.owner.dead)this.dead=true;
+    }
     draw(ctx){ctx.save();ctx.globalAlpha=.28+.28*this.life/this.maxLife;ctx.translate(this.x+this.w/2,this.y);if(this.facing<0)ctx.scale(-1,1);ctx.fillStyle='#29225b';ctx.fillRect(-this.w/2,0,this.w,this.h);ctx.strokeStyle='#b8a6ff';ctx.lineWidth=3;ctx.strokeRect(-this.w/2-3,-3,this.w+6,this.h+6);ctx.fillStyle='#dffaff';ctx.fillRect(this.w/2-12,10,8,7);ctx.restore();}
 }
 

@@ -298,6 +298,7 @@ function loadPhysicsGame(heroName = 'Hunter') {
     class TemporalBolt extends Entity { constructor(owner,x,y,vx,vy,damage,kind){super(x,y,18,14);Object.assign(this,{owner,vx,vy,damage,kind,type:kind==='copy'?'voss_copy_bolt':'temporal_shard'});} }
     class TemporalEcho extends Entity { constructor(owner,x,y){super(x,y,owner.w,owner.h);Object.assign(this,{owner,type:'temporal_echo',life:3000,maxLife:3000});} }
     class VossTemporalDouble extends Entity { constructor(owner,x,y){super(x,y,owner.w,owner.h);Object.assign(this,{owner,type:'voss_double',life:6000,queue:[]});} mirrorAttack(data){this.queue.push(data);} }
+    class Hurricane extends Entity { constructor(owner,x,y){super(x,y,120,120);Object.assign(this,{owner,type:'hurricane',life:5000});} }
 
     const platforms = [
         { x: 300, y: 480, w: 400, h: 20, type: 'center' },
@@ -326,6 +327,7 @@ function loadPhysicsGame(heroName = 'Hunter') {
         TemporalBolt,
         TemporalEcho,
         VossTemporalDouble,
+        Hurricane,
         Minion,
         CANVAS_W: 1280,
         CANVAS_H: 760,
@@ -2452,29 +2454,66 @@ test('Roka cannon and mortar explosions apply specified damage and directional k
     assert.equal(target.vy, -18);
 });
 
-test('Voss copy is temporary, Voss-owned, and his double repeats attacks at half damage', () => {
+test('Voss gains the opponent kit for three seconds while her own cooldowns stay frozen', () => {
     const simulation = loadPhysicsGame('Voss');
     const { ai, context, target } = simulation;
     ai.isCPU = false;
+    ai.superCooldown = 5000;
     assert.equal(ai.startVossCopy(), true);
     assert.equal(ai.vossCopiedHero, 'Hunter');
-    assert.equal(ai.vossCopyTimer, 3500);
+    assert.equal(ai.heroName, 'Hunter');
+    assert.equal(ai.vossCopyActive, true);
+    assert.equal(ai.vossCopyTimer, 3000);
     assert.equal(ai.vossCopyCooldown, 7500);
+    assert.equal(ai.superCooldown, 0);
+
     ai.attackState = 'active';
     ai.executeActiveAttack();
-    const copiedBolt = context.game.projectiles.at(-1);
-    assert.equal(copiedBolt.owner, ai);
-    assert.equal(copiedBolt.kind, 'copy');
+    const copiedShot = context.game.projectiles.at(-1);
+    assert.equal(copiedShot.owner, ai);
+    assert.equal(copiedShot.type, 'homing_bullet');
 
+    ai.attackState = 'idle';
+    context.keysPressed[ai.controls.switch] = true;
+    ai.update(16);
+    delete context.keysPressed[ai.controls.switch];
+    assert.equal(ai.hunterWeapon, 'sword');
+    ai.hunterWeapon = 'musket';
     ai.superCooldown = 0;
     ai.performSuper();
-    assert.equal(ai.vossDouble.type, 'voss_double');
-    ai.queueVossMirror(40, 'copy', target.x, target.y);
-    assert.equal(ai.vossDouble.queue.length, 1);
+    assert.equal(context.game.hurricane.owner, ai);
+    assert.equal(ai.vossDouble, null);
 
+    ai.hunterMusketCD = 1000;
+    ai.update(984);
+    assert.equal(ai.hunterMusketCD, 0);
+    assert.equal(ai.superCooldown, 0);
+    assert.equal(ai.vossCopyCooldown, 7500);
+    assert.equal(ai.vossOwnSuperCooldown, 5000);
+
+    ai.update(2000);
+    assert.equal(ai.heroName, 'Voss');
+    assert.equal(ai.vossCopyActive, false);
+    assert.equal(ai.superCooldown, 5000);
+    assert.equal(ai.vossCopyCooldown, 7500);
+
+    ai.update(1000);
+    assert.equal(ai.superCooldown, 4000);
+    assert.equal(ai.vossCopyCooldown, 6500);
+});
+
+test('Voss Temporal Double moves to the mirrored arena position and attacks for half damage', () => {
     const entityContext = loadProjectileContext();
     const owner = { id: 'voss', heroName: 'Voss', x: 100, y: 500, w: 40, h: 70, facing: 1, dead: false };
-    const duplicate = new entityContext.window.VossTemporalDouble(owner, 200, 500);
+    const duplicate = new entityContext.window.VossTemporalDouble(owner, 300, 500);
+    const startX = duplicate.x;
+    duplicate.update(16.667);
+    assert.ok(duplicate.x > startX);
+    assert.equal(duplicate.facing, -1);
+    owner.x = 1100;
+    duplicate.update(16.667);
+    assert.ok(duplicate.x < 320);
+
     duplicate.mirrorAttack({ damage: 40, kind: 'copy', targetX: 500, targetY: 520, facing: 1 });
     duplicate.update(180);
     assert.equal(entityContext.game.projectiles.length, 1);

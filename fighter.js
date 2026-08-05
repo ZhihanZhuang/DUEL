@@ -186,13 +186,16 @@ class Fighter extends Entity {
         if (this.heroName === 'Roka') {
             this.rokaMortarCooldown = 0;
             this.rokaArtilleryTimer = 0;
+            this.rokaWeaponAngle = 0;
         }
         if (this.heroName === 'Voss') {
             this.vossCopyCooldown = 0;
             this.vossCopyTimer = 0;
+            this.vossCopyActive = false;
             this.vossCopiedHero = null;
             this.vossCopiedTarget = null;
             this.vossCopiedMelee = false;
+            this.vossOwnSuperCooldown = 0;
             this.vossDouble = null;
         }
         if (this.heroName === 'Raigo') {
@@ -582,6 +585,7 @@ class Fighter extends Entity {
     }
 
     update(dt) {
+        const vossCopyWasActive = this.vossCopyActive === true;
         if (this.dead) return;
 
         if (this.heroName === 'Laegon') {
@@ -623,18 +627,22 @@ class Fighter extends Entity {
             if (this.moriFanComboTimer <= 0) this.moriFanCombo = 0;
             this.updateMoriGrapple(dt);
         }
+        if (this.vossCopyActive) {
+            this.vossCopyTimer = Math.max(0, this.vossCopyTimer - dt);
+            this.resetVossCopiedCooldowns();
+            if (this.vossCopyTimer <= 0) this.endVossCopy();
+        }
         if (this.heroName === 'Roka') {
             this.rokaMortarCooldown = Math.max(0, this.rokaMortarCooldown - dt);
             this.rokaArtilleryTimer = Math.max(0, this.rokaArtilleryTimer - dt);
+            const targetAngle = this.getRokaWeaponAimAngle();
+            let angleDelta = targetAngle - this.rokaWeaponAngle;
+            while(angleDelta > Math.PI) angleDelta -= Math.PI*2;
+            while(angleDelta < -Math.PI) angleDelta += Math.PI*2;
+            this.rokaWeaponAngle += angleDelta * Math.min(1, dt/90);
         }
-        if (this.heroName === 'Voss') {
+        if (this.heroName === 'Voss' && !vossCopyWasActive) {
             this.vossCopyCooldown = Math.max(0, this.vossCopyCooldown - dt);
-            this.vossCopyTimer = Math.max(0, this.vossCopyTimer - dt);
-            if (this.vossCopyTimer <= 0) {
-                this.vossCopiedHero = null;
-                this.vossCopiedTarget = null;
-                this.vossCopiedMelee = false;
-            }
             if (this.vossDouble?.dead) this.vossDouble = null;
         }
         if (this.heroName === 'Raigo') {
@@ -932,7 +940,7 @@ class Fighter extends Entity {
             }
         }
 
-        if (this.superCooldown > 0) this.superCooldown -= dt;
+        if (this.superCooldown > 0 && !vossCopyWasActive) this.superCooldown -= dt;
         if (this.stunTimer > 0) this.stunTimer -= dt;
         if (this.hunterMusketCD > 0) this.hunterMusketCD -= dt;
 
@@ -1317,6 +1325,7 @@ class Fighter extends Entity {
                 if (this.stateTimer <= 0) this.attackState = 'idle';
             }
 
+            const mirrorCopiedSwitch = this.vossCopyActive && keysPressed[this.controls.switch];
             if (keysPressed[this.controls.switch]) {
                 if (this.heroName === 'Hunter') {
                     this.hunterWeapon = this.hunterWeapon === 'musket' ? 'sword' : 'musket';
@@ -1466,11 +1475,14 @@ class Fighter extends Entity {
                 } else if (this.heroName === 'Roka' && this.attackState === 'idle') {
                     this.fireRokaMortar();
                 } else if (this.heroName === 'Voss' && this.attackState === 'idle') {
-                    if (this.vossCopyTimer > 0) this.performVossCopiedAbility();
-                    else this.startVossCopy();
+                    this.startVossCopy();
                 } else if (this.heroName === 'Raigo' && this.attackState === 'idle') {
                     this.startRaigoCharge();
                 }
+            }
+            if (mirrorCopiedSwitch) {
+                const target = game.getEnemyOf(this);
+                this.queueVossMirror(this.getVossCopiedDamage(), 'copy', target ? target.x + target.w/2 : this.x + this.facing*180, target ? target.y + target.h/2 : this.y + this.h/2);
             }
             if (keysPressed[this.controls.attack] && this.attackState === 'idle') {
                 if (hasPuppet) {
@@ -1486,7 +1498,12 @@ class Fighter extends Entity {
             const superActivated = keysPressed[this.controls.super]
                 || (this.heroName === 'Sola' && keys[this.controls.super] && !this.solaForceActive);
             if (superActivated && (this.superCooldown <= 0 || ukonDropFollowup || (this.heroName === 'Hason' && this.hasonSuperCharges > 0) || (this.heroName === 'Willi' && this.williSuperCharges > 0) || this.grapplePhase === 1)) {
+                const mirrorCopiedSuper = this.vossCopyActive;
                 this.performSuper();
+                if (mirrorCopiedSuper) {
+                    const target = game.getEnemyOf(this);
+                    this.queueVossMirror(this.getVossCopiedDamage(), 'copy', target ? target.x + target.w/2 : this.x + this.facing*180, target ? target.y + target.h/2 : this.y + this.h/2);
+                }
             }
         }
 
@@ -1847,6 +1864,7 @@ class Fighter extends Entity {
             game.projectiles.push(new TemporalBolt(this,px,py,Math.cos(aimAngle)*18,Math.sin(aimAngle)*18,damage,copied?'copy':'shard'));
             this.queueVossMirror(damage,copied?'copy':'shard',tx,ty);
         }
+        if (this.vossCopyActive) this.queueVossMirror(this.getVossCopiedDamage(), 'copy', tx, ty);
     }
 
     getRokaAimVector() {
@@ -1854,6 +1872,11 @@ class Fighter extends Entity {
         let dy=(keys[this.controls.down]?1:0)-(keys[this.controls.jump]?1:0);
         if(!dx&&!dy){const target=game.getEnemyOf(this);if(target){dx=target.x+target.w/2-(this.x+this.w/2);dy=target.y+target.h/2-(this.y+this.h*.42);}else dx=this.facing;}
         const length=Math.max(1,Math.hypot(dx,dy));if(dx)this.facing=dx>0?1:-1;return{x:dx/length,y:dy/length};
+    }
+
+    getRokaWeaponAimAngle() {
+        const direction = this.getRokaAimVector();
+        return Math.atan2(direction.y, Math.abs(direction.x));
     }
 
     fireRokaMortar() {
@@ -1873,32 +1896,62 @@ class Fighter extends Entity {
     startVossCopy() {
         if(this.heroName!=='Voss'||this.vossCopyCooldown>0)return false;
         const target=game.getEnemyOf(this);if(!target||target.dead)return false;
-        this.vossCopiedTarget=target;this.vossCopiedHero=target.heroName||'Unknown';
+        const copiedHero=target.heroName;
+        if(!copiedHero||!HEROES[copiedHero]||copiedHero==='Voss')return false;
+        this.initializeVossCopiedState(copiedHero);
+        this.vossCopiedTarget=target;this.vossCopiedHero=copiedHero;
         this.vossCopiedMelee=typeof target.isMeleeAttack==='function'?target.isMeleeAttack():false;
-        this.vossCopyTimer=3500;this.vossCopyCooldown=7500;
+        this.vossOwnSuperCooldown=this.superCooldown;
+        this.vossCopyTimer=3000;this.vossCopyCooldown=7500;this.vossCopyActive=true;
+        this.heroName=copiedHero;this.superCooldown=0;this.superCooldownMax=HEROES[copiedHero].superCD;
+        this.attackState='idle';this.stateTimer=0;this.maxStateTimer=0;
+        this.resetVossCopiedCooldowns();
         for(let i=0;i<22;i++)game.particles.push(new Particle(this.x+this.w/2,this.y+this.h/2,i%2?'#c9b8ff':'#8be9ff',(Math.random()-.5)*12,(Math.random()-.5)*12,420,4));
         return true;
     }
 
-    performVossCopiedAbility() {
-        if(this.heroName!=='Voss'||this.vossCopyTimer<=0)return false;
-        const target=game.getEnemyOf(this),hero=this.vossCopiedHero;
-        const summonHeroes=['Artu','Euclid','Ugo','Noae','D2F1','Mori'];
-        const mobilityHeroes=['Willi','Kae','Wolf','Sola','Nyra','Axeron','Ukon','Raigo'];
-        let tx=target?target.x+target.w/2:this.x+this.facing*220,ty=target?target.y+target.h/2:this.y+this.h/2;
-        if(summonHeroes.includes(hero)){
-            const echo=new TemporalEcho(this,Math.max(0,Math.min(CANVAS_W-this.w,tx-this.w/2)),Math.max(0,Math.min(GROUND_Y-this.h,ty-this.h/2)));echo.life=1800;echo.maxLife=1800;game.minions.push(echo);
-        } else if(mobilityHeroes.includes(hero)){
-            const dx=tx-(this.x+this.w/2),dy=ty-(this.y+this.h/2),length=Math.max(1,Math.hypot(dx,dy));this.vx=dx/length*18;this.vy=dy/length*18;this.invincible=Math.max(this.invincible,120);
-        } else {
-            const damage=Math.max(15,this.getVossCopiedDamage()*.75);for(const enemy of game.getOpponentsOf(this)){if(Math.hypot(enemy.x+enemy.w/2-tx,enemy.y+enemy.h/2-ty)>95)continue;enemy.takeDamage(damage,this,false,true);enemy.buffs=enemy.buffs||{};enemy.buffs.slow=Math.max(enemy.buffs.slow||0,650);}
+    initializeVossCopiedState(heroName) {
+        const template=new Fighter('__voss_copy__',heroName,this.x,this.controls,this.isP1);
+        const protectedFields=new Set(['id','heroName','controls','isP1','x','y','w','h','vx','vy','hp','maxHp','baseMaxHp','baseSpeed','baseJump','color','facing','dead','buffs','invincible','superCooldown','superCooldownMax','vossCopyCooldown','vossCopyTimer','vossCopyActive','vossCopiedHero','vossCopiedTarget','vossCopiedMelee','vossOwnSuperCooldown','vossDouble']);
+        for(const [key,value] of Object.entries(template)){
+            if(protectedFields.has(key))continue;
+            if(Array.isArray(value))this[key]=[...value];
+            else if(value instanceof Set)this[key]=new Set(value);
+            else if(value&&Object.getPrototypeOf(value)===Object.prototype)this[key]={...value};
+            else this[key]=value;
         }
-        this.queueVossMirror(Math.max(15,this.getVossCopiedDamage()*.75),'copy',tx,ty);
-        for(let i=0;i<18;i++)game.particles.push(new Particle(tx,ty,'#c9b8ff',(Math.random()-.5)*12,(Math.random()-.5)*12,360,4));return true;
+    }
+
+    resetVossCopiedCooldowns() {
+        if(!this.vossCopyActive)return;
+        this.superCooldown=0;
+        for(const key of Object.keys(this)){
+            if(key==='vossCopyCooldown'||key==='vossOwnSuperCooldown')continue;
+            if(/(?:Cooldown|CD)$/.test(key)&&typeof this[key]==='number')this[key]=0;
+        }
+        this.hasonAmmo=6;
+        if(Number.isFinite(this.maxEnergy))this.energy=this.maxEnergy;
+        if(Number.isFinite(this.laegonMaxEnergy))this.laegonEnergy=this.laegonMaxEnergy;
+        if(Number.isFinite(this.raigoMaxEnergy))this.raigoEnergy=this.raigoMaxEnergy;
+        if(this.heroName==='Duke')this.runTimer=3000;
+    }
+
+    endVossCopy() {
+        if(!this.vossCopyActive)return;
+        this.heroName='Voss';
+        this.superCooldown=this.vossOwnSuperCooldown;
+        this.superCooldownMax=HEROES.Voss.superCD;
+        this.vossCopyActive=false;this.vossCopyTimer=0;
+        this.vossCopiedTarget=null;this.vossCopiedMelee=false;
+        this.attackState='idle';this.stateTimer=0;this.maxStateTimer=0;this.hasHit=false;
+        this.overdriveTimer=0;this.thunderGodTimer=0;this.raigoArmorTimer=0;
+        this.solaChargeTimer=0;this.solaForceActive=false;this.axeronRushTimer=0;this.raigoChargeTimer=0;
+        this.ukonUltimatePhase=null;this.ukonDashTimer=0;this.ukonChargeTimer=0;
+        for(let i=0;i<18;i++)game.particles.push(new Particle(this.x+this.w/2,this.y+this.h/2,i%2?'#8be9ff':'#c9b8ff',(Math.random()-.5)*10,(Math.random()-.5)*10,360,3));
     }
 
     queueVossMirror(damage,kind,targetX,targetY) {
-        if(this.heroName!=='Voss'||!this.vossDouble||this.vossDouble.dead)return;
+        if((this.heroName!=='Voss'&&!this.vossCopyActive)||!this.vossDouble||this.vossDouble.dead)return;
         this.vossDouble.mirrorAttack({damage,kind,targetX,targetY,facing:this.facing});
     }
 
@@ -2506,8 +2559,7 @@ class Fighter extends Entity {
         if (this.heroName === 'Voss') {
             if(this.superCooldown<=0){
                 this.superCooldown=this.superCooldownMax;if(this.vossDouble&&!this.vossDouble.dead)this.vossDouble.dead=true;
-                let dx=(keys[this.controls.right]?1:0)-(keys[this.controls.left]?1:0),dy=(keys[this.controls.down]?1:0)-(keys[this.controls.jump]?1:0);if(!dx&&!dy)dx=this.facing;
-                const length=Math.max(1,Math.hypot(dx,dy)),distance=240,x=this.x+dx/length*distance,y=this.y+dy/length*distance;
+                const x=CANVAS_W-this.x-this.w,y=this.y;
                 this.vossDouble=new VossTemporalDouble(this,x,y);game.minions.push(this.vossDouble);
                 for(let i=0;i<28;i++)game.particles.push(new Particle(this.vossDouble.x+this.w/2,this.vossDouble.y+this.h/2,'#c9b8ff',(Math.random()-.5)*14,(Math.random()-.5)*14,480,5));
             }
@@ -2905,7 +2957,7 @@ class Fighter extends Entity {
             const pulse=8+Math.sin(Date.now()*.02)*4;ctx.save();ctx.strokeStyle='#ffd84d';ctx.shadowBlur=24;ctx.shadowColor='#ffd84d';ctx.lineWidth=5;
             ctx.strokeRect(this.x-pulse,this.y-pulse,this.w+pulse*2,this.h+pulse*2);ctx.restore();
         }
-        if (this.heroName === 'Voss' && this.vossCopyTimer > 0) {
+        if (this.vossCopyActive) {
             ctx.save();ctx.strokeStyle='rgba(201,184,255,.75)';ctx.lineWidth=3;ctx.setLineDash([7,5]);ctx.lineDashOffset=-Date.now()*.03;ctx.strokeRect(this.x-5,this.y-5,this.w+10,this.h+10);ctx.restore();
         }
         const kuroFullyInvisible = this.isKuroFullyInvisible();
@@ -3174,7 +3226,6 @@ class Fighter extends Entity {
             ctx.fillStyle='#1d2326';ctx.fillRect(-hw+4,2,this.w-8,5);
         } else if (this.heroName === 'Roka') {
             ctx.fillStyle='#263238';ctx.fillRect(-hw-4,-4,this.w+8,h+8);ctx.fillStyle=this.color;ctx.fillRect(-hw,0,this.w,h);ctx.fillStyle='#b9d8df';ctx.fillRect(-hw+6,8,this.w-12,14);ctx.fillStyle='#1d2529';ctx.fillRect(-hw,30,this.w,11);ctx.fillStyle='#d5a94d';ctx.fillRect(-hw+3,44,this.w-6,5);
-            ctx.fillStyle='#30383c';ctx.fillRect(hw-5,23,60,20);ctx.fillStyle='#66767c';ctx.fillRect(hw+38,27,35,12);ctx.fillStyle='#ffb347';ctx.fillRect(hw+66,30,9,6);
         } else if (this.heroName === 'Voss') {
             ctx.fillStyle='#252149';ctx.fillRect(-hw-3,-3,this.w+6,h+6);ctx.fillStyle=this.color;ctx.fillRect(-hw,0,this.w,h);ctx.fillStyle='#d5d0ff';ctx.fillRect(-hw+6,8,this.w-12,14);ctx.fillStyle='#27233f';ctx.fillRect(-hw,29,this.w,9);ctx.strokeStyle='#8be9ff';ctx.lineWidth=2;ctx.beginPath();ctx.arc(0,48,10,0,Math.PI*2);ctx.stroke();
         } else if (this.heroName === 'Raigo') {
@@ -3439,6 +3490,29 @@ class Fighter extends Entity {
             ctx.save();ctx.translate(hw-4,31);let angle=.65;
             if(this.attackState==='windup')angle=.65-1.25*phaseProg;else if(this.attackState==='active')angle=-.6+2.8*phaseProg;else if(this.attackState==='recovery')angle=2.2-1.55*phaseProg;
             ctx.rotate(angle);ctx.fillStyle='#5b646a';ctx.fillRect(-3,-14,6,24);ctx.fillStyle='#ffd166';ctx.beginPath();ctx.moveTo(0,-12);ctx.arc(0,-12,34,-2.7,-.44);ctx.closePath();ctx.fill();ctx.strokeStyle='#31383c';ctx.lineWidth=2;for(let rib=-2.5;rib<-.55;rib+=.38){ctx.beginPath();ctx.moveTo(0,-12);ctx.lineTo(Math.cos(rib)*32,Math.sin(rib)*32-12);ctx.stroke();}ctx.restore();
+        }
+        else if (this.heroName === 'Roka') {
+            ctx.save();
+            const idleBob=Math.sin(Date.now()*.006)*1.5;
+            const windupPull=this.attackState==='windup'?phaseProg*7:0;
+            const recoil=this.attackState==='active'?Math.sin(phaseProg*Math.PI)*13:0;
+            ctx.translate(-hw+7-windupPull-recoil,19+idleBob);
+            ctx.rotate(this.rokaWeaponAngle||0);
+            if(this.rokaArtilleryTimer>0){ctx.shadowBlur=18;ctx.shadowColor='#ffe066';}
+            ctx.fillStyle='#1c2428';ctx.fillRect(-17,5,32,13);
+            ctx.fillStyle='#39484e';ctx.fillRect(-8,-10,77,24);
+            ctx.fillStyle=this.rokaArtilleryTimer>0?'#d5a94d':'#71858c';ctx.fillRect(1,-7,59,18);
+            ctx.fillStyle='#20292d';ctx.fillRect(13,-13,22,7);ctx.fillRect(22,-18,6,8);
+            ctx.fillStyle='#a9c3ca';ctx.fillRect(58,-10,18,24);
+            ctx.fillStyle='#111719';ctx.fillRect(70,-7,12,18);
+            ctx.fillStyle='#d5a94d';ctx.fillRect(-12,-8,7,20);
+            ctx.fillStyle='#252d31';ctx.beginPath();ctx.moveTo(-8,14);ctx.lineTo(8,14);ctx.lineTo(1,30);ctx.lineTo(-8,27);ctx.closePath();ctx.fill();
+            ctx.fillStyle='#ffb347';ctx.beginPath();ctx.moveTo(82,0);ctx.lineTo(73,-6);ctx.lineTo(73,6);ctx.closePath();ctx.fill();
+            if(this.attackState==='active'){
+                ctx.shadowBlur=14;ctx.shadowColor='#ff9f1c';ctx.fillStyle='#fff1a8';ctx.beginPath();ctx.moveTo(84,0);ctx.lineTo(101,-9);ctx.lineTo(95,0);ctx.lineTo(101,9);ctx.closePath();ctx.fill();
+                ctx.shadowBlur=0;ctx.fillStyle='rgba(210,230,235,.55)';for(let puff=0;puff<3;puff++){ctx.beginPath();ctx.arc(-18-puff*8,(puff-1)*4,5+puff*2,0,Math.PI*2);ctx.fill();}
+            }
+            ctx.shadowBlur=0;ctx.restore();
         }
         else if (this.heroName === 'Raigo') {
             ctx.save();

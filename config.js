@@ -373,7 +373,7 @@ var HEROES = {
     Voss: {
         name: "Voss", desc: "Temporal Copycat",
         color: "#5660a8", maxHp: 750, speed: 5.6, jump: 15, width: 40, height: 70, superCD: 22000,
-        ui: { hp: "75 WRD", atk: "1.5 WRD (Temporal Shard)", passive: "<span class='skill-tag'>Temporal Copy</span> Press [Switch] to copy the opponent for 3.5s (7.5s CD). Basic attacks and a second [Switch] reproduce a balanced temporal version of their kit, owned by Voss; summons become a short-lived echo effect.", super: "<span class='skill-tag'>Temporal Double</span> Places a duplicate within limited range for 6s. It repeats Voss's basic and copied attacks after a short delay for 50% damage, but cannot use an Ultimate or create another copy." }
+        ui: { hp: "75 WRD", atk: "1.5 WRD (Temporal Shard)", passive: "<span class='skill-tag'>Temporal Copy</span> Press [Switch] to become the opponent for 3s (7.5s CD), gaining their Basic, [Switch], and Super with copied cooldowns reset to zero. Voss's own skills are unavailable and their cooldowns freeze until the copy ends.", super: "<span class='skill-tag'>Temporal Double</span> Summons a duplicate for 6s that moves as Voss's reflection across the arena center and repeats Voss's attacks after a short delay for 50% damage. It cannot create another double." }
     },
     Raigo: {
         name: "Raigo", desc: "Golden Thunder Rider",

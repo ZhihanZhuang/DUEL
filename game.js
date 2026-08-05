@@ -740,7 +740,7 @@ class Game {
             p1Stat += `[NODES: ${nodes}/3] ${this.p1.moriGrappleCooldown>0?`[WIRE ${(this.p1.moriGrappleCooldown/1000).toFixed(1)}s]`:'[WIRE READY]'}`;
         }
         if (this.p1.heroName === 'Roka') p1Stat += `${this.p1.rokaArtilleryTimer>0?`[ARTILLERY ${(this.p1.rokaArtilleryTimer/1000).toFixed(1)}s] `:''}${this.p1.rokaMortarCooldown>0?`[MORTAR ${(this.p1.rokaMortarCooldown/1000).toFixed(1)}s]`:'[MORTAR READY]'}`;
-        if (this.p1.heroName === 'Voss') p1Stat += `${this.p1.vossCopyTimer>0?`[COPIED: ${this.p1.vossCopiedHero} ${(this.p1.vossCopyTimer/1000).toFixed(1)}s] `:''}${this.p1.vossCopyCooldown>0?`[COPY ${(this.p1.vossCopyCooldown/1000).toFixed(1)}s]`:'[COPY READY]'}${this.p1.vossDouble&&!this.p1.vossDouble.dead?' [DOUBLE]':''}`;
+        if (this.p1.heroName === 'Voss' || this.p1.vossCopyActive) p1Stat += `${this.p1.vossCopyActive?`[COPIED: ${this.p1.vossCopiedHero} ${(this.p1.vossCopyTimer/1000).toFixed(1)}s] `:''}${this.p1.vossCopyCooldown>0?`[COPY ${(this.p1.vossCopyCooldown/1000).toFixed(1)}s]`:'[COPY READY]'}${this.p1.vossDouble&&!this.p1.vossDouble.dead?' [DOUBLE]':''}`;
         if (this.p1.heroName === 'Raigo') p1Stat += `[ENERGY: ${Math.floor(this.p1.raigoEnergy)}/100]${this.p1.raigoEnergy>=100?' [THUNDER STRIKE]':''}${this.p1.raigoArmorTimer>0?` [GOLDEN ARMOR ${(this.p1.raigoArmorTimer/1000).toFixed(1)}s]`:''}`;
 
         if (this.p1.buffs.poison > 0) p1Stat += " [POISONED]";
@@ -885,7 +885,7 @@ class Game {
             p2Stat += `[NODES: ${nodes}/3] ${this.p2.moriGrappleCooldown>0?`[WIRE ${(this.p2.moriGrappleCooldown/1000).toFixed(1)}s]`:'[WIRE READY]'}`;
         }
         if (this.p2.heroName === 'Roka') p2Stat += `${this.p2.rokaArtilleryTimer>0?`[ARTILLERY ${(this.p2.rokaArtilleryTimer/1000).toFixed(1)}s] `:''}${this.p2.rokaMortarCooldown>0?`[MORTAR ${(this.p2.rokaMortarCooldown/1000).toFixed(1)}s]`:'[MORTAR READY]'}`;
-        if (this.p2.heroName === 'Voss') p2Stat += `${this.p2.vossCopyTimer>0?`[COPIED: ${this.p2.vossCopiedHero} ${(this.p2.vossCopyTimer/1000).toFixed(1)}s] `:''}${this.p2.vossCopyCooldown>0?`[COPY ${(this.p2.vossCopyCooldown/1000).toFixed(1)}s]`:'[COPY READY]'}${this.p2.vossDouble&&!this.p2.vossDouble.dead?' [DOUBLE]':''}`;
+        if (this.p2.heroName === 'Voss' || this.p2.vossCopyActive) p2Stat += `${this.p2.vossCopyActive?`[COPIED: ${this.p2.vossCopiedHero} ${(this.p2.vossCopyTimer/1000).toFixed(1)}s] `:''}${this.p2.vossCopyCooldown>0?`[COPY ${(this.p2.vossCopyCooldown/1000).toFixed(1)}s]`:'[COPY READY]'}${this.p2.vossDouble&&!this.p2.vossDouble.dead?' [DOUBLE]':''}`;
         if (this.p2.heroName === 'Raigo') p2Stat += `[ENERGY: ${Math.floor(this.p2.raigoEnergy)}/100]${this.p2.raigoEnergy>=100?' [THUNDER STRIKE]':''}${this.p2.raigoArmorTimer>0?` [GOLDEN ARMOR ${(this.p2.raigoArmorTimer/1000).toFixed(1)}s]`:''}`;
 
         if (this.p2.buffs.poison > 0) p2Stat += " [POISONED]";
