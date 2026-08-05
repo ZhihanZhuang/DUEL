@@ -510,7 +510,7 @@ function hasSetupOpportunity(game, ai) {
         case 'Veyra': return owned('time_anchor') < 2;
         case 'Brom': return !ai.bromStickyBomb || ai.bromStickyBomb.dead;
         case 'Laegon': return ai.laegonSwitchCooldown <= 0;
-        case 'Axeron': return (ai.axeronMarks || []).some(mark => mark.life > 0 && mark.target && !mark.target.dead);
+        case 'Axeron': return ai.axeronRushCooldown <= 0 && (ai.axeronMarks || []).some(mark => mark.life > 0 && mark.target && !mark.target.dead);
         case 'Ukon': return ai.ukonShadowCooldown <= 0 && owned('ukon_shadow') === 0;
         case 'Mori': return owned('mori_node') < 3;
         case 'Roka': return ai.rokaMortarCooldown <= 0;
@@ -868,7 +868,7 @@ function chooseHeroAction(game, ai, target, targetEntity, dist, verticalDistance
         }
         case 'Axeron': {
             const marked = (ai.axeronMarks || []).some(mark => mark.life > 0 && mark.target && !mark.target.dead);
-            if (marked && (dist > 105 || isVulnerableTarget(target))) return 'switch';
+            if (ai.axeronRushCooldown <= 0 && marked && (dist > 105 || isVulnerableTarget(target))) return 'switch';
             if (superReady && dist < 720 && (combatState === 'burst' || isVulnerableTarget(target) || target.hp < target.maxHp*.42)) return 'super';
             break;
         }

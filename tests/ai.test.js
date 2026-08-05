@@ -146,6 +146,7 @@ function makeFighter(heroName, id = 'cpu') {
         axeronCombo: 0,
         axeronMarks: [],
         axeronRushTimer: 0,
+        axeronRushCooldown: 0,
         ukonDashCooldown: 0,
         ukonShadowCooldown: 0,
         ukonUltimatePhase: null,
@@ -2063,12 +2064,18 @@ test('Axeron applies a five-second mark on the third hit and rushes its target',
     simulation.target.y = 500;
     simulation.ai.attackState = 'idle';
     assert.equal(simulation.ai.startAxeronRush(), true);
+    assert.equal(simulation.ai.axeronRushCooldown, 5000);
+    assert.equal(simulation.ai.startAxeronRush(), false);
     simulation.ai.updateAxeronRush(180);
 
     assert.equal(simulation.target.hp, hpBeforeRush - 25);
     assert.ok(simulation.target.buffs.dizzy >= 260);
     assert.ok(simulation.target.vx > 20);
     assert.ok(simulation.ai.x < simulation.target.x);
+
+    simulation.ai.update(1000);
+    assert.equal(simulation.ai.axeronRushCooldown, 4000);
+    assert.equal(simulation.ai.startAxeronRush(), false);
 });
 
 test('Axeron misses do not reset his every-third-hit mark counter', () => {
@@ -2170,6 +2177,8 @@ test('Ukon Iron Rod Charge hits only when the target begins within reach', () =>
     close.target.y = close.context.GROUND_Y - close.target.h;
     const closeHp = close.target.hp;
     close.ai.performAttack();
+    assert.equal(close.ai.ukonRodCooldown, 800);
+    assert.equal(close.ai.startUkonRodCharge(), false, 'Iron Rod Charge bypassed its cooldown');
     for (let frame = 0; frame < 12 && close.target.hp === closeHp; frame++) close.ai.update(16);
 
     assert.equal(close.target.hp, closeHp - 40, JSON.stringify({
@@ -2179,6 +2188,9 @@ test('Ukon Iron Rod Charge hits only when the target begins within reach', () =>
     }));
     assert.ok(close.target.buffs.dizzy >= 320);
     assert.ok(Math.abs(close.target.vx) >= 19);
+
+    close.ai.update(800);
+    assert.equal(close.ai.ukonRodCooldown, 0);
 
     const far = loadPhysicsGame('Ukon');
     far.ai.isCPU = false;

@@ -729,9 +729,11 @@ class Game {
         if (this.p1.heroName === 'Axeron') {
             p1Stat += `[AXE HIT COUNT: ${this.p1.axeronCombo}/3] [MARKS: ${this.p1.axeronMarks.length}]`;
             if (this.p1.axeronRushTimer > 0) p1Stat += ' [AXE RUSH]';
+            else p1Stat += this.p1.axeronRushCooldown > 0 ? ` [RUSH ${(this.p1.axeronRushCooldown/1000).toFixed(1)}s]` : ' [RUSH READY]';
         }
         if (this.p1.heroName === 'Ukon') {
             p1Stat += this.p1.ukonDashCooldown > 0 ? `[DASH ${(this.p1.ukonDashCooldown/1000).toFixed(1)}s]` : '[DASH READY]';
+            p1Stat += this.p1.ukonRodCooldown > 0 ? ` [ROD ${(this.p1.ukonRodCooldown/1000).toFixed(1)}s]` : ' [ROD READY]';
             p1Stat += this.p1.ukonShadowCooldown > 0 ? ` [SHADOW ${(this.p1.ukonShadowCooldown/1000).toFixed(1)}s]` : ' [SHADOW READY]';
             if (this.p1.ukonUltimatePhase) p1Stat += ` [TREE: ${this.p1.ukonUltimatePhase.toUpperCase()}]`;
         }
@@ -874,9 +876,11 @@ class Game {
         if (this.p2.heroName === 'Axeron') {
             p2Stat += `[AXE HIT COUNT: ${this.p2.axeronCombo}/3] [MARKS: ${this.p2.axeronMarks.length}]`;
             if (this.p2.axeronRushTimer > 0) p2Stat += ' [AXE RUSH]';
+            else p2Stat += this.p2.axeronRushCooldown > 0 ? ` [RUSH ${(this.p2.axeronRushCooldown/1000).toFixed(1)}s]` : ' [RUSH READY]';
         }
         if (this.p2.heroName === 'Ukon') {
             p2Stat += this.p2.ukonDashCooldown > 0 ? `[DASH ${(this.p2.ukonDashCooldown/1000).toFixed(1)}s]` : '[DASH READY]';
+            p2Stat += this.p2.ukonRodCooldown > 0 ? ` [ROD ${(this.p2.ukonRodCooldown/1000).toFixed(1)}s]` : ' [ROD READY]';
             p2Stat += this.p2.ukonShadowCooldown > 0 ? ` [SHADOW ${(this.p2.ukonShadowCooldown/1000).toFixed(1)}s]` : ' [SHADOW READY]';
             if (this.p2.ukonUltimatePhase) p2Stat += ` [TREE: ${this.p2.ukonUltimatePhase.toUpperCase()}]`;
         }

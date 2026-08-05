@@ -152,11 +152,13 @@ class Fighter extends Entity {
         if (this.heroName === 'Axeron') {
             this.axeronCombo = 0; this.axeronMarks = []; this.axeronRushTarget = null;
             this.axeronRushTimer = 0; this.axeronRushMax = 180; this.axeronRushHit = false;
+            this.axeronRushCooldown = 0;
         }
         if (this.heroName === 'Ukon') {
             this.ukonDashCooldown = 0;
             this.ukonDashTimer = 0;
             this.ukonDashDuration = 135;
+            this.ukonRodCooldown = 0;
             this.ukonBurstOriginX = this.x;
             this.ukonBurstOriginY = this.y;
             this.ukonBurstMaxDistance = 0;
@@ -605,10 +607,12 @@ class Fighter extends Entity {
         if (this.heroName === 'Axeron') {
             this.axeronMarks.forEach(mark => mark.life -= dt);
             this.axeronMarks = this.axeronMarks.filter(mark => mark.life > 0 && mark.target && !mark.target.dead);
+            this.axeronRushCooldown = Math.max(0, this.axeronRushCooldown - dt);
             if (this.axeronRushTimer > 0) this.updateAxeronRush(dt);
         }
         if (this.heroName === 'Ukon') {
             if (this.ukonDashCooldown > 0) this.ukonDashCooldown = Math.max(0, this.ukonDashCooldown - dt);
+            if (this.ukonRodCooldown > 0) this.ukonRodCooldown = Math.max(0, this.ukonRodCooldown - dt);
             if (this.ukonShadowCooldown > 0) this.ukonShadowCooldown = Math.max(0, this.ukonShadowCooldown - dt);
             this.updateUkonBurst(dt);
             this.updateUkonUltimate(dt);
@@ -2088,7 +2092,7 @@ class Fighter extends Entity {
 
     startUkonRodCharge() {
         if (this.heroName !== 'Ukon' || this.dead || this.attackState !== 'idle' || this.ukonDashTimer > 0
-            || this.ukonChargeTimer > 0 || this.ukonUltimatePhase) return false;
+            || this.ukonChargeTimer > 0 || this.ukonUltimatePhase || this.ukonRodCooldown > 0) return false;
         const target = this.getUkonTarget();
         const originX = this.x + this.w/2;
         const originY = this.y + this.h/2;
@@ -2101,6 +2105,7 @@ class Fighter extends Entity {
         this.ukonChargeTarget = target || null;
         this.ukonChargeCanStrike = !!target && distance <= 365;
         this.ukonChargeTimer = 235;
+        this.ukonRodCooldown = 800;
         this.ukonBurstOriginX = this.x;
         this.ukonBurstOriginY = this.y;
         this.ukonBurstMaxDistance = 295;
@@ -2381,10 +2386,11 @@ class Fighter extends Entity {
     }
 
     startAxeronRush() {
-        if (this.heroName !== 'Axeron' || this.axeronRushTimer > 0) return false;
+        if (this.heroName !== 'Axeron' || this.axeronRushTimer > 0 || this.axeronRushCooldown > 0) return false;
         const target = this.selectAxeronMarkTarget();
         if (!target) return false;
         this.axeronRushTarget = target; this.axeronRushTimer = this.axeronRushMax; this.axeronRushHit = false;
+        this.axeronRushCooldown = 5000;
         this.attackState = 'idle'; this.stateTimer = 0; this.vx = 0; this.vy = 0;
         for (let i=0;i<12;i++) game.particles.push(new Particle(this.x+this.w/2,this.y+this.h/2,'#ffcf5a',(Math.random()-.5)*12,(Math.random()-.5)*12,280,4));
         return true;
