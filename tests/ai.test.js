@@ -2008,7 +2008,7 @@ test('Axeron applies a five-second mark on the third hit and rushes its target',
     assert.ok(simulation.ai.x < simulation.target.x);
 });
 
-test('Axeron missing a basic attack breaks the consecutive-hit sequence', () => {
+test('Axeron misses do not reset his every-third-hit mark counter', () => {
     const simulation = loadPhysicsGame('Axeron');
     simulation.ai.axeronCombo = 2;
     simulation.ai.attackState = 'active'; simulation.ai.stateTimer = 1;
@@ -2017,8 +2017,16 @@ test('Axeron missing a basic attack breaks the consecutive-hit sequence', () => 
 
     simulation.ai.update(16);
 
-    assert.equal(simulation.ai.axeronCombo, 0);
+    assert.equal(simulation.ai.axeronCombo, 2);
     assert.equal(simulation.ai.axeronMarks.length, 0);
+
+    simulation.ai.attackState = 'active'; simulation.ai.stateTimer = 100;
+    simulation.ai.maxStateTimer = 100; simulation.ai.hasHit = false;
+    simulation.context.checkAABB = () => true;
+    simulation.ai.update(16);
+
+    assert.equal(simulation.ai.axeronCombo, 0);
+    assert.equal(simulation.ai.axeronMarks.length, 1);
 });
 
 test('Titan Descent heals Axeron from actual damage and grants nothing on invulnerability', () => {

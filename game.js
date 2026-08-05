@@ -722,7 +722,7 @@ class Game {
         }
         if (this.p1.heroName === 'Brom') p1Stat += this.p1.bromStickyBomb && !this.p1.bromStickyBomb.dead ? '[STICKY: DETONATE]' : '[STICKY: READY]';
         if (this.p1.heroName === 'Axeron') {
-            p1Stat += `[AXE COMBO: ${this.p1.axeronCombo}/3] [MARKS: ${this.p1.axeronMarks.length}]`;
+            p1Stat += `[AXE HIT COUNT: ${this.p1.axeronCombo}/3] [MARKS: ${this.p1.axeronMarks.length}]`;
             if (this.p1.axeronRushTimer > 0) p1Stat += ' [AXE RUSH]';
         }
 
@@ -852,7 +852,7 @@ class Game {
         }
         if (this.p2.heroName === 'Brom') p2Stat += this.p2.bromStickyBomb && !this.p2.bromStickyBomb.dead ? '[STICKY: DETONATE]' : '[STICKY: READY]';
         if (this.p2.heroName === 'Axeron') {
-            p2Stat += `[AXE COMBO: ${this.p2.axeronCombo}/3] [MARKS: ${this.p2.axeronMarks.length}]`;
+            p2Stat += `[AXE HIT COUNT: ${this.p2.axeronCombo}/3] [MARKS: ${this.p2.axeronMarks.length}]`;
             if (this.p2.axeronRushTimer > 0) p2Stat += ' [AXE RUSH]';
         }
 

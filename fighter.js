@@ -1161,7 +1161,6 @@ class Fighter extends Entity {
                 }
 
                 if (this.stateTimer <= 0) {
-                    if (this.heroName === 'Axeron' && !this.hasHit) this.axeronCombo = 0;
                     let recTime = 250;
                     if (this.heroName === 'Hason') recTime = 100;
                     if (this.heroName === 'Willi') recTime = Math.round(250 / Math.max(0.5, Math.min(3, this.aiAttackTempo || 1)));
