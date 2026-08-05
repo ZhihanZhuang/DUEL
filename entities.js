@@ -1250,15 +1250,20 @@ class MechanicFanBlade extends Entity {
 
 class MoriTrap extends Entity {
     constructor(owner,kind,x,surfaceY,life=6500){
-        const dimensions=kind==='blade'?{w:150,h:8}:kind==='bomb'?{w:20,h:20}:{w:34,h:kind==='spear'?70:18};
+        const dimensions=kind==='blade'?{w:150,h:8}:kind==='bomb'?{w:20,h:20}:kind==='machinegun'?{w:40,h:26}:{w:34,h:kind==='spear'?70:18};
         super(Math.max(0,Math.min(CANVAS_W-dimensions.w,x-dimensions.w/2)),surfaceY-dimensions.h,dimensions.w,dimensions.h);
-        this.owner=owner;this.kind=kind;this.type='mori_ultimate_trap';this.life=life;this.warning=kind==='bomb'?500:700;this.triggered=false;this.hitTargets=new Set();this.vx=kind==='bomb'?(Math.random()<.5?-1:1)*4.5:0;this.untargetable=true;
+        this.owner=owner;this.kind=kind;this.type='mori_ultimate_trap';this.life=life;this.warning=kind==='bomb'?500:700;this.triggered=false;this.hitTargets=new Set();this.vx=kind==='bomb'?(Math.random()<.5?-1:1)*4.5:0;this.untargetable=true;this.fireTimer=0;this.ammo=kind==='machinegun'?6:0;this.aimAngle=0;
     }
     hit(target,damage){target.takeDamage(damage,this.owner,false,true);this.hitTargets.add(target);}
     update(dt){
         this.life-=dt;this.warning=Math.max(0,this.warning-dt);if(this.life<=0||!this.owner||this.owner.dead){this.dead=true;return;}
         if(this.kind==='bomb'&&this.warning<=0){this.x+=this.vx;this.vy+=GRAVITY*.3;this.y+=this.vy;if(this.y+this.h>=GROUND_Y){this.y=GROUND_Y-this.h;this.vy=0;}if(this.x<=0||this.x+this.w>=CANVAS_W)this.vx*=-1;}
         if(this.warning>0)return;
+        if(this.kind==='machinegun'){
+            this.fireTimer-=dt;const targets=getHostileTargets(this.owner,this).filter(target=>Math.hypot(target.x+target.w/2-(this.x+this.w/2),target.y+target.h/2-(this.y+this.h/2))<=650);
+            if(targets.length&&this.fireTimer<=0&&this.ammo>0){const target=targets.reduce((closest,candidate)=>Math.hypot(candidate.x-this.x,candidate.y-this.y)<Math.hypot(closest.x-this.x,closest.y-this.y)?candidate:closest);this.aimAngle=Math.atan2(target.y+target.h/2-(this.y+10),target.x+target.w/2-(this.x+this.w/2));const muzzleX=this.x+this.w/2+Math.cos(this.aimAngle)*25,muzzleY=this.y+10+Math.sin(this.aimAngle)*25;game.projectiles.push(new Projectile(muzzleX,muzzleY,10,4,Math.cos(this.aimAngle)*23,Math.sin(this.aimAngle)*23,8,this.owner,'#ffd166','mori_machinegun'));for(let i=0;i<5;i++)game.particles.push(new Particle(muzzleX,muzzleY,'#fff0a8',Math.cos(this.aimAngle)*(2+Math.random()*5),Math.sin(this.aimAngle)*(2+Math.random()*5),150,2));this.ammo--;this.fireTimer=140;}
+            if(this.ammo<=0)this.dead=true;return;
+        }
         for(const target of getHostileTargets(this.owner,this)){
             if(this.hitTargets.has(target)||!checkAABB(this,target))continue;
             if(this.kind==='spear'){this.hit(target,50);target.vx+=(target.x+target.w/2<this.x+this.w/2?-1:1)*8;target.vy=-9;this.dead=true;}
@@ -1274,6 +1279,7 @@ class MoriTrap extends Entity {
         if(this.kind==='spear'){ctx.fillStyle='#d8dde0';ctx.beginPath();ctx.moveTo(this.x+this.w/2,this.y);ctx.lineTo(this.x+this.w,this.y+this.h);ctx.lineTo(this.x,this.y+this.h);ctx.fill();}
         else if(this.kind==='spring'){ctx.strokeStyle='#ffd166';ctx.lineWidth=5;ctx.beginPath();for(let i=0;i<5;i++)ctx.lineTo(this.x+(i%2?this.w:0),this.y+i*this.h/4);ctx.stroke();}
         else if(this.kind==='blade'){ctx.strokeStyle='#fff1b0';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(this.x,this.y+4);ctx.lineTo(this.x+this.w,this.y+4);ctx.stroke();ctx.strokeStyle='#f0a33b';ctx.setLineDash([7,5]);ctx.lineDashOffset=-Date.now()*.04;ctx.stroke();}
+        else if(this.kind==='machinegun'){ctx.translate(this.x+this.w/2,this.y+10);ctx.fillStyle='#353b3e';ctx.strokeStyle='#ffd166';ctx.lineWidth=2;ctx.fillRect(-15,-9,30,18);ctx.strokeRect(-15,-9,30,18);ctx.rotate(this.aimAngle);ctx.fillStyle='#69747a';ctx.fillRect(0,-4,30,8);ctx.fillStyle='#ffd166';ctx.fillRect(25,-2,9,4);ctx.rotate(-this.aimAngle);ctx.fillStyle='#252a2d';ctx.fillRect(-18,9,36,7);}
         else {ctx.translate(this.x+10,this.y+10);ctx.rotate(Date.now()*.01);ctx.fillStyle='#35383b';ctx.strokeStyle='#ffd166';ctx.lineWidth=2;ctx.beginPath();ctx.arc(0,0,9,0,Math.PI*2);ctx.fill();ctx.stroke();ctx.fillStyle='#f04f3d';ctx.fillRect(-3,-3,6,6);}
         ctx.restore();
     }
@@ -1283,7 +1289,7 @@ class ThousandMechanisms extends Entity {
     constructor(owner){super(0,0,CANVAS_W,GROUND_Y);this.owner=owner;this.type='thousand_mechanisms';this.life=8000;this.maxLife=8000;this.spawnTimer=0;this.spawnCount=0;this.untargetable=true;}
     validSurfaces(){return [...PLATFORMS.map(platform=>({x:platform.x,w:platform.w,y:platform.y})),{x:30,w:Math.max(80,CANVAS_W-60),y:GROUND_Y}].filter(surface=>surface.w>=90);}
     spawnTrap(){
-        const surfaces=this.validSurfaces();if(!surfaces.length)return;const surface=surfaces[this.spawnCount%surfaces.length];const kind=['spear','spring','blade','bomb'][this.spawnCount%4];
+        const surfaces=this.validSurfaces();if(!surfaces.length)return;const surface=surfaces[this.spawnCount%surfaces.length];const kind=['spear','spring','blade','bomb','machinegun'][this.spawnCount%5];
         let x=surface.x+surface.w*(.2+Math.random()*.6);const enemies=getHostileTargets(this.owner,this);for(let attempt=0;attempt<4&&enemies.some(target=>Math.abs(target.x+target.w/2-x)<70&&Math.abs(target.y+target.h-surface.y)<90);attempt++)x=surface.x+surface.w*(.12+Math.random()*.76);
         game.hazards.push(new MoriTrap(this.owner,kind,x,surface.y,Math.min(6500,this.life)));this.spawnCount++;
     }

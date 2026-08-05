@@ -2291,6 +2291,19 @@ test('Mori fan and ultimate traps use their augmented damage values', () => {
         trap.update(16);
         assert.equal(target.hp, 300 - damage, `${kind} trap damage was not augmented`);
     }
+
+    const gunTarget = makeTarget();
+    gunTarget.x = 300;
+    context.game.opponents = [gunTarget];
+    const machinegun = new context.window.MoriTrap(owner, 'machinegun', 120, 500);
+    machinegun.warning = 0;
+    machinegun.update(16);
+    const bullet = context.game.projectiles.find(projectile => projectile.type === 'mori_machinegun');
+    assert.equal(bullet.damage, 8);
+    assert.equal(machinegun.ammo, 5);
+    for (let shot = 0; shot < 5; shot++) machinegun.update(140);
+    assert.equal(context.game.projectiles.filter(projectile => projectile.type === 'mori_machinegun').length, 6);
+    assert.equal(machinegun.dead, true);
 });
 
 test('Mori Grappling Wire disrupts enemies and Thousand Mechanisms rotates all trap types', () => {
@@ -2311,7 +2324,7 @@ test('Mori Grappling Wire disrupts enemies and Thousand Mechanisms rotates all t
     entityContext.game.hazards = [field];
     field.update(2000);
     const firstKinds = entityContext.game.hazards.filter(item => item.type === 'mori_ultimate_trap').map(item => item.kind);
-    assert.deepEqual(firstKinds.slice(0, 4), ['spear', 'spring', 'blade', 'bomb']);
+    assert.deepEqual(firstKinds.slice(0, 5), ['spear', 'spring', 'blade', 'bomb', 'machinegun']);
     field.update(5500);
     const kinds = entityContext.game.hazards.filter(item => item.type === 'mori_ultimate_trap').map(item => item.kind);
     assert.equal(kinds.length, 20);

@@ -363,7 +363,7 @@ var HEROES = {
     Mori: {
         name: "Mori", desc: "Mechanist Trap Controller",
         color: "#c58a32", maxHp: 800, speed: 5.4, jump: 15, width: 40, height: 70, superCD: 26000,
-        ui: { hp: "80 WRD", atk: "2.5 WRD (Mechanic Fan)", passive: "<span class='skill-tag'>Linked Mechanisms</span> Fan blades leave 5s Mechanism Nodes on walls and platforms (max 3). Nearby nodes connect with a one-use Energy Wire that deals 2 WRD and slows for 1s. Every third consecutive fan hit gains knockback. Press [Switch] to fire Grappling Wire toward an enemy, node, or surface (3s CD).", super: "<span class='skill-tag'>Thousand Mechanisms</span> For 8s, valid arena surfaces deploy up to 20 warned traps: 5 WRD spears, 2 WRD springs, 4 WRD blade wires, and 6 WRD rolling bombs. Mori remains fully vulnerable." }
+        ui: { hp: "80 WRD", atk: "2.5 WRD (Mechanic Fan)", passive: "<span class='skill-tag'>Linked Mechanisms</span> Fan blades leave 5s Mechanism Nodes on walls and platforms (max 3). Nearby nodes connect with a one-use Energy Wire that deals 2 WRD and slows for 1s. Every third consecutive fan hit gains knockback. Press [Switch] to fire Grappling Wire toward an enemy, node, or surface (3s CD).", super: "<span class='skill-tag'>Thousand Mechanisms</span> For 8s, valid arena surfaces deploy up to 20 warned traps: spears, springs, blade wires, rolling bombs, and tracking mini machine guns. Each machine gun fires six blockable 0.8 WRD rounds. Mori remains fully vulnerable." }
     }
 };
 
