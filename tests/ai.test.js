@@ -57,7 +57,7 @@ function loadProjectileContext() {
     };
     vm.createContext(context);
     const source = fs.readFileSync(path.join(__dirname, '..', 'entities.js'), 'utf8');
-    vm.runInContext(`${source}\nwindow.Projectile = Projectile; window.KuroDecoy = KuroDecoy; window.UkonShadow = UkonShadow; window.PeachTree = PeachTree; window.GiantSword = GiantSword; window.GravityWell = GravityWell; window.ChiqPath = ChiqPath; window.D2FDrone = D2FDrone; window.D2FTargetBeacon = D2FTargetBeacon; window.D2FGiantRobot = D2FGiantRobot; window.TimeAnchor = TimeAnchor; window.TemporalEcho = TemporalEcho; window.LaegonLightning = LaegonLightning; window.LaegonHammer = LaegonHammer; window.LaegonHammerStrike = LaegonHammerStrike; window.BromBlastCharge = BromBlastCharge; window.BromStickyBomb = BromStickyBomb; window.DemolitionZone = DemolitionZone; window.TitanAxe = TitanAxe; window.MechanismNode = MechanismNode; window.MoriEnergyWire = MoriEnergyWire; window.MechanicFanBlade = MechanicFanBlade; window.MoriTrap = MoriTrap; window.ThousandMechanisms = ThousandMechanisms;`, context, { filename: 'entities.js' });
+    vm.runInContext(`${source}\nwindow.Projectile = Projectile; window.KuroDecoy = KuroDecoy; window.UkonShadow = UkonShadow; window.PeachTree = PeachTree; window.GiantSword = GiantSword; window.GravityWell = GravityWell; window.ChiqPath = ChiqPath; window.D2FDrone = D2FDrone; window.D2FTargetBeacon = D2FTargetBeacon; window.D2FGiantRobot = D2FGiantRobot; window.TimeAnchor = TimeAnchor; window.TemporalEcho = TemporalEcho; window.LaegonLightning = LaegonLightning; window.LaegonHammer = LaegonHammer; window.LaegonHammerStrike = LaegonHammerStrike; window.BromBlastCharge = BromBlastCharge; window.BromStickyBomb = BromStickyBomb; window.DemolitionZone = DemolitionZone; window.TitanAxe = TitanAxe; window.MechanismNode = MechanismNode; window.MoriEnergyWire = MoriEnergyWire; window.MechanicFanBlade = MechanicFanBlade; window.MoriTrap = MoriTrap; window.ThousandMechanisms = ThousandMechanisms; window.RokaCannonball = RokaCannonball; window.RokaMortarShell = RokaMortarShell; window.TemporalBolt = TemporalBolt; window.VossTemporalDouble = VossTemporalDouble;`, context, { filename: 'entities.js' });
     return context;
 }
 
@@ -150,9 +150,17 @@ function makeFighter(heroName, id = 'cpu') {
         ukonShadowCooldown: 0,
         ukonUltimatePhase: null,
         moriGrappleCooldown: 0,
+        rokaMortarCooldown: 0,
+        rokaArtilleryTimer: 0,
+        vossCopyCooldown: 0,
+        vossCopyTimer: 0,
+        vossCopiedMelee: false,
+        raigoEnergy: 100,
+        raigoArmorTimer: 0,
         isMeleeAttack() {
             if (this.heroName === 'Laegon') return this.thunderGodTimer > 0;
-            return !['Hason', 'Willi', 'Ugo', 'Kila', 'Volt', 'Noae', 'Kuro', 'Nyra', 'Archor', 'D2F1', 'Veyra', 'Brom', 'Mori'].includes(this.heroName)
+            if (this.heroName === 'Voss') return this.vossCopyTimer > 0 && this.vossCopiedMelee;
+            return !['Hason', 'Willi', 'Ugo', 'Kila', 'Volt', 'Noae', 'Kuro', 'Nyra', 'Archor', 'D2F1', 'Veyra', 'Brom', 'Mori', 'Roka'].includes(this.heroName)
                 && !(this.heroName === 'Hunter' && this.hunterWeapon === 'musket')
                 && !(this.heroName === 'Euclid' && this.euclidWeapon === 'magic');
         }
@@ -272,7 +280,7 @@ function loadPhysicsGame(heroName = 'Hunter') {
     class UkonShadow extends Entity {
         constructor(owner, target) {
             super(target.x, target.y, owner.w, owner.h);
-            Object.assign(this, { owner, targetId: target.id, type: 'ukon_shadow', hp: 18, maxHp: 18, buffs: {} });
+            Object.assign(this, { owner, target, targetId: target.id, type: 'ukon_shadow', hp: 18, maxHp: 18, buffs: {} });
         }
     }
     class PeachTree extends Entity {
@@ -285,6 +293,11 @@ function loadPhysicsGame(heroName = 'Hunter') {
     class MoriEnergyWire extends Entity { constructor(owner,first,second){super(first.x,first.y,100,8);Object.assign(this,{owner,first,second,type:'mori_wire',life:5000});} }
     class MechanicFanBlade extends Entity { constructor(owner,x,y,vx,vy){super(x,y,28,12);Object.assign(this,{owner,vx,vy,type:'mori_fan'});} }
     class ThousandMechanisms extends Entity { constructor(owner){super(0,0,1280,660);Object.assign(this,{owner,type:'thousand_mechanisms',life:8000});} }
+    class RokaCannonball extends Entity { constructor(owner,x,y,vx,vy,artillery){super(x,y,28,28);Object.assign(this,{owner,vx,vy,artillery,type:'roka_cannonball',damage:artillery?50:40,radius:artillery?165:110});} }
+    class RokaMortarShell extends Entity { constructor(owner,x,y){super(x,y,20,26);Object.assign(this,{owner,targetX:x,targetY:y,type:'roka_mortar'});} }
+    class TemporalBolt extends Entity { constructor(owner,x,y,vx,vy,damage,kind){super(x,y,18,14);Object.assign(this,{owner,vx,vy,damage,kind,type:kind==='copy'?'voss_copy_bolt':'temporal_shard'});} }
+    class TemporalEcho extends Entity { constructor(owner,x,y){super(x,y,owner.w,owner.h);Object.assign(this,{owner,type:'temporal_echo',life:3000,maxLife:3000});} }
+    class VossTemporalDouble extends Entity { constructor(owner,x,y){super(x,y,owner.w,owner.h);Object.assign(this,{owner,type:'voss_double',life:6000,queue:[]});} mirrorAttack(data){this.queue.push(data);} }
 
     const platforms = [
         { x: 300, y: 480, w: 400, h: 20, type: 'center' },
@@ -308,6 +321,11 @@ function loadPhysicsGame(heroName = 'Hunter') {
         MoriEnergyWire,
         MechanicFanBlade,
         ThousandMechanisms,
+        RokaCannonball,
+        RokaMortarShell,
+        TemporalBolt,
+        TemporalEcho,
+        VossTemporalDouble,
         Minion,
         CANVAS_W: 1280,
         CANVAS_H: 760,
@@ -328,7 +346,10 @@ function loadPhysicsGame(heroName = 'Hunter') {
             Veyra: { maxHp: 700, speed: 6.2, jump: 14.5, width: 39, height: 69, color: '#9d5cff', superCD: 18000 },
             Axeron: { maxHp: 700, speed: 6.5, jump: 16, width: 39, height: 68, color: '#2468c9', superCD: 22000 },
             Ukon: { maxHp: 850, speed: 7.4, jump: 17, width: 42, height: 72, color: '#b94b3f', superCD: 28000 },
-            Mori: { maxHp: 800, speed: 5.4, jump: 15, width: 40, height: 70, color: '#c58a32', superCD: 26000 }
+            Mori: { maxHp: 800, speed: 5.4, jump: 15, width: 40, height: 70, color: '#c58a32', superCD: 26000 },
+            Roka: { maxHp: 600, speed: 4.6, jump: 14, width: 42, height: 70, color: '#496d7b', superCD: 24000 },
+            Voss: { maxHp: 750, speed: 5.6, jump: 15, width: 40, height: 70, color: '#5660a8', superCD: 22000 },
+            Raigo: { maxHp: 800, speed: 6.4, jump: 16, width: 42, height: 72, color: '#287b8f', superCD: 22000 }
         },
         keys: {},
         keysPressed: {},
@@ -576,7 +597,7 @@ test('every hero with a direct super can decide to use it', () => {
     const context = loadAI();
     const directSuperHeroes = [
         'Hason', 'Willi', 'Hunter', 'Macu', 'Artu', 'Duke', 'Kadaxi', 'Euclid',
-        'Lique', 'Kae', 'Kila', 'Volt', 'Gensan', 'Noae', 'Wolf', 'Kuro', 'Sola', 'Nyra', 'Orion', 'Archor', 'Itan', 'D2F1', 'Laegon', 'Veyra', 'Brom', 'Axeron', 'Ukon', 'Mori'
+        'Lique', 'Kae', 'Kila', 'Volt', 'Gensan', 'Noae', 'Wolf', 'Kuro', 'Sola', 'Nyra', 'Orion', 'Archor', 'Itan', 'D2F1', 'Laegon', 'Veyra', 'Brom', 'Axeron', 'Ukon', 'Mori', 'Roka', 'Voss', 'Raigo'
     ];
 
     for (const heroName of directSuperHeroes) {
@@ -2174,6 +2195,59 @@ test('Ukon Iron Rod Charge hits only when the target begins within reach', () =>
     assert.ok(far.ai.x < 430, 'mobility-only charge exceeded its travel cap');
 });
 
+test('Ukon selects the closest target and summons win equal-distance ties', () => {
+    const simulation = loadPhysicsGame('Ukon');
+    const { ai, target, context } = simulation;
+    ai.isCPU = false;
+    ai.attackState = 'idle';
+    ai.x = 300;
+    ai.y = 500;
+    target.x = 360;
+    target.y = 500;
+    const summon = {
+        id: 'hostile_skeleton', type: 'skeleton', owner: target,
+        x: 470, y: 500, w: 34, h: 60, hp: 100, maxHp: 100,
+        dead: false, untargetable: false, buffs: {}, vx: 0, vy: 0,
+        takeDamage(amount) { this.hp -= amount; }
+    };
+    context.game.minions.push(summon);
+
+    assert.equal(ai.getUkonTarget(), target, 'a farther summon outranked the closest fighter');
+    const ukonCenterX = ai.x + ai.w/2;
+    const ukonCenterY = ai.y + ai.h/2;
+    target.x = ukonCenterX + 100 - target.w/2;
+    target.y = ukonCenterY - target.h/2;
+    summon.x = ukonCenterX - 100 - summon.w/2;
+    summon.y = ukonCenterY - summon.h/2;
+    assert.equal(ai.getUkonTarget(), summon);
+    assert.equal(ai.startUkonRodCharge(), true);
+    assert.equal(ai.ukonChargeTarget, summon);
+    ai.x = summon.x;
+    ai.y = summon.y;
+    assert.equal(ai.resolveUkonRodHit(), true);
+    assert.equal(summon.hp, 60);
+    assert.equal(target.hp, target.maxHp, 'Ukon attacked the fighter instead of its summon');
+});
+
+test('Ukon CPU navigates toward a closer hostile summon before its owning fighter', () => {
+    const context = loadAI();
+    const ai = makeFighter('Ukon', 'cpu_ukon_summon');
+    const target = makeFighter('Euclid', 'target_summoner');
+    target.x = 780;
+    const summon = {
+        type: 'skeleton', owner: target, x: 560, y: 570, w: 34, h: 60,
+        hp: 60, maxHp: 60, dead: false, untargetable: false,
+        takeDamage() {}
+    };
+    const game = makeGame(ai, target);
+    game.minions.push(summon);
+    readyBrain(ai, target);
+
+    context.window.runAI(game, 16);
+
+    assert.equal(ai.aiCombatTarget, summon);
+});
+
 test('Ukon Iron Shadow chases once, controls its target, and disappears', () => {
     const context = loadProjectileContext();
     const owner = { id: 'ukon', heroName: 'Ukon', x: 100, y: 500, w: 42, h: 72, facing: 1, dead: false };
@@ -2328,4 +2402,118 @@ test('Mori Grappling Wire disrupts enemies and Thousand Mechanisms rotates all t
     field.update(5500);
     const kinds = entityContext.game.hazards.filter(item => item.type === 'mori_ultimate_trap').map(item => item.kind);
     assert.equal(kinds.length, 20);
+});
+
+test('Roka charges cannon fire, recoils opposite the shot, and empowers artillery projectiles', () => {
+    const simulation = loadPhysicsGame('Roka');
+    const { ai, context } = simulation;
+    ai.isCPU = false;
+    ai.attackState = 'idle';
+    ai.performAttack();
+    assert.equal(ai.stateTimer, 800);
+
+    ai.attackState = 'active';
+    ai.executeActiveAttack();
+    const normal = context.game.projectiles.at(-1);
+    assert.equal(normal.type, 'roka_cannonball');
+    assert.equal(normal.damage, 40);
+    assert.equal(normal.radius, 110);
+    assert.ok(normal.vx * ai.vx <= 0, 'Roka did not recoil opposite the cannonball');
+
+    ai.superCooldown = 0;
+    ai.performSuper();
+    assert.equal(ai.rokaArtilleryTimer, 10000);
+    ai.executeActiveAttack();
+    const artillery = context.game.projectiles.at(-1);
+    assert.equal(artillery.damage, 50);
+    assert.equal(artillery.radius, 165);
+
+    assert.equal(ai.fireRokaMortar(), true);
+    assert.equal(context.game.projectiles.at(-1).type, 'roka_mortar');
+    assert.equal(ai.rokaMortarCooldown, 6000);
+});
+
+test('Roka cannon and mortar explosions apply specified damage and directional knockback', () => {
+    const context = loadProjectileContext();
+    const owner = { id: 'roka', heroName: 'Roka', dead: false };
+    const target = { x: 120, y: 100, w: 40, h: 70, hp: 100, vx: 0, vy: 0, buffs: {}, takeDamage(amount) { this.hp -= amount; } };
+    context.game.opponents = [target];
+    const shell = new context.window.RokaCannonball(owner, 100, 130, 0, 0, false);
+    shell.explode();
+    assert.equal(target.hp, 60);
+    assert.ok(target.vy < 0);
+
+    target.hp = 100; target.vy = 0;
+    const mortar = new context.window.RokaMortarShell(owner, 140, 160);
+    mortar.targetX = target.x + target.w/2;
+    mortar.targetY = target.y + target.h/2;
+    mortar.impact();
+    assert.equal(target.hp, 70);
+    assert.equal(target.vy, -18);
+});
+
+test('Voss copy is temporary, Voss-owned, and his double repeats attacks at half damage', () => {
+    const simulation = loadPhysicsGame('Voss');
+    const { ai, context, target } = simulation;
+    ai.isCPU = false;
+    assert.equal(ai.startVossCopy(), true);
+    assert.equal(ai.vossCopiedHero, 'Hunter');
+    assert.equal(ai.vossCopyTimer, 3500);
+    assert.equal(ai.vossCopyCooldown, 7500);
+    ai.attackState = 'active';
+    ai.executeActiveAttack();
+    const copiedBolt = context.game.projectiles.at(-1);
+    assert.equal(copiedBolt.owner, ai);
+    assert.equal(copiedBolt.kind, 'copy');
+
+    ai.superCooldown = 0;
+    ai.performSuper();
+    assert.equal(ai.vossDouble.type, 'voss_double');
+    ai.queueVossMirror(40, 'copy', target.x, target.y);
+    assert.equal(ai.vossDouble.queue.length, 1);
+
+    const entityContext = loadProjectileContext();
+    const owner = { id: 'voss', heroName: 'Voss', x: 100, y: 500, w: 40, h: 70, facing: 1, dead: false };
+    const duplicate = new entityContext.window.VossTemporalDouble(owner, 200, 500);
+    duplicate.mirrorAttack({ damage: 40, kind: 'copy', targetX: 500, targetY: 520, facing: 1 });
+    duplicate.update(180);
+    assert.equal(entityContext.game.projectiles.length, 1);
+    assert.equal(entityContext.game.projectiles[0].damage, 20);
+    assert.equal(entityContext.game.projectiles[0].owner, owner);
+});
+
+test('Raigo builds Energy, spends Thunder Strike, and lifesteals from actual armored damage', () => {
+    const simulation = loadPhysicsGame('Raigo');
+    const { ai, target, context } = simulation;
+    ai.isCPU = false;
+    ai.raigoEnergy = 90;
+    ai.raigoEmpoweredAttack = false;
+    ai.onRaigoBasicHit(target, 22);
+    assert.equal(ai.raigoEnergy, 100);
+
+    ai.attackState = 'idle';
+    ai.performAttack();
+    assert.equal(ai.raigoEnergy, 0);
+    assert.equal(ai.getMeleeDamage(), 50);
+    ai.onRaigoBasicHit(target, 50);
+    assert.equal(target.buffs.dizzy, 500);
+
+    ai.superCooldown = 0;
+    ai.performSuper();
+    assert.equal(ai.raigoArmorTimer, 8000);
+    assert.equal(ai.getMeleeDamage(), 75);
+    ai.hp = 700;
+    ai.healRaigoFromDamage(40);
+    assert.equal(ai.hp, 710);
+
+    ai.raigoEnergy = 30;
+    assert.equal(ai.startRaigoCharge(), true);
+    assert.equal(ai.raigoEnergy, 0);
+    const hpBefore = target.hp;
+    const raigoHpBefore = ai.hp;
+    context.checkAABB = () => true;
+    ai.updateRaigoCharge(16);
+    assert.equal(target.hp, hpBefore - 45);
+    assert.equal(ai.hp, raigoHpBefore + 11.25);
+    assert.ok(target.vx < 0);
 });

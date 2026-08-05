@@ -162,6 +162,7 @@ class Fighter extends Entity {
             this.ukonBurstMaxDistance = 0;
             this.ukonChargeTimer = 0;
             this.ukonChargeTargetId = null;
+            this.ukonChargeTarget = null;
             this.ukonChargeCanStrike = false;
             this.ukonShadowCooldown = 0;
             this.ukonUltimatePhase = null;
@@ -181,6 +182,26 @@ class Fighter extends Entity {
             this.moriGrappleTimer = 0;
             this.moriGrappleTargetX = this.x;
             this.moriGrappleTargetY = this.y;
+        }
+        if (this.heroName === 'Roka') {
+            this.rokaMortarCooldown = 0;
+            this.rokaArtilleryTimer = 0;
+        }
+        if (this.heroName === 'Voss') {
+            this.vossCopyCooldown = 0;
+            this.vossCopyTimer = 0;
+            this.vossCopiedHero = null;
+            this.vossCopiedTarget = null;
+            this.vossCopiedMelee = false;
+            this.vossDouble = null;
+        }
+        if (this.heroName === 'Raigo') {
+            this.raigoEnergy = 0;
+            this.raigoMaxEnergy = 100;
+            this.raigoEmpoweredAttack = false;
+            this.raigoChargeTimer = 0;
+            this.raigoChargeHitTargets = new Set();
+            this.raigoArmorTimer = 0;
         }
     }
 
@@ -602,6 +623,27 @@ class Fighter extends Entity {
             if (this.moriFanComboTimer <= 0) this.moriFanCombo = 0;
             this.updateMoriGrapple(dt);
         }
+        if (this.heroName === 'Roka') {
+            this.rokaMortarCooldown = Math.max(0, this.rokaMortarCooldown - dt);
+            this.rokaArtilleryTimer = Math.max(0, this.rokaArtilleryTimer - dt);
+        }
+        if (this.heroName === 'Voss') {
+            this.vossCopyCooldown = Math.max(0, this.vossCopyCooldown - dt);
+            this.vossCopyTimer = Math.max(0, this.vossCopyTimer - dt);
+            if (this.vossCopyTimer <= 0) {
+                this.vossCopiedHero = null;
+                this.vossCopiedTarget = null;
+                this.vossCopiedMelee = false;
+            }
+            if (this.vossDouble?.dead) this.vossDouble = null;
+        }
+        if (this.heroName === 'Raigo') {
+            this.raigoArmorTimer = Math.max(0, this.raigoArmorTimer - dt);
+            if (this.raigoChargeTimer > 0) this.updateRaigoCharge(dt);
+            if (this.raigoArmorTimer > 0 && Math.random() < 0.45) {
+                game.particles.push(new Particle(this.x+Math.random()*this.w,this.y+Math.random()*this.h,'#ffd84d',(Math.random()-.5)*5,-2-Math.random()*4,260,3));
+            }
+        }
 
         if (this.heroName === 'Archor') {
             if (this.archorSpeedCooldown > 0) this.archorSpeedCooldown = Math.max(0, this.archorSpeedCooldown - dt);
@@ -709,7 +751,8 @@ class Fighter extends Entity {
         const isUkonBursting = this.heroName === 'Ukon' && (this.ukonDashTimer > 0 || this.ukonChargeTimer > 0);
         const isUkonUltimateLocked = this.heroName === 'Ukon' && !!this.ukonUltimatePhase;
         const isMoriGrappling = this.heroName === 'Mori' && this.moriGrappleTimer > 0;
-        let canAct = (this.stunTimer <= 0 && this.buffs.dizzy <= 0 && this.grapplePhase !== 1 && this.superWindupTimer <= 0 && this.euclidSwitchTimer <= 0 && !(this.itanSuperWindupTimer > 0) && !(this.veyraReversalTimer > 0) && !(this.axeronRushTimer > 0) && !isKilaSwitching && !isSolaForceLocked && !isSolaCharging && !isUkonBursting && !isUkonUltimateLocked && !isMoriGrappling);
+        const isRaigoCharging = this.heroName === 'Raigo' && this.raigoChargeTimer > 0;
+        let canAct = (this.stunTimer <= 0 && this.buffs.dizzy <= 0 && this.grapplePhase !== 1 && this.superWindupTimer <= 0 && this.euclidSwitchTimer <= 0 && !(this.itanSuperWindupTimer > 0) && !(this.veyraReversalTimer > 0) && !(this.axeronRushTimer > 0) && !isKilaSwitching && !isSolaForceLocked && !isSolaCharging && !isUkonBursting && !isUkonUltimateLocked && !isMoriGrappling && !isRaigoCharging);
         let canMoveAndAttack = canAct && !hasPuppet;
 
         if (this.heroName === 'Gensan') {
@@ -898,7 +941,7 @@ class Fighter extends Entity {
 
         let applyGravity = true;
 
-        if (isSolaForceLocked || (this.heroName === 'Axeron' && this.axeronRushTimer > 0) || isUkonBursting || isUkonUltimateLocked || isMoriGrappling) {
+        if (isSolaForceLocked || (this.heroName === 'Axeron' && this.axeronRushTimer > 0) || isUkonBursting || isUkonUltimateLocked || isMoriGrappling || isRaigoCharging) {
             applyGravity = false;
             if (isSolaForceLocked) { this.vx = 0; this.vy = 0; }
             this.jumpBuffer = 0;
@@ -1043,6 +1086,8 @@ class Fighter extends Entity {
         let targetVx = 0;
         if (isSolaCharging) {
             targetVx = this.solaChargeDirection * 18;
+        } else if (isRaigoCharging) {
+            targetVx = this.vx;
         } else if (isMoriGrappling) {
             targetVx = this.vx;
         } else if (isUkonBursting || (this.heroName === 'Ukon' && this.ukonUltimatePhase === 'drop')) {
@@ -1077,6 +1122,7 @@ class Fighter extends Entity {
         if (this.currentPlatform && this.currentPlatform.type === 'center') friction = 0.03;
         if (!canAct || ((this.heroName === 'Euclid' || this.heroName === 'Kae' || this.heroName === 'Ugo' || this.heroName === 'Volt' || this.heroName === 'Gensan' || this.heroName === 'Wolf') && this.attackState === 'windup') || hasPuppet) friction = 0.1;
         if (isSolaCharging) friction = 1;
+        if (isRaigoCharging) friction = 1;
         if (isMoriGrappling) friction = 1;
         if (isUkonBursting || (this.heroName === 'Ukon' && this.ukonUltimatePhase === 'drop')) friction = 1;
 
@@ -1140,13 +1186,17 @@ class Fighter extends Entity {
                     let targetsHit = [];
                     for (const enemy of game.getOpponentsOf(this)) {
                         if (!enemy.untargetable && checkAABB(hitBox, enemy)) {
+                            const hpBefore = Number.isFinite(enemy.hp) ? enemy.hp : null;
                             enemy.takeDamage(this.getMeleeDamage(), this);
+                            if (this.heroName === 'Raigo') this.onRaigoBasicHit(enemy, hpBefore === null ? this.getMeleeDamage() : Math.max(0, hpBefore - Math.max(0, enemy.hp)));
                             targetsHit.push(enemy);
                         }
                     }
                     for (let m of game.minions) {
                         if (m && !m.isBoss && m.owner !== this && !m.dead && !m.untargetable && checkAABB(hitBox, m)) {
+                            const hpBefore = Number.isFinite(m.hp) ? m.hp : null;
                             m.takeDamage(this.getMeleeDamage(), this);
+                            if (this.heroName === 'Raigo') this.onRaigoBasicHit(m, hpBefore === null ? this.getMeleeDamage() : Math.max(0, hpBefore - Math.max(0, m.hp)));
                             targetsHit.push(m);
                         }
                     }
@@ -1254,6 +1304,9 @@ class Fighter extends Entity {
                     if (this.heroName === 'Veyra') recTime = 180;
                     if (this.heroName === 'Brom') recTime = 420;
                     if (this.heroName === 'Axeron') recTime = 80;
+                    if (this.heroName === 'Roka') recTime = this.rokaArtilleryTimer > 0 ? 120 : 340;
+                    if (this.heroName === 'Voss') recTime = 210;
+                    if (this.heroName === 'Raigo') recTime = 115;
 
                     this.attackState = 'recovery';
                     this.stateTimer = recTime;
@@ -1410,6 +1463,13 @@ class Fighter extends Entity {
                     this.summonUkonShadow();
                 } else if (this.heroName === 'Mori' && this.attackState === 'idle') {
                     this.fireMoriGrapple();
+                } else if (this.heroName === 'Roka' && this.attackState === 'idle') {
+                    this.fireRokaMortar();
+                } else if (this.heroName === 'Voss' && this.attackState === 'idle') {
+                    if (this.vossCopyTimer > 0) this.performVossCopiedAbility();
+                    else this.startVossCopy();
+                } else if (this.heroName === 'Raigo' && this.attackState === 'idle') {
+                    this.startRaigoCharge();
                 }
             }
             if (keysPressed[this.controls.attack] && this.attackState === 'idle') {
@@ -1481,7 +1541,8 @@ class Fighter extends Entity {
     }
 
     isMeleeAttack() {
-        if (this.heroName === 'Hason' || this.heroName === 'Willi' || this.heroName === 'Ugo' || this.heroName === 'Kila' || this.heroName === 'Volt' || this.heroName === 'Noae' || this.heroName === 'Kuro' || this.heroName === 'Nyra' || this.heroName === 'Archor' || this.heroName === 'D2F1' || this.heroName === 'Veyra' || this.heroName === 'Brom' || this.heroName === 'Mori') return false;
+        if (this.heroName === 'Hason' || this.heroName === 'Willi' || this.heroName === 'Ugo' || this.heroName === 'Kila' || this.heroName === 'Volt' || this.heroName === 'Noae' || this.heroName === 'Kuro' || this.heroName === 'Nyra' || this.heroName === 'Archor' || this.heroName === 'D2F1' || this.heroName === 'Veyra' || this.heroName === 'Brom' || this.heroName === 'Mori' || this.heroName === 'Roka') return false;
+        if (this.heroName === 'Voss') return this.vossCopyTimer > 0 && this.vossCopiedMelee;
         if (this.heroName === 'Laegon') return this.thunderGodTimer > 0;
         if (this.heroName === 'Euclid' && this.euclidWeapon === 'magic') return false;
         if (this.heroName === 'Hunter' && this.hunterWeapon === 'musket') return false;
@@ -1504,6 +1565,8 @@ class Fighter extends Entity {
         if (this.heroName === 'Itan') { range = 132; yOffset = -12; h = 92; }
         if (this.heroName === 'Laegon') { range = 82; yOffset = 2; h = 58; }
         if (this.heroName === 'Axeron') { range = 76; yOffset = 0; h = 62; }
+        if (this.heroName === 'Voss') { range = 78; yOffset = 2; h = 58; }
+        if (this.heroName === 'Raigo') { range = 92; yOffset = -3; h = 68; }
 
         if (this.heroName === 'Macu') {
             range = 110;
@@ -1534,6 +1597,11 @@ class Fighter extends Entity {
         if (this.heroName === 'Itan') return 32;
         if (this.heroName === 'Laegon') return 30;
         if (this.heroName === 'Axeron') return 30;
+        if (this.heroName === 'Voss') return this.getVossCopiedDamage();
+        if (this.heroName === 'Raigo') {
+            const damage = this.raigoEmpoweredAttack ? 50 : 22;
+            return this.raigoArmorTimer > 0 ? damage * 1.5 : damage;
+        }
         return 13;
     }
 
@@ -1565,6 +1633,10 @@ class Fighter extends Entity {
             this.startUkonRodCharge();
             return;
         }
+        if (this.heroName === 'Raigo') {
+            this.raigoEmpoweredAttack = this.raigoEnergy >= this.raigoMaxEnergy;
+            if (this.raigoEmpoweredAttack) this.raigoEnergy = 0;
+        }
 
         this.attackState = 'windup';
         this.stateTimer = (this.heroName === 'Hunter' && this.hunterWeapon === 'sword') ? 200 : 100;
@@ -1592,6 +1664,9 @@ class Fighter extends Entity {
         if (this.heroName === 'Brom') this.stateTimer = 180;
         if (this.heroName === 'Axeron') this.stateTimer = 45;
         if (this.heroName === 'Mori') this.stateTimer = 160;
+        if (this.heroName === 'Roka') this.stateTimer = this.rokaArtilleryTimer > 0 ? 280 : 800;
+        if (this.heroName === 'Voss') this.stateTimer = this.vossCopyTimer > 0 ? 90 : 120;
+        if (this.heroName === 'Raigo') this.stateTimer = 70;
         if (this.heroName === 'Wolf') {
             this.stateTimer = 50;
             this.wolfPassiveReady = this.wolfAttackTimer >= 1500;
@@ -1630,6 +1705,11 @@ class Fighter extends Entity {
         let aimAngle = Math.atan2(ty - py, tx - px);
 
         if (this.heroName === 'Macu') this.vx = this.facing * 12;
+        if (this.heroName === 'Voss' && this.vossCopyTimer > 0 && this.vossCopiedMelee) {
+            this.queueVossMirror(this.getVossCopiedDamage(), 'copy', tx, ty);
+            for(let i=0;i<10;i++)game.particles.push(new Particle(px,py,'#c9b8ff',this.facing*(3+Math.random()*6),(Math.random()-.5)*8,240,3));
+            return;
+        }
 
         if (this.heroName === 'Hason') {
             this.hasonAmmo--;
@@ -1752,6 +1832,102 @@ class Fighter extends Entity {
         else if (this.heroName === 'Mori') {
             game.projectiles.push(new MechanicFanBlade(this, px, py - 4, Math.cos(aimAngle)*17, Math.sin(aimAngle)*17));
         }
+        else if (this.heroName === 'Roka') {
+            const direction = this.getRokaAimVector();
+            const speed = 15;
+            const muzzleX = this.x + this.w/2 + direction.x*32, muzzleY = this.y + this.h*.42 + direction.y*24;
+            game.projectiles.push(new RokaCannonball(this,muzzleX,muzzleY,direction.x*speed,direction.y*speed,this.rokaArtilleryTimer>0));
+            const recoil = (this.rokaArtilleryTimer>0?18.75:15);
+            this.vx -= direction.x*recoil;this.vy -= direction.y*recoil;
+            for(let i=0;i<18;i++)game.particles.push(new Particle(muzzleX,muzzleY,i%2?'#ffb347':'#d8f4ff',direction.x*(3+Math.random()*8)+(Math.random()-.5)*4,direction.y*(3+Math.random()*8)+(Math.random()-.5)*4,260,3+Math.random()*3));
+        }
+        else if (this.heroName === 'Voss') {
+            const copied = this.vossCopyTimer > 0;
+            const damage = copied ? this.getVossCopiedDamage() : 15;
+            game.projectiles.push(new TemporalBolt(this,px,py,Math.cos(aimAngle)*18,Math.sin(aimAngle)*18,damage,copied?'copy':'shard'));
+            this.queueVossMirror(damage,copied?'copy':'shard',tx,ty);
+        }
+    }
+
+    getRokaAimVector() {
+        let dx=(keys[this.controls.right]?1:0)-(keys[this.controls.left]?1:0);
+        let dy=(keys[this.controls.down]?1:0)-(keys[this.controls.jump]?1:0);
+        if(!dx&&!dy){const target=game.getEnemyOf(this);if(target){dx=target.x+target.w/2-(this.x+this.w/2);dy=target.y+target.h/2-(this.y+this.h*.42);}else dx=this.facing;}
+        const length=Math.max(1,Math.hypot(dx,dy));if(dx)this.facing=dx>0?1:-1;return{x:dx/length,y:dy/length};
+    }
+
+    fireRokaMortar() {
+        if(this.heroName!=='Roka'||this.rokaMortarCooldown>0)return false;
+        const target=game.getEnemyOf(this);let targetX=this.x+this.w/2+this.facing*260,targetY=GROUND_Y;
+        if(target&&!target.dead){targetX=target.x+target.w/2;targetY=target.y+target.h;}
+        game.projectiles.push(new RokaMortarShell(this,targetX,targetY));this.rokaMortarCooldown=6000;
+        this.vx-=this.facing*4;this.vy=Math.min(this.vy,-3);return true;
+    }
+
+    getVossCopiedDamage() {
+        if(!this.vossCopiedHero)return 15;
+        const values={Hason:28,Hunter:20,Macu:22,Willi:23,Artu:73,Duke:33,Kadaxi:33,Euclid:35,Lique:18,Kae:25,Ugo:17,Kila:35,Volt:12,Gensan:32,Noae:19,Wolf:20,Kuro:35,Sola:56,Nyra:22,Orion:30,Archor:24,Itan:32,D2F1:15,Laegon:30,Veyra:30,Brom:45,Axeron:30,Ukon:40,Mori:25,Roka:40,Raigo:22};
+        return values[this.vossCopiedHero]||30;
+    }
+
+    startVossCopy() {
+        if(this.heroName!=='Voss'||this.vossCopyCooldown>0)return false;
+        const target=game.getEnemyOf(this);if(!target||target.dead)return false;
+        this.vossCopiedTarget=target;this.vossCopiedHero=target.heroName||'Unknown';
+        this.vossCopiedMelee=typeof target.isMeleeAttack==='function'?target.isMeleeAttack():false;
+        this.vossCopyTimer=3500;this.vossCopyCooldown=7500;
+        for(let i=0;i<22;i++)game.particles.push(new Particle(this.x+this.w/2,this.y+this.h/2,i%2?'#c9b8ff':'#8be9ff',(Math.random()-.5)*12,(Math.random()-.5)*12,420,4));
+        return true;
+    }
+
+    performVossCopiedAbility() {
+        if(this.heroName!=='Voss'||this.vossCopyTimer<=0)return false;
+        const target=game.getEnemyOf(this),hero=this.vossCopiedHero;
+        const summonHeroes=['Artu','Euclid','Ugo','Noae','D2F1','Mori'];
+        const mobilityHeroes=['Willi','Kae','Wolf','Sola','Nyra','Axeron','Ukon','Raigo'];
+        let tx=target?target.x+target.w/2:this.x+this.facing*220,ty=target?target.y+target.h/2:this.y+this.h/2;
+        if(summonHeroes.includes(hero)){
+            const echo=new TemporalEcho(this,Math.max(0,Math.min(CANVAS_W-this.w,tx-this.w/2)),Math.max(0,Math.min(GROUND_Y-this.h,ty-this.h/2)));echo.life=1800;echo.maxLife=1800;game.minions.push(echo);
+        } else if(mobilityHeroes.includes(hero)){
+            const dx=tx-(this.x+this.w/2),dy=ty-(this.y+this.h/2),length=Math.max(1,Math.hypot(dx,dy));this.vx=dx/length*18;this.vy=dy/length*18;this.invincible=Math.max(this.invincible,120);
+        } else {
+            const damage=Math.max(15,this.getVossCopiedDamage()*.75);for(const enemy of game.getOpponentsOf(this)){if(Math.hypot(enemy.x+enemy.w/2-tx,enemy.y+enemy.h/2-ty)>95)continue;enemy.takeDamage(damage,this,false,true);enemy.buffs=enemy.buffs||{};enemy.buffs.slow=Math.max(enemy.buffs.slow||0,650);}
+        }
+        this.queueVossMirror(Math.max(15,this.getVossCopiedDamage()*.75),'copy',tx,ty);
+        for(let i=0;i<18;i++)game.particles.push(new Particle(tx,ty,'#c9b8ff',(Math.random()-.5)*12,(Math.random()-.5)*12,360,4));return true;
+    }
+
+    queueVossMirror(damage,kind,targetX,targetY) {
+        if(this.heroName!=='Voss'||!this.vossDouble||this.vossDouble.dead)return;
+        this.vossDouble.mirrorAttack({damage,kind,targetX,targetY,facing:this.facing});
+    }
+
+    healRaigoFromDamage(actualDamage) {
+        if(this.heroName!=='Raigo'||this.raigoArmorTimer<=0||actualDamage<=0)return;
+        const healing=actualDamage*.25;this.hp=Math.min(this.maxHp,this.hp+healing);
+        for(let i=0;i<5;i++)game.particles.push(new Particle(this.x+Math.random()*this.w,this.y+Math.random()*this.h,'#fff3a6',0,-2-Math.random()*3,300,3));
+    }
+
+    onRaigoBasicHit(target,actualDamage) {
+        if(actualDamage<=0)return;
+        if(this.raigoEmpoweredAttack){target.buffs=target.buffs||{};target.buffs.dizzy=Math.max(target.buffs.dizzy||0,500);for(let i=0;i<18;i++)game.particles.push(new Particle(target.x+target.w/2,target.y+target.h/2,i%2?'#ffd84d':'#dffcff',(Math.random()-.5)*14,(Math.random()-.5)*14,380,4));}
+        else this.raigoEnergy=Math.min(this.raigoMaxEnergy,this.raigoEnergy+10);
+        this.healRaigoFromDamage(actualDamage);
+    }
+
+    startRaigoCharge() {
+        if(this.heroName!=='Raigo'||this.raigoEnergy<30||this.raigoChargeTimer>0)return false;
+        let dx=(keys[this.controls.right]?1:0)-(keys[this.controls.left]?1:0),dy=(keys[this.controls.down]?1:0)-(keys[this.controls.jump]?1:0);
+        if(!dx&&!dy)dx=this.facing;const length=Math.max(1,Math.hypot(dx,dy));this.raigoEnergy-=30;this.raigoChargeTimer=240;this.raigoChargeHitTargets=new Set();this.vx=dx/length*24;this.vy=dy/length*24;if(dx)this.facing=dx>0?1:-1;return true;
+    }
+
+    updateRaigoCharge(dt) {
+        const damage=this.raigoArmorTimer>0?45:30;
+        for(const target of [...game.getOpponentsOf(this),...game.minions.filter(item=>item&&item.owner!==this&&!item.dead&&!item.untargetable)]){
+            if(this.raigoChargeHitTargets.has(target)||!checkAABB(this,target))continue;const hpBefore=Number.isFinite(target.hp)?target.hp:null;target.takeDamage(damage,this,false,true);const actual=hpBefore===null?damage:Math.max(0,hpBefore-Math.max(0,target.hp));this.healRaigoFromDamage(actual);target.buffs=target.buffs||{};target.buffs.dizzy=Math.max(target.buffs.dizzy||0,350);target.vx=this.facing*17;target.vy=-7;this.raigoChargeHitTargets.add(target);
+        }
+        for(let i=0;i<4;i++)game.particles.push(new Particle(this.x+this.w/2,this.y+this.h/2,this.raigoArmorTimer>0?'#ffd84d':'#58e6ff',-this.vx*.2+(Math.random()-.5)*4,-this.vy*.2+(Math.random()-.5)*4,260,3));
+        this.raigoChargeTimer=Math.max(0,this.raigoChargeTimer-dt);if(this.raigoChargeTimer<=0){this.vx*=.45;this.vy*=.45;}
     }
 
     getMoriNodes() {
@@ -1820,16 +1996,19 @@ class Fighter extends Entity {
     }
 
     getUkonTarget() {
+        const summons = (game.minions || []).filter(target => target && target.owner !== this && !target.dead && !target.untargetable
+            && target.type !== 'time_anchor' && target.type !== 'temporal_echo' && typeof target.takeDamage === 'function');
         const opponents = typeof game.getOpponentsOf === 'function'
             ? game.getOpponentsOf(this).filter(target => target && !target.dead && !target.untargetable)
             : [];
-        const preferred = this.aiTarget && opponents.includes(this.aiTarget) ? this.aiTarget : null;
-        if (preferred) return preferred;
-        return opponents.reduce((best, target) => {
+        const candidates = [...opponents, ...summons];
+        return candidates.reduce((best, target) => {
             if (!best) return target;
             const targetDistance = Math.hypot(target.x + target.w/2 - (this.x + this.w/2), target.y + target.h/2 - (this.y + this.h/2));
             const bestDistance = Math.hypot(best.x + best.w/2 - (this.x + this.w/2), best.y + best.h/2 - (this.y + this.h/2));
-            return targetDistance < bestDistance ? target : best;
+            if (targetDistance < bestDistance - 0.5) return target;
+            if (Math.abs(targetDistance - bestDistance) <= 0.5 && summons.includes(target) && !summons.includes(best)) return target;
+            return best;
         }, null);
     }
 
@@ -1866,6 +2045,7 @@ class Fighter extends Entity {
         const dy = targetY - originY;
         const distance = Math.max(1, Math.hypot(dx, dy));
         this.ukonChargeTargetId = target?.id || null;
+        this.ukonChargeTarget = target || null;
         this.ukonChargeCanStrike = !!target && distance <= 365;
         this.ukonChargeTimer = 235;
         this.ukonBurstOriginX = this.x;
@@ -1892,6 +2072,7 @@ class Fighter extends Entity {
         this.ukonDashTimer = 0;
         this.ukonChargeTimer = 0;
         this.ukonChargeTargetId = null;
+        this.ukonChargeTarget = null;
         this.ukonChargeCanStrike = false;
         this.ukonBurstMaxDistance = 0;
         this.vx *= interrupted ? 0.12 : 0.24;
@@ -1926,8 +2107,7 @@ class Fighter extends Entity {
 
     resolveUkonRodHit() {
         if (this.heroName !== 'Ukon' || this.ukonChargeTimer <= 0 || !this.ukonChargeCanStrike) return false;
-        const fighters = typeof game.getFighters === 'function' ? game.getFighters() : [];
-        const target = fighters.find(fighter => fighter && fighter.id === this.ukonChargeTargetId && !fighter.dead);
+        const target = this.ukonChargeTarget && !this.ukonChargeTarget.dead ? this.ukonChargeTarget : null;
         if (!target) return false;
         const distance = Math.hypot(target.x + target.w/2 - (this.x + this.w/2), target.y + target.h/2 - (this.y + this.h/2));
         if (distance > 72 && !checkAABB(this, target)) return false;
@@ -2319,6 +2499,24 @@ class Fighter extends Entity {
     }
 
     performSuper() {
+        if (this.heroName === 'Roka') {
+            if(this.superCooldown<=0){this.superCooldown=this.superCooldownMax;this.rokaArtilleryTimer=10000;for(let i=0;i<34;i++)game.particles.push(new Particle(this.x+this.w/2,this.y+this.h/2,i%2?'#ffe066':'#9ed6e5',(Math.random()-.5)*15,(Math.random()-.5)*15,520,5));}
+            return;
+        }
+        if (this.heroName === 'Voss') {
+            if(this.superCooldown<=0){
+                this.superCooldown=this.superCooldownMax;if(this.vossDouble&&!this.vossDouble.dead)this.vossDouble.dead=true;
+                let dx=(keys[this.controls.right]?1:0)-(keys[this.controls.left]?1:0),dy=(keys[this.controls.down]?1:0)-(keys[this.controls.jump]?1:0);if(!dx&&!dy)dx=this.facing;
+                const length=Math.max(1,Math.hypot(dx,dy)),distance=240,x=this.x+dx/length*distance,y=this.y+dy/length*distance;
+                this.vossDouble=new VossTemporalDouble(this,x,y);game.minions.push(this.vossDouble);
+                for(let i=0;i<28;i++)game.particles.push(new Particle(this.vossDouble.x+this.w/2,this.vossDouble.y+this.h/2,'#c9b8ff',(Math.random()-.5)*14,(Math.random()-.5)*14,480,5));
+            }
+            return;
+        }
+        if (this.heroName === 'Raigo') {
+            if(this.superCooldown<=0){this.superCooldown=this.superCooldownMax;this.raigoArmorTimer=8000;for(let i=0;i<42;i++)game.particles.push(new Particle(this.x+this.w/2,this.y+this.h/2,i%2?'#ffd84d':'#fff7b0',(Math.random()-.5)*18,(Math.random()-.5)*18,600,5));}
+            return;
+        }
         if (this.heroName === 'Mori') {
             if (this.superCooldown <= 0) {
                 this.superCooldown = this.superCooldownMax;
@@ -2703,6 +2901,13 @@ class Fighter extends Entity {
             }
             ctx.restore();
         }
+        if (this.heroName === 'Raigo' && this.raigoArmorTimer > 0) {
+            const pulse=8+Math.sin(Date.now()*.02)*4;ctx.save();ctx.strokeStyle='#ffd84d';ctx.shadowBlur=24;ctx.shadowColor='#ffd84d';ctx.lineWidth=5;
+            ctx.strokeRect(this.x-pulse,this.y-pulse,this.w+pulse*2,this.h+pulse*2);ctx.restore();
+        }
+        if (this.heroName === 'Voss' && this.vossCopyTimer > 0) {
+            ctx.save();ctx.strokeStyle='rgba(201,184,255,.75)';ctx.lineWidth=3;ctx.setLineDash([7,5]);ctx.lineDashOffset=-Date.now()*.03;ctx.strokeRect(this.x-5,this.y-5,this.w+10,this.h+10);ctx.restore();
+        }
         const kuroFullyInvisible = this.isKuroFullyInvisible();
         const revealOwnedKuro = kuroFullyInvisible && view.revealOwnedKuro === true;
         if (kuroFullyInvisible && !revealOwnedKuro) return;
@@ -2967,6 +3172,14 @@ class Fighter extends Entity {
             ctx.fillStyle='#ddb18a';ctx.fillRect(-hw+6,8,this.w-12,14);ctx.fillStyle='#353b3e';ctx.fillRect(-hw,28,this.w,12);
             ctx.fillStyle='#ffd166';ctx.fillRect(-hw+4,43,this.w-8,4);ctx.fillStyle='#596269';ctx.fillRect(-hw+4,50,7,17);ctx.fillRect(hw-11,50,7,17);
             ctx.fillStyle='#1d2326';ctx.fillRect(-hw+4,2,this.w-8,5);
+        } else if (this.heroName === 'Roka') {
+            ctx.fillStyle='#263238';ctx.fillRect(-hw-4,-4,this.w+8,h+8);ctx.fillStyle=this.color;ctx.fillRect(-hw,0,this.w,h);ctx.fillStyle='#b9d8df';ctx.fillRect(-hw+6,8,this.w-12,14);ctx.fillStyle='#1d2529';ctx.fillRect(-hw,30,this.w,11);ctx.fillStyle='#d5a94d';ctx.fillRect(-hw+3,44,this.w-6,5);
+            ctx.fillStyle='#30383c';ctx.fillRect(hw-5,23,60,20);ctx.fillStyle='#66767c';ctx.fillRect(hw+38,27,35,12);ctx.fillStyle='#ffb347';ctx.fillRect(hw+66,30,9,6);
+        } else if (this.heroName === 'Voss') {
+            ctx.fillStyle='#252149';ctx.fillRect(-hw-3,-3,this.w+6,h+6);ctx.fillStyle=this.color;ctx.fillRect(-hw,0,this.w,h);ctx.fillStyle='#d5d0ff';ctx.fillRect(-hw+6,8,this.w-12,14);ctx.fillStyle='#27233f';ctx.fillRect(-hw,29,this.w,9);ctx.strokeStyle='#8be9ff';ctx.lineWidth=2;ctx.beginPath();ctx.arc(0,48,10,0,Math.PI*2);ctx.stroke();
+        } else if (this.heroName === 'Raigo') {
+            ctx.fillStyle=this.raigoArmorTimer>0?'#5f4b12':'#123b47';ctx.fillRect(-hw-4,-4,this.w+8,h+8);ctx.fillStyle=this.raigoArmorTimer>0?'#d7a928':this.color;ctx.fillRect(-hw,0,this.w,h);ctx.fillStyle='#dffaff';ctx.fillRect(-hw+6,8,this.w-12,14);ctx.fillStyle='#14313b';ctx.fillRect(-hw,29,this.w,10);ctx.fillStyle=this.raigoArmorTimer>0?'#fff3a6':'#58e6ff';ctx.fillRect(-hw+4,43,this.w-8,5);
+            ctx.fillStyle='#d6e9ee';ctx.fillRect(hw-2,25,68,5);ctx.fillStyle=this.raigoArmorTimer>0?'#ffd84d':'#58e6ff';ctx.beginPath();ctx.moveTo(hw+70,27);ctx.lineTo(hw+54,18);ctx.lineTo(hw+57,27);ctx.lineTo(hw+54,36);ctx.closePath();ctx.fill();
         } else if (this.heroName === 'Wolf') {
             ctx.fillStyle = "#404040"; ctx.fillRect(-hw - 2, -2, this.w + 4, h + 4);
             ctx.fillStyle = this.color; ctx.fillRect(-hw, 0, this.w, h);

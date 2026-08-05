@@ -61,7 +61,10 @@ const HERO_TACTICS = {
     Brom:    { role: 'demolitionist', aggression: 0.52, caution: 1.08, burst: 1.55, kite: 1.18, setup: 1.85, highGround: 0.92, retreatHp: 0.36, retreatFireChance: 0.30 },
     Axeron:  { role: 'power_assassin', aggression: 1.32, caution: 0.62, burst: 1.75, kite: 0.32, setup: 0.85, highGround: 0.48, retreatHp: 0.30, retreatFireChance: 0.08 },
     Ukon:    { role: 'dash_assassin', aggression: 1.38, caution: 0.58, burst: 1.82, kite: 0.36, setup: 1.05, highGround: 0.84, retreatHp: 0.27, retreatFireChance: 0.06 },
-    Mori:    { role: 'mechanist', aggression: 0.46, caution: 1.22, burst: 0.72, kite: 1.34, setup: 1.92, highGround: 1.28, retreatHp: 0.40, retreatFireChance: 0.42 }
+    Mori:    { role: 'mechanist', aggression: 0.46, caution: 1.22, burst: 0.72, kite: 1.34, setup: 1.92, highGround: 1.28, retreatHp: 0.40, retreatFireChance: 0.42 },
+    Roka:    { role: 'recoil_artillery', aggression: 0.62, caution: 1.35, burst: 1.65, kite: 1.55, setup: 0.85, highGround: 1.42, retreatHp: 0.42, retreatFireChance: 0.72 },
+    Voss:    { role: 'copycat', aggression: 0.72, caution: 1.05, burst: 1.38, kite: 0.92, setup: 1.45, highGround: 0.85, retreatHp: 0.36, retreatFireChance: 0.48 },
+    Raigo:   { role: 'thunder_bruiser', aggression: 1.28, caution: 0.58, burst: 1.55, kite: 0.18, setup: 0.32, highGround: 0.65, retreatHp: 0.27, retreatFireChance: 0.10 }
 };
 
 function getHeroTactic(ai) {
@@ -230,6 +233,18 @@ function getControlledEntity(game, ai) {
 }
 
 function getTargetEntity(game, ai, target, source) {
+    if (ai.heroName === 'Ukon') {
+        const summons = game.minions.filter(minion => minion && minion.owner !== ai && !minion.dead && !minion.untargetable
+            && minion.type !== 'time_anchor' && minion.type !== 'temporal_echo' && typeof minion.takeDamage === 'function');
+        return [target, ...summons].filter(Boolean).reduce((best, candidate) => {
+            if (!best) return candidate;
+            const candidateDistance = distanceBetween(source, candidate);
+            const bestDistance = distanceBetween(source, best);
+            if (candidateDistance < bestDistance - 0.5) return candidate;
+            if (Math.abs(candidateDistance - bestDistance) <= 0.5 && summons.includes(candidate) && !summons.includes(best)) return candidate;
+            return best;
+        }, null);
+    }
     const drones = game.minions.filter(minion => minion.type === 'd2f_drone' && minion.owner !== ai && !minion.dead && !minion.untargetable);
     if (drones.length) {
         return drones.reduce((best, drone) => {
@@ -460,6 +475,9 @@ function getCombatProfile(ai, source = ai) {
         case 'Axeron': range = 96; preferred = 62; break;
         case 'Ukon': range = 365; preferred = 88; break;
         case 'Mori': range = 430; preferred = 270; break;
+        case 'Roka': range = 650; preferred = 410; break;
+        case 'Voss': range = ai.vossCopyTimer > 0 && ai.vossCopiedMelee ? 92 : 430; preferred = ai.vossCopyTimer > 0 && ai.vossCopiedMelee ? 62 : 275; break;
+        case 'Raigo': range = 112; preferred = 72; break;
     }
     return { range, preferred, ranged: !ai.isMeleeAttack(), tactics };
 }
@@ -495,6 +513,9 @@ function hasSetupOpportunity(game, ai) {
         case 'Axeron': return (ai.axeronMarks || []).some(mark => mark.life > 0 && mark.target && !mark.target.dead);
         case 'Ukon': return ai.ukonShadowCooldown <= 0 && owned('ukon_shadow') === 0;
         case 'Mori': return owned('mori_node') < 3;
+        case 'Roka': return ai.rokaMortarCooldown <= 0;
+        case 'Voss': return ai.vossCopyTimer <= 0 && ai.vossCopyCooldown <= 0;
+        case 'Raigo': return ai.raigoEnergy >= 30;
         default: return false;
     }
 }
@@ -680,6 +701,12 @@ function chooseDefensiveAction(game, ai, target, threat) {
         case 'Mori':
             if (ai.moriGrappleCooldown <= 0) return 'switch';
             break;
+        case 'Roka':
+            if (ai.rokaMortarCooldown <= 0) return 'switch';
+            break;
+        case 'Raigo':
+            if (ai.raigoEnergy >= 30) return 'switch';
+            break;
     }
     return null;
 }
@@ -857,6 +884,19 @@ function chooseHeroAction(game, ai, target, targetEntity, dist, verticalDistance
             if(ai.moriGrappleCooldown<=0&&(combatState==='evade'||combatState==='highground'||dist<135))return 'switch';
             break;
         }
+        case 'Roka':
+            if(superReady&&dist<760)return 'super';
+            if(ai.rokaMortarCooldown<=0&&(Math.abs(verticalDistance)>80||combatState==='setup'||isVulnerableTarget(target)))return 'switch';
+            break;
+        case 'Voss':
+            if(superReady&&dist<620)return 'super';
+            if(ai.vossCopyTimer>0&&(combatState==='burst'||isVulnerableTarget(target)))return 'switch';
+            if(ai.vossCopyCooldown<=0)return 'switch';
+            break;
+        case 'Raigo':
+            if(superReady&&dist<520)return 'super';
+            if(ai.raigoEnergy>=30&&(dist>105||Math.abs(verticalDistance)>65||combatState==='pressure'))return 'switch';
+            break;
     }
     return null;
 }

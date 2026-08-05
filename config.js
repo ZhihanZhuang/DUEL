@@ -358,12 +358,27 @@ var HEROES = {
     Ukon: {
         name: "Ukon", desc: "Iron Rod Burst Warrior",
         color: "#b94b3f", maxHp: 850, speed: 7.4, jump: 17, width: 42, height: 72, superCD: 28000,
-        ui: { hp: "85 WRD", atk: "4 WRD (Iron Rod Charge)", passive: "<span class='skill-tag'>Iron Momentum</span> Ukon cannot walk. [Left], [Down], and [Right] launch short collision-aware directional dashes with a fast recharge; [Jump] works normally. Basic Attack locks a direction and travels a limited distance toward the enemy; it only strikes if the enemy began within reach, otherwise it is a mobility dash. Press [Switch] to summon a fragile Iron Shadow at the enemy that chases once, strikes for 1.5 WRD, and briefly slows and stuns (8s CD).", super: "<span class='skill-tag'>Heavenly Peach Tree</span> Summons a towering peach tree and carries vulnerable Ukon to its crown. Press [Super] again to predict the enemy's position and perform Heavenly Drop after a short warning. Deals 6-16 WRD based on actual fall distance with heavy knockback, stun, debris, and screen shake." }
+        ui: { hp: "85 WRD", atk: "4 WRD (Iron Rod Charge)", passive: "<span class='skill-tag'>Iron Momentum</span> Ukon cannot walk. [Left], [Down], and [Right] launch short collision-aware directional dashes with a fast recharge; [Jump] works normally. Basic Attack locks a direction and travels a limited distance toward the closest enemy; it only strikes if that enemy began within reach, otherwise it is a mobility dash. Hostile summoned units are valid targets and win equal-distance ties. Press [Switch] to summon a fragile Iron Shadow at the enemy that chases once, strikes for 1.5 WRD, and briefly slows and stuns (8s CD).", super: "<span class='skill-tag'>Heavenly Peach Tree</span> Summons a towering peach tree and carries vulnerable Ukon to its crown. Press [Super] again to predict the enemy's position and perform Heavenly Drop after a short warning. Deals 6-16 WRD based on actual fall distance with heavy knockback, stun, debris, and screen shake." }
     },
     Mori: {
         name: "Mori", desc: "Mechanist Trap Controller",
         color: "#c58a32", maxHp: 800, speed: 5.4, jump: 15, width: 40, height: 70, superCD: 26000,
         ui: { hp: "80 WRD", atk: "2.5 WRD (Mechanic Fan)", passive: "<span class='skill-tag'>Linked Mechanisms</span> Fan blades leave 5s Mechanism Nodes on walls and platforms (max 3). Nearby nodes connect with a one-use Energy Wire that deals 2 WRD and slows for 1s. Every third consecutive fan hit gains knockback. Press [Switch] to fire Grappling Wire toward an enemy, node, or surface (3s CD).", super: "<span class='skill-tag'>Thousand Mechanisms</span> For 8s, valid arena surfaces deploy up to 20 warned traps: spears, springs, blade wires, rolling bombs, and tracking mini machine guns. Each machine gun fires six blockable 0.8 WRD rounds. Mori remains fully vulnerable." }
+    },
+    Roka: {
+        name: "Roka", desc: "Recoil Heavy Cannon Gunner",
+        color: "#496d7b", maxHp: 600, speed: 4.6, jump: 14, width: 42, height: 70, superCD: 24000,
+        ui: { hp: "60 WRD", atk: "4 WRD (Charged Cannon)", passive: "<span class='skill-tag'>Recoil Movement</span> Every cannon shot immediately launches Roka opposite the aimed direction, including while airborne. Hold a direction while firing to aim. Press [Switch] for a marked Mortar shell that falls from above (6s CD).", super: "<span class='skill-tag'>Heavy Artillery</span> For 10s, Cannon Shot charges faster and deals 5 WRD with 1.5x explosion radius and knockback. Recoil is 1.25x stronger, enabling sustained aerial movement." }
+    },
+    Voss: {
+        name: "Voss", desc: "Temporal Copycat",
+        color: "#5660a8", maxHp: 750, speed: 5.6, jump: 15, width: 40, height: 70, superCD: 22000,
+        ui: { hp: "75 WRD", atk: "1.5 WRD (Temporal Shard)", passive: "<span class='skill-tag'>Temporal Copy</span> Press [Switch] to copy the opponent for 3.5s (7.5s CD). Basic attacks and a second [Switch] reproduce a balanced temporal version of their kit, owned by Voss; summons become a short-lived echo effect.", super: "<span class='skill-tag'>Temporal Double</span> Places a duplicate within limited range for 6s. It repeats Voss's basic and copied attacks after a short delay for 50% damage, but cannot use an Ultimate or create another copy." }
+    },
+    Raigo: {
+        name: "Raigo", desc: "Golden Thunder Rider",
+        color: "#287b8f", maxHp: 800, speed: 6.4, jump: 16, width: 42, height: 72, superCD: 22000,
+        ui: { hp: "80 WRD", atk: "2.2 WRD (Lightning Spear)", passive: "<span class='skill-tag'>Static Energy</span> Basic hits generate 10 Energy. At 100, the next attack becomes a 5 WRD Thunder Strike with a brief stun and consumes all Energy. Press [Switch] to spend 30 Energy on a directional 3 WRD Thunder Charge.", super: "<span class='skill-tag'>Golden Thunder Armor</span> For 8s, all attacks deal 150% damage and heal Raigo for 25% of actual damage dealt. Golden lightning makes the empowered state unmistakable." }
     }
 };
 

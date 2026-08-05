@@ -209,6 +209,7 @@ class UkonShadow extends Entity {
         this.owner = owner;
         this.type = 'ukon_shadow';
         this.targetId = target?.id || null;
+        this.target = target || null;
         this.hp = 18;
         this.maxHp = 18;
         this.life = 4200;
@@ -219,17 +220,20 @@ class UkonShadow extends Entity {
         this.buffs = {};
     }
     getTarget() {
-        const fighters = typeof game.getFighters === 'function' ? game.getFighters() : [];
-        const locked = fighters.find(fighter => fighter && fighter.id === this.targetId && !fighter.dead && fighter !== this.owner);
+        const locked = this.target && !this.target.dead && this.target !== this.owner ? this.target : null;
         if (locked) return locked;
+        const summons = (game.minions || []).filter(target => target && target !== this && target.owner !== this.owner && !target.dead && !target.untargetable
+            && target.type !== 'time_anchor' && target.type !== 'temporal_echo' && typeof target.takeDamage === 'function');
         const candidates = typeof game.getOpponentsOf === 'function'
             ? game.getOpponentsOf(this.owner).filter(target => target && !target.dead && !target.untargetable)
             : [];
-        return candidates.reduce((best, target) => {
+        return [...candidates, ...summons].reduce((best, target) => {
             if (!best) return target;
-            const targetDistance = Math.hypot(target.x - this.x, target.y - this.y);
-            const bestDistance = Math.hypot(best.x - this.x, best.y - this.y);
-            return targetDistance < bestDistance ? target : best;
+            const targetDistance = Math.hypot(target.x + target.w/2 - (this.x + this.w/2), target.y + target.h/2 - (this.y + this.h/2));
+            const bestDistance = Math.hypot(best.x + best.w/2 - (this.x + this.w/2), best.y + best.h/2 - (this.y + this.h/2));
+            if (targetDistance < bestDistance - 0.5) return target;
+            if (Math.abs(targetDistance - bestDistance) <= 0.5 && summons.includes(target) && !summons.includes(best)) return target;
+            return best;
         }, null);
     }
     takeDamage(amt) {
@@ -1295,6 +1299,99 @@ class ThousandMechanisms extends Entity {
     }
     update(dt){this.life-=dt;this.spawnTimer-=dt;while(this.spawnTimer<=0&&this.spawnCount<20&&this.life>0){this.spawnTrap();this.spawnTimer+=380;}if(this.life<=0){for(const hazard of game.hazards||[])if(hazard!==this&&hazard.owner===this.owner&&hazard.type==='mori_ultimate_trap')hazard.dead=true;this.dead=true;}}
     draw(ctx){ctx.save();ctx.fillStyle='rgba(240,163,59,.035)';ctx.fillRect(0,0,CANVAS_W,GROUND_Y);ctx.strokeStyle='rgba(255,209,102,.16)';ctx.lineWidth=1;for(let x=0;x<CANVAS_W;x+=80){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x+80,GROUND_Y);ctx.stroke();}ctx.restore();}
+}
+
+class RokaCannonball extends Entity {
+    constructor(owner, x, y, vx, vy, artillery = false) {
+        super(x - 14, y - 14, 28, 28);
+        this.owner = owner; this.type = 'roka_cannonball'; this.vx = vx; this.vy = vy;
+        this.damage = artillery ? 50 : 40; this.radius = artillery ? 165 : 110;
+        this.knockback = artillery ? 22.5 : 15; this.life = 2200; this.artillery = artillery;
+    }
+    explode() {
+        if (this.dead) return;
+        this.dead = true;
+        const cx = this.x + this.w/2, cy = this.y + this.h/2;
+        for (const target of getHostileTargets(this.owner, this)) {
+            const dx = target.x + target.w/2 - cx, dy = target.y + target.h/2 - cy;
+            const distance = Math.hypot(dx, dy);
+            if (distance > this.radius) continue;
+            target.takeDamage(this.damage, this.owner, false, true);
+            const scale = 1 - distance / this.radius * 0.45;
+            target.vx = dx / Math.max(1, distance) * this.knockback * scale;
+            target.vy = Math.min(-5, dy / Math.max(1, distance) * this.knockback - 5);
+        }
+        for (let i = 0; i < (this.artillery ? 62 : 44); i++) {
+            const angle = Math.random() * Math.PI * 2, speed = 4 + Math.random() * (this.artillery ? 20 : 15);
+            game.particles.push(new Particle(cx, cy, i % 3 ? '#ff9f1c' : '#fff2b2', Math.cos(angle)*speed, Math.sin(angle)*speed, 420 + Math.random()*280, 4 + Math.random()*6));
+        }
+    }
+    update(dt) {
+        this.x += this.vx; this.y += this.vy; this.vy += GRAVITY * 0.08; this.life -= dt;
+        if (getHostileTargets(this.owner, this).some(target => checkAABB(this, target))) return this.explode();
+        const surface = this.x <= 0 || this.x + this.w >= CANVAS_W || this.y <= 0 || this.y + this.h >= GROUND_Y
+            || PLATFORMS.some(platform => checkAABB(this, platform));
+        if (surface || this.life <= 0) this.explode();
+    }
+    draw(ctx) {
+        const cx=this.x+this.w/2,cy=this.y+this.h/2;
+        ctx.save();ctx.translate(cx,cy);ctx.fillStyle='#263238';ctx.strokeStyle=this.artillery?'#ffe066':'#9ed6e5';ctx.lineWidth=4;
+        ctx.shadowBlur=this.artillery?18:9;ctx.shadowColor=this.artillery?'#ffb000':'#7dd7ef';ctx.beginPath();ctx.arc(0,0,13,0,Math.PI*2);ctx.fill();ctx.stroke();ctx.restore();
+    }
+}
+
+class RokaMortarShell extends Entity {
+    constructor(owner, targetX, targetY) {
+        super(owner.x + owner.w/2 - 10, owner.y + 8, 20, 26);
+        this.owner=owner;this.type='roka_mortar';this.targetX=Math.max(30,Math.min(CANVAS_W-30,targetX));
+        this.targetY=Math.max(80,Math.min(GROUND_Y,targetY));this.elapsed=0;this.riseTime=650;this.warningTime=1300;
+        this.damage=30;this.radius=105;this.untargetable=true;
+    }
+    impact() {
+        if(this.dead)return;this.dead=true;
+        for(const target of getHostileTargets(this.owner,this)){
+            const dx=target.x+target.w/2-this.targetX,dy=target.y+target.h/2-this.targetY,distance=Math.hypot(dx,dy);
+            if(distance>this.radius)continue;target.takeDamage(this.damage,this.owner,false,true);target.vx=dx/Math.max(1,distance)*7;target.vy=-18;
+        }
+        for(let i=0;i<40;i++){const angle=Math.random()*Math.PI*2,speed=3+Math.random()*14;game.particles.push(new Particle(this.targetX,this.targetY,i%2?'#ffb347':'#5d6970',Math.cos(angle)*speed,Math.sin(angle)*speed,500,4+Math.random()*5));}
+    }
+    update(dt){
+        this.elapsed+=dt;
+        if(this.elapsed<this.riseTime){const progress=this.elapsed/this.riseTime;this.x+=(this.targetX-this.x)*.035;this.y=this.owner.y+8-progress*420;}
+        else {const progress=Math.min(1,(this.elapsed-this.riseTime)/(this.warningTime-this.riseTime));this.x=this.targetX-this.w/2;this.y=-55+(this.targetY+35)*progress*progress;}
+        if(this.elapsed>=this.warningTime)this.impact();
+    }
+    draw(ctx){
+        const blink=.25+Math.sin(Date.now()*.025)*.16;ctx.save();ctx.fillStyle=`rgba(255,92,35,${blink})`;ctx.strokeStyle='#ff9f1c';ctx.lineWidth=3;
+        ctx.beginPath();ctx.ellipse(this.targetX,this.targetY,55,16,0,0,Math.PI*2);ctx.fill();ctx.stroke();
+        ctx.fillStyle='#30383c';ctx.strokeStyle='#ffd166';ctx.fillRect(this.x,this.y,this.w,this.h);ctx.strokeRect(this.x,this.y,this.w,this.h);ctx.restore();
+    }
+}
+
+class TemporalBolt extends Entity {
+    constructor(owner,x,y,vx,vy,damage=15,kind='shard'){
+        super(x-9,y-7,18,14);this.owner=owner;this.type=kind==='copy'?'voss_copy_bolt':'temporal_shard';this.vx=vx;this.vy=vy;
+        this.damage=damage;this.kind=kind;this.life=1200;this.hitTargets=new Set();
+    }
+    update(dt){
+        this.x+=this.vx;this.y+=this.vy;this.life-=dt;
+        for(const target of getHostileTargets(this.owner,this)){if(this.hitTargets.has(target)||!checkAABB(this,target))continue;target.takeDamage(this.damage,this.owner,false,true);target.buffs=target.buffs||{};target.buffs.slow=Math.max(target.buffs.slow||0,this.kind==='copy'?550:700);this.hitTargets.add(target);this.dead=true;break;}
+        if(this.life<=0||this.x<-40||this.x>CANVAS_W+40||this.y<-40||this.y>CANVAS_H+40)this.dead=true;
+    }
+    draw(ctx){ctx.save();ctx.translate(this.x+this.w/2,this.y+this.h/2);ctx.rotate(Math.atan2(this.vy,this.vx));ctx.fillStyle=this.kind==='copy'?'#f5c2ff':'#8be9ff';ctx.shadowBlur=13;ctx.shadowColor='#8c6cff';ctx.beginPath();ctx.moveTo(12,0);ctx.lineTo(-8,-7);ctx.lineTo(-3,0);ctx.lineTo(-8,7);ctx.closePath();ctx.fill();ctx.restore();}
+}
+
+class VossTemporalDouble extends Entity {
+    constructor(owner,x,y){super(Math.max(0,Math.min(CANVAS_W-owner.w,x)),Math.max(0,Math.min(GROUND_Y-owner.h,y)),owner.w,owner.h);this.owner=owner;this.type='voss_double';this.life=6000;this.maxLife=6000;this.untargetable=true;this.queue=[];this.facing=owner.facing;}
+    mirrorAttack(data){if(!this.dead)this.queue.push({...data,delay:180});}
+    fire(data){
+        this.facing=data.facing||this.facing;const px=this.x+this.w/2+this.facing*this.w*.45,py=this.y+this.h*.4;
+        const dx=data.targetX-px,dy=data.targetY-py,length=Math.max(1,Math.hypot(dx,dy));
+        game.projectiles.push(new TemporalBolt(this.owner,px,py,dx/length*18,dy/length*18,Math.max(1,data.damage*.5),data.kind||'copy'));
+        for(let i=0;i<9;i++)game.particles.push(new Particle(px,py,'#c9b8ff',(Math.random()-.5)*7,(Math.random()-.5)*7,260,3));
+    }
+    update(dt){this.life-=dt;for(const item of this.queue)item.delay-=dt;const ready=this.queue.filter(item=>item.delay<=0);this.queue=this.queue.filter(item=>item.delay>0);ready.forEach(item=>this.fire(item));if(this.life<=0||!this.owner||this.owner.dead)this.dead=true;}
+    draw(ctx){ctx.save();ctx.globalAlpha=.28+.28*this.life/this.maxLife;ctx.translate(this.x+this.w/2,this.y);if(this.facing<0)ctx.scale(-1,1);ctx.fillStyle='#29225b';ctx.fillRect(-this.w/2,0,this.w,this.h);ctx.strokeStyle='#b8a6ff';ctx.lineWidth=3;ctx.strokeRect(-this.w/2-3,-3,this.w+6,this.h+6);ctx.fillStyle='#dffaff';ctx.fillRect(this.w/2-12,10,8,7);ctx.restore();}
 }
 
 class DemolitionZone extends Entity {

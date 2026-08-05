@@ -615,6 +615,9 @@ class Game {
         } else if (this.p1.heroName === 'Laegon') {
             document.getElementById('p1-horse-hp').style.width = `${Math.max(0, this.p1.laegonEnergy)}%`;
             document.getElementById('p1-horse-hp').style.background = '#9d5cff';
+        } else if (this.p1.heroName === 'Raigo') {
+            document.getElementById('p1-horse-hp').style.width = `${Math.max(0, this.p1.raigoEnergy)}%`;
+            document.getElementById('p1-horse-hp').style.background = this.p1.raigoEnergy >= 100 ? '#ffd84d' : '#58e6ff';
         }
 
         let p1Sup = 100 - (this.p1.superCooldown / this.p1.superCooldownMax) * 100;
@@ -736,6 +739,9 @@ class Game {
             const nodes=this.minions.filter(item=>item?.owner===this.p1&&item.type==='mori_node'&&!item.dead).length;
             p1Stat += `[NODES: ${nodes}/3] ${this.p1.moriGrappleCooldown>0?`[WIRE ${(this.p1.moriGrappleCooldown/1000).toFixed(1)}s]`:'[WIRE READY]'}`;
         }
+        if (this.p1.heroName === 'Roka') p1Stat += `${this.p1.rokaArtilleryTimer>0?`[ARTILLERY ${(this.p1.rokaArtilleryTimer/1000).toFixed(1)}s] `:''}${this.p1.rokaMortarCooldown>0?`[MORTAR ${(this.p1.rokaMortarCooldown/1000).toFixed(1)}s]`:'[MORTAR READY]'}`;
+        if (this.p1.heroName === 'Voss') p1Stat += `${this.p1.vossCopyTimer>0?`[COPIED: ${this.p1.vossCopiedHero} ${(this.p1.vossCopyTimer/1000).toFixed(1)}s] `:''}${this.p1.vossCopyCooldown>0?`[COPY ${(this.p1.vossCopyCooldown/1000).toFixed(1)}s]`:'[COPY READY]'}${this.p1.vossDouble&&!this.p1.vossDouble.dead?' [DOUBLE]':''}`;
+        if (this.p1.heroName === 'Raigo') p1Stat += `[ENERGY: ${Math.floor(this.p1.raigoEnergy)}/100]${this.p1.raigoEnergy>=100?' [THUNDER STRIKE]':''}${this.p1.raigoArmorTimer>0?` [GOLDEN ARMOR ${(this.p1.raigoArmorTimer/1000).toFixed(1)}s]`:''}`;
 
         if (this.p1.buffs.poison > 0) p1Stat += " [POISONED]";
         if (this.p1.buffs.burn > 0) p1Stat += " [BURN]";
@@ -754,6 +760,9 @@ class Game {
         } else if (this.p2.heroName === 'Laegon') {
             document.getElementById('p2-horse-hp').style.width = `${Math.max(0, this.p2.laegonEnergy)}%`;
             document.getElementById('p2-horse-hp').style.background = '#9d5cff';
+        } else if (this.p2.heroName === 'Raigo') {
+            document.getElementById('p2-horse-hp').style.width = `${Math.max(0, this.p2.raigoEnergy)}%`;
+            document.getElementById('p2-horse-hp').style.background = this.p2.raigoEnergy >= 100 ? '#ffd84d' : '#58e6ff';
         }
 
         let p2Sup = 100 - (this.p2.superCooldown / this.p2.superCooldownMax) * 100;
@@ -875,6 +884,9 @@ class Game {
             const nodes=this.minions.filter(item=>item?.owner===this.p2&&item.type==='mori_node'&&!item.dead).length;
             p2Stat += `[NODES: ${nodes}/3] ${this.p2.moriGrappleCooldown>0?`[WIRE ${(this.p2.moriGrappleCooldown/1000).toFixed(1)}s]`:'[WIRE READY]'}`;
         }
+        if (this.p2.heroName === 'Roka') p2Stat += `${this.p2.rokaArtilleryTimer>0?`[ARTILLERY ${(this.p2.rokaArtilleryTimer/1000).toFixed(1)}s] `:''}${this.p2.rokaMortarCooldown>0?`[MORTAR ${(this.p2.rokaMortarCooldown/1000).toFixed(1)}s]`:'[MORTAR READY]'}`;
+        if (this.p2.heroName === 'Voss') p2Stat += `${this.p2.vossCopyTimer>0?`[COPIED: ${this.p2.vossCopiedHero} ${(this.p2.vossCopyTimer/1000).toFixed(1)}s] `:''}${this.p2.vossCopyCooldown>0?`[COPY ${(this.p2.vossCopyCooldown/1000).toFixed(1)}s]`:'[COPY READY]'}${this.p2.vossDouble&&!this.p2.vossDouble.dead?' [DOUBLE]':''}`;
+        if (this.p2.heroName === 'Raigo') p2Stat += `[ENERGY: ${Math.floor(this.p2.raigoEnergy)}/100]${this.p2.raigoEnergy>=100?' [THUNDER STRIKE]':''}${this.p2.raigoArmorTimer>0?` [GOLDEN ARMOR ${(this.p2.raigoArmorTimer/1000).toFixed(1)}s]`:''}`;
 
         if (this.p2.buffs.poison > 0) p2Stat += " [POISONED]";
         if (this.p2.buffs.burn > 0) p2Stat += " [BURN]";
