@@ -359,6 +359,11 @@ var HEROES = {
         name: "Ukon", desc: "Iron Rod Burst Warrior",
         color: "#b94b3f", maxHp: 850, speed: 7.4, jump: 17, width: 42, height: 72, superCD: 28000,
         ui: { hp: "85 WRD", atk: "4 WRD (Iron Rod Charge)", passive: "<span class='skill-tag'>Iron Momentum</span> Ukon cannot walk. [Left], [Down], and [Right] launch short collision-aware directional dashes with a fast recharge; [Jump] works normally. Basic Attack locks a direction and travels a limited distance toward the enemy; it only strikes if the enemy began within reach, otherwise it is a mobility dash. Press [Switch] to summon a fragile Iron Shadow at the enemy that chases once, strikes for 1.5 WRD, and briefly slows and stuns (8s CD).", super: "<span class='skill-tag'>Heavenly Peach Tree</span> Summons a towering peach tree and carries vulnerable Ukon to its crown. Press [Super] again to predict the enemy's position and perform Heavenly Drop after a short warning. Deals 6-16 WRD based on actual fall distance with heavy knockback, stun, debris, and screen shake." }
+    },
+    Mori: {
+        name: "Mori", desc: "Mechanist Trap Controller",
+        color: "#c58a32", maxHp: 800, speed: 5.4, jump: 15, width: 40, height: 70, superCD: 26000,
+        ui: { hp: "80 WRD", atk: "1.5 WRD (Mechanic Fan)", passive: "<span class='skill-tag'>Linked Mechanisms</span> Fan blades leave 5s Mechanism Nodes on walls and platforms (max 3). Nearby nodes connect with a one-use Energy Wire that deals 1 WRD and slows for 1s. Every third consecutive fan hit gains knockback. Press [Switch] to fire Grappling Wire toward an enemy, node, or surface (3s CD).", super: "<span class='skill-tag'>Thousand Mechanisms</span> For 8s, valid arena surfaces deploy a capped rotation of warned spear, spring, blade-wire, and rolling bomb traps. Mori remains fully vulnerable." }
     }
 };
 

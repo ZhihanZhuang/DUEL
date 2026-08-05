@@ -732,6 +732,10 @@ class Game {
             p1Stat += this.p1.ukonShadowCooldown > 0 ? ` [SHADOW ${(this.p1.ukonShadowCooldown/1000).toFixed(1)}s]` : ' [SHADOW READY]';
             if (this.p1.ukonUltimatePhase) p1Stat += ` [TREE: ${this.p1.ukonUltimatePhase.toUpperCase()}]`;
         }
+        if (this.p1.heroName === 'Mori') {
+            const nodes=this.minions.filter(item=>item?.owner===this.p1&&item.type==='mori_node'&&!item.dead).length;
+            p1Stat += `[NODES: ${nodes}/3] ${this.p1.moriGrappleCooldown>0?`[WIRE ${(this.p1.moriGrappleCooldown/1000).toFixed(1)}s]`:'[WIRE READY]'}`;
+        }
 
         if (this.p1.buffs.poison > 0) p1Stat += " [POISONED]";
         if (this.p1.buffs.burn > 0) p1Stat += " [BURN]";
@@ -866,6 +870,10 @@ class Game {
             p2Stat += this.p2.ukonDashCooldown > 0 ? `[DASH ${(this.p2.ukonDashCooldown/1000).toFixed(1)}s]` : '[DASH READY]';
             p2Stat += this.p2.ukonShadowCooldown > 0 ? ` [SHADOW ${(this.p2.ukonShadowCooldown/1000).toFixed(1)}s]` : ' [SHADOW READY]';
             if (this.p2.ukonUltimatePhase) p2Stat += ` [TREE: ${this.p2.ukonUltimatePhase.toUpperCase()}]`;
+        }
+        if (this.p2.heroName === 'Mori') {
+            const nodes=this.minions.filter(item=>item?.owner===this.p2&&item.type==='mori_node'&&!item.dead).length;
+            p2Stat += `[NODES: ${nodes}/3] ${this.p2.moriGrappleCooldown>0?`[WIRE ${(this.p2.moriGrappleCooldown/1000).toFixed(1)}s]`:'[WIRE READY]'}`;
         }
 
         if (this.p2.buffs.poison > 0) p2Stat += " [POISONED]";

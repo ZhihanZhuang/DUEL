@@ -1195,6 +1195,102 @@ class BromStickyBomb extends BromExplosive {
     draw(ctx){ctx.save();ctx.translate(this.x+9,this.y+9);ctx.rotate(Date.now()*.006);ctx.fillStyle=Math.floor(this.life/200)%2?'#ffdf5d':'#e34234';ctx.fillRect(-8,-8,16,16);ctx.fillStyle='#222';ctx.fillRect(-3,-3,6,6);ctx.restore();}
 }
 
+class MechanismNode extends Entity {
+    constructor(owner, x, y) {
+        super(Math.max(3, Math.min(CANVAS_W - 15, x - 6)), Math.max(3, Math.min(GROUND_Y - 12, y - 6)), 12, 12);
+        this.owner = owner; this.type = 'mori_node'; this.life = 5000; this.maxLife = 5000; this.untargetable = true;
+        this.serial = owner.moriNodeSerial = (owner.moriNodeSerial || 0) + 1;
+    }
+    update(dt) { this.life -= dt; if (this.life <= 0 || !this.owner || this.owner.dead) this.dead = true; }
+    draw(ctx) {
+        const pulse = 1 + Math.sin(Date.now() * 0.014 + this.serial) * 0.15;
+        ctx.save(); ctx.translate(this.x + 6, this.y + 6); ctx.scale(pulse, pulse); ctx.rotate(Date.now() * 0.004);
+        ctx.fillStyle = '#2b3135'; ctx.strokeStyle = '#ffd166'; ctx.lineWidth = 2; ctx.shadowBlur = 10; ctx.shadowColor = '#f0a33b';
+        ctx.beginPath(); for (let i=0;i<8;i++){const a=i*Math.PI/4,r=i%2?5:8;const px=Math.cos(a)*r,py=Math.sin(a)*r;i?ctx.lineTo(px,py):ctx.moveTo(px,py);}ctx.closePath();ctx.fill();ctx.stroke();
+        ctx.restore();
+    }
+}
+
+class MoriEnergyWire extends Entity {
+    constructor(owner, first, second) {
+        const minX=Math.min(first.x,second.x),minY=Math.min(first.y,second.y),maxX=Math.max(first.x,second.x),maxY=Math.max(first.y,second.y);
+        super(minX, minY, Math.max(8,maxX-minX), Math.max(8,maxY-minY));
+        this.owner=owner;this.type='mori_wire';this.first=first;this.second=second;this.untargetable=true;this.life=Math.min(first.life,second.life);
+    }
+    distanceTo(target) {
+        const ax=this.first.x+6,ay=this.first.y+6,bx=this.second.x+6,by=this.second.y+6,px=target.x+target.w/2,py=target.y+target.h/2;
+        const dx=bx-ax,dy=by-ay,lengthSq=dx*dx+dy*dy;
+        const t=lengthSq?Math.max(0,Math.min(1,((px-ax)*dx+(py-ay)*dy)/lengthSq)):0;
+        return Math.hypot(px-(ax+dx*t),py-(ay+dy*t));
+    }
+    update(dt) {
+        this.life-=dt;
+        if(this.life<=0||this.first.dead||this.second.dead||!this.owner||this.owner.dead){this.dead=true;return;}
+        for(const target of getHostileTargets(this.owner,this)){
+            if(this.distanceTo(target)>Math.max(13,Math.min(target.w,target.h)*0.38))continue;
+            target.takeDamage(10,this.owner,false,true);target.buffs=target.buffs||{};target.buffs.slow=Math.max(target.buffs.slow||0,1000);
+            for(let i=0;i<18;i++)game.particles.push(new Particle(target.x+target.w/2,target.y+target.h/2,i%2?'#fff3b0':'#f0a33b',(Math.random()-.5)*10,(Math.random()-.5)*10,300,3));
+            this.dead=true;break;
+        }
+    }
+    draw(ctx){const ax=this.first.x+6,ay=this.first.y+6,bx=this.second.x+6,by=this.second.y+6;ctx.save();ctx.strokeStyle='#ffd166';ctx.shadowBlur=12;ctx.shadowColor='#f0a33b';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(ax,ay);ctx.lineTo(bx,by);ctx.stroke();ctx.strokeStyle='#fff6cf';ctx.lineWidth=1.5;ctx.setLineDash([8,6]);ctx.lineDashOffset=-Date.now()*.03;ctx.stroke();ctx.restore();}
+}
+
+class MechanicFanBlade extends Entity {
+    constructor(owner,x,y,vx,vy){super(x,y,28,12);this.owner=owner;this.type='mori_fan';this.vx=vx;this.vy=vy;this.life=720;this.hit=false;}
+    plantNode(){if(this.dead)return;this.dead=true;this.owner?.createMoriNode?.(this.x+this.w/2,this.y+this.h/2);}
+    update(dt){
+        this.x+=this.vx;this.y+=this.vy;this.life-=dt;
+        for(const target of getHostileTargets(this.owner,this)){if(!checkAABB(this,target))continue;target.takeDamage(15,this.owner,false,true);this.owner?.onMoriFanHit?.(target);this.dead=true;return;}
+        const surface=this.x<=0||this.x+this.w>=CANVAS_W||this.y<=0||this.y+this.h>=GROUND_Y||PLATFORMS.some(platform=>checkAABB(this,platform));
+        if(surface)this.plantNode();else if(this.life<=0)this.dead=true;
+    }
+    draw(ctx){ctx.save();ctx.translate(this.x+this.w/2,this.y+this.h/2);ctx.rotate(Math.atan2(this.vy,this.vx));ctx.fillStyle='rgba(255,225,145,.32)';ctx.strokeStyle='#ffd166';ctx.lineWidth=2;ctx.shadowBlur=10;ctx.shadowColor='#f0a33b';ctx.beginPath();ctx.moveTo(14,0);ctx.quadraticCurveTo(0,-12,-14,0);ctx.quadraticCurveTo(0,12,14,0);ctx.fill();ctx.stroke();ctx.restore();}
+}
+
+class MoriTrap extends Entity {
+    constructor(owner,kind,x,surfaceY,life=6500){
+        const dimensions=kind==='blade'?{w:150,h:8}:kind==='bomb'?{w:20,h:20}:{w:34,h:kind==='spear'?70:18};
+        super(Math.max(0,Math.min(CANVAS_W-dimensions.w,x-dimensions.w/2)),surfaceY-dimensions.h,dimensions.w,dimensions.h);
+        this.owner=owner;this.kind=kind;this.type='mori_ultimate_trap';this.life=life;this.warning=kind==='bomb'?500:700;this.triggered=false;this.hitTargets=new Set();this.vx=kind==='bomb'?(Math.random()<.5?-1:1)*4.5:0;this.untargetable=true;
+    }
+    hit(target,damage){target.takeDamage(damage,this.owner,false,true);this.hitTargets.add(target);}
+    update(dt){
+        this.life-=dt;this.warning=Math.max(0,this.warning-dt);if(this.life<=0||!this.owner||this.owner.dead){this.dead=true;return;}
+        if(this.kind==='bomb'&&this.warning<=0){this.x+=this.vx;this.vy+=GRAVITY*.3;this.y+=this.vy;if(this.y+this.h>=GROUND_Y){this.y=GROUND_Y-this.h;this.vy=0;}if(this.x<=0||this.x+this.w>=CANVAS_W)this.vx*=-1;}
+        if(this.warning>0)return;
+        for(const target of getHostileTargets(this.owner,this)){
+            if(this.hitTargets.has(target)||!checkAABB(this,target))continue;
+            if(this.kind==='spear'){this.hit(target,30);target.vx+=(target.x+target.w/2<this.x+this.w/2?-1:1)*8;target.vy=-9;this.dead=true;}
+            else if(this.kind==='spring'){this.hit(target,10);target.vy=-23;target.vx*=.45;target.attackState='idle';this.dead=true;}
+            else if(this.kind==='blade'){this.hit(target,20);target.buffs=target.buffs||{};target.buffs.dizzy=Math.max(target.buffs.dizzy||0,500);this.dead=true;}
+            else {this.hit(target,40);const direction=target.x+target.w/2<this.x+this.w/2?-1:1;target.vx=direction*16;target.vy=-10;for(let i=0;i<28;i++)game.particles.push(new Particle(this.x+10,this.y+10,i%2?'#ffb13b':'#5c3022',(Math.random()-.5)*16,(Math.random()-.5)*16,480,5));this.dead=true;}
+            break;
+        }
+    }
+    draw(ctx){
+        ctx.save();const blink=.35+Math.sin(Date.now()*.025)*.2;if(this.warning>0){ctx.fillStyle=`rgba(255,196,76,${blink})`;ctx.strokeStyle='#ffd166';ctx.lineWidth=2;ctx.strokeRect(this.x-5,this.y-5,this.w+10,this.h+10);ctx.fillRect(this.x,this.y+this.h-5,this.w,5);ctx.restore();return;}
+        ctx.shadowBlur=10;ctx.shadowColor='#f0a33b';
+        if(this.kind==='spear'){ctx.fillStyle='#d8dde0';ctx.beginPath();ctx.moveTo(this.x+this.w/2,this.y);ctx.lineTo(this.x+this.w,this.y+this.h);ctx.lineTo(this.x,this.y+this.h);ctx.fill();}
+        else if(this.kind==='spring'){ctx.strokeStyle='#ffd166';ctx.lineWidth=5;ctx.beginPath();for(let i=0;i<5;i++)ctx.lineTo(this.x+(i%2?this.w:0),this.y+i*this.h/4);ctx.stroke();}
+        else if(this.kind==='blade'){ctx.strokeStyle='#fff1b0';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(this.x,this.y+4);ctx.lineTo(this.x+this.w,this.y+4);ctx.stroke();ctx.strokeStyle='#f0a33b';ctx.setLineDash([7,5]);ctx.lineDashOffset=-Date.now()*.04;ctx.stroke();}
+        else {ctx.translate(this.x+10,this.y+10);ctx.rotate(Date.now()*.01);ctx.fillStyle='#35383b';ctx.strokeStyle='#ffd166';ctx.lineWidth=2;ctx.beginPath();ctx.arc(0,0,9,0,Math.PI*2);ctx.fill();ctx.stroke();ctx.fillStyle='#f04f3d';ctx.fillRect(-3,-3,6,6);}
+        ctx.restore();
+    }
+}
+
+class ThousandMechanisms extends Entity {
+    constructor(owner){super(0,0,CANVAS_W,GROUND_Y);this.owner=owner;this.type='thousand_mechanisms';this.life=8000;this.maxLife=8000;this.spawnTimer=0;this.spawnCount=0;this.untargetable=true;}
+    validSurfaces(){return [...PLATFORMS.map(platform=>({x:platform.x,w:platform.w,y:platform.y})),{x:30,w:Math.max(80,CANVAS_W-60),y:GROUND_Y}].filter(surface=>surface.w>=90);}
+    spawnTrap(){
+        const surfaces=this.validSurfaces();if(!surfaces.length)return;const surface=surfaces[this.spawnCount%surfaces.length];const kind=['spear','spring','blade','bomb'][this.spawnCount%4];
+        let x=surface.x+surface.w*(.2+Math.random()*.6);const enemies=getHostileTargets(this.owner,this);for(let attempt=0;attempt<4&&enemies.some(target=>Math.abs(target.x+target.w/2-x)<70&&Math.abs(target.y+target.h-surface.y)<90);attempt++)x=surface.x+surface.w*(.12+Math.random()*.76);
+        game.hazards.push(new MoriTrap(this.owner,kind,x,surface.y,Math.min(6500,this.life)));this.spawnCount++;
+    }
+    update(dt){this.life-=dt;this.spawnTimer-=dt;while(this.spawnTimer<=0&&this.spawnCount<12&&this.life>0){this.spawnTrap();this.spawnTimer+=620;}if(this.life<=0){for(const hazard of game.hazards||[])if(hazard!==this&&hazard.owner===this.owner&&hazard.type==='mori_ultimate_trap')hazard.dead=true;this.dead=true;}}
+    draw(ctx){ctx.save();ctx.fillStyle='rgba(240,163,59,.035)';ctx.fillRect(0,0,CANVAS_W,GROUND_Y);ctx.strokeStyle='rgba(255,209,102,.16)';ctx.lineWidth=1;for(let x=0;x<CANVAS_W;x+=80){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x+80,GROUND_Y);ctx.stroke();}ctx.restore();}
+}
+
 class DemolitionZone extends Entity {
     constructor(owner,x,y){super(x-240,y-150,480,300);this.owner=owner;this.type='demolition_zone';this.life=3500;this.maxLife=3500;this.elapsed=0;this.nextBlast=2000;this.blastIndex=0;this.fieldPulseTimer=0;this.untargetable=true;}
     update(dt){

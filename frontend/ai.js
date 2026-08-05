@@ -60,7 +60,8 @@ const HERO_TACTICS = {
     Veyra:   { role: 'chronomancer', aggression: 0.48, caution: 1.42, burst: 0.72, kite: 1.38, setup: 1.75, highGround: 1.30, retreatHp: 0.45, retreatFireChance: 0.35 },
     Brom:    { role: 'demolitionist', aggression: 0.52, caution: 1.08, burst: 1.55, kite: 1.18, setup: 1.85, highGround: 0.92, retreatHp: 0.36, retreatFireChance: 0.30 },
     Axeron:  { role: 'power_assassin', aggression: 1.32, caution: 0.62, burst: 1.75, kite: 0.32, setup: 0.85, highGround: 0.48, retreatHp: 0.30, retreatFireChance: 0.08 },
-    Ukon:    { role: 'dash_assassin', aggression: 1.38, caution: 0.58, burst: 1.82, kite: 0.36, setup: 1.05, highGround: 0.84, retreatHp: 0.27, retreatFireChance: 0.06 }
+    Ukon:    { role: 'dash_assassin', aggression: 1.38, caution: 0.58, burst: 1.82, kite: 0.36, setup: 1.05, highGround: 0.84, retreatHp: 0.27, retreatFireChance: 0.06 },
+    Mori:    { role: 'mechanist', aggression: 0.46, caution: 1.22, burst: 0.72, kite: 1.34, setup: 1.92, highGround: 1.28, retreatHp: 0.40, retreatFireChance: 0.42 }
 };
 
 function getHeroTactic(ai) {
@@ -458,6 +459,7 @@ function getCombatProfile(ai, source = ai) {
         case 'Brom': range = 390; preferred = 255; break;
         case 'Axeron': range = 96; preferred = 62; break;
         case 'Ukon': range = 365; preferred = 88; break;
+        case 'Mori': range = 430; preferred = 270; break;
     }
     return { range, preferred, ranged: !ai.isMeleeAttack(), tactics };
 }
@@ -492,6 +494,7 @@ function hasSetupOpportunity(game, ai) {
         case 'Laegon': return ai.laegonSwitchCooldown <= 0;
         case 'Axeron': return (ai.axeronMarks || []).some(mark => mark.life > 0 && mark.target && !mark.target.dead);
         case 'Ukon': return ai.ukonShadowCooldown <= 0 && owned('ukon_shadow') === 0;
+        case 'Mori': return owned('mori_node') < 3;
         default: return false;
     }
 }
@@ -674,6 +677,9 @@ function chooseDefensiveAction(game, ai, target, threat) {
         case 'Ukon':
             if (ai.ukonShadowCooldown <= 0) return 'switch';
             break;
+        case 'Mori':
+            if (ai.moriGrappleCooldown <= 0) return 'switch';
+            break;
     }
     return null;
 }
@@ -843,6 +849,12 @@ function chooseHeroAction(game, ai, target, targetEntity, dist, verticalDistance
             const shadow = minions.find(minion => minion && minion.owner === ai && minion.type === 'ukon_shadow' && !minion.dead);
             if (superReady && (combatState === 'burst' || combatState === 'pressure' || target.hp < target.maxHp * 0.48)) return 'super';
             if (!shadow && ai.ukonShadowCooldown <= 0 && (combatState === 'setup' || combatState === 'pressure' || dist < 240)) return 'switch';
+            break;
+        }
+        case 'Mori': {
+            const nodes=minions.filter(item=>item&&item.owner===ai&&item.type==='mori_node'&&!item.dead).length;
+            if(superReady&&dist<700&&(nodes>=2||combatState==='pressure'||combatState==='burst'||dist<360))return 'super';
+            if(ai.moriGrappleCooldown<=0&&(combatState==='evade'||combatState==='highground'||dist<135))return 'switch';
             break;
         }
     }

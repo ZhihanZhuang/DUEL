@@ -57,7 +57,7 @@ function loadProjectileContext() {
     };
     vm.createContext(context);
     const source = fs.readFileSync(path.join(__dirname, '..', 'entities.js'), 'utf8');
-    vm.runInContext(`${source}\nwindow.Projectile = Projectile; window.KuroDecoy = KuroDecoy; window.UkonShadow = UkonShadow; window.PeachTree = PeachTree; window.GiantSword = GiantSword; window.GravityWell = GravityWell; window.ChiqPath = ChiqPath; window.D2FDrone = D2FDrone; window.D2FTargetBeacon = D2FTargetBeacon; window.D2FGiantRobot = D2FGiantRobot; window.TimeAnchor = TimeAnchor; window.TemporalEcho = TemporalEcho; window.LaegonLightning = LaegonLightning; window.LaegonHammer = LaegonHammer; window.LaegonHammerStrike = LaegonHammerStrike; window.BromBlastCharge = BromBlastCharge; window.BromStickyBomb = BromStickyBomb; window.DemolitionZone = DemolitionZone; window.TitanAxe = TitanAxe;`, context, { filename: 'entities.js' });
+    vm.runInContext(`${source}\nwindow.Projectile = Projectile; window.KuroDecoy = KuroDecoy; window.UkonShadow = UkonShadow; window.PeachTree = PeachTree; window.GiantSword = GiantSword; window.GravityWell = GravityWell; window.ChiqPath = ChiqPath; window.D2FDrone = D2FDrone; window.D2FTargetBeacon = D2FTargetBeacon; window.D2FGiantRobot = D2FGiantRobot; window.TimeAnchor = TimeAnchor; window.TemporalEcho = TemporalEcho; window.LaegonLightning = LaegonLightning; window.LaegonHammer = LaegonHammer; window.LaegonHammerStrike = LaegonHammerStrike; window.BromBlastCharge = BromBlastCharge; window.BromStickyBomb = BromStickyBomb; window.DemolitionZone = DemolitionZone; window.TitanAxe = TitanAxe; window.MechanismNode = MechanismNode; window.MoriEnergyWire = MoriEnergyWire; window.MechanicFanBlade = MechanicFanBlade; window.MoriTrap = MoriTrap; window.ThousandMechanisms = ThousandMechanisms;`, context, { filename: 'entities.js' });
     return context;
 }
 
@@ -149,9 +149,10 @@ function makeFighter(heroName, id = 'cpu') {
         ukonDashCooldown: 0,
         ukonShadowCooldown: 0,
         ukonUltimatePhase: null,
+        moriGrappleCooldown: 0,
         isMeleeAttack() {
             if (this.heroName === 'Laegon') return this.thunderGodTimer > 0;
-            return !['Hason', 'Willi', 'Ugo', 'Kila', 'Volt', 'Noae', 'Kuro', 'Nyra', 'Archor', 'D2F1', 'Veyra', 'Brom'].includes(this.heroName)
+            return !['Hason', 'Willi', 'Ugo', 'Kila', 'Volt', 'Noae', 'Kuro', 'Nyra', 'Archor', 'D2F1', 'Veyra', 'Brom', 'Mori'].includes(this.heroName)
                 && !(this.heroName === 'Hunter' && this.hunterWeapon === 'musket')
                 && !(this.heroName === 'Euclid' && this.euclidWeapon === 'magic');
         }
@@ -280,6 +281,10 @@ function loadPhysicsGame(heroName = 'Hunter') {
             Object.assign(this, { owner, type: 'peach_tree', life: 18000, untargetable: true });
         }
     }
+    class MechanismNode extends Entity { constructor(owner,x,y){super(x,y,12,12);Object.assign(this,{owner,type:'mori_node',life:5000,serial:++owner.moriNodeSerial});} }
+    class MoriEnergyWire extends Entity { constructor(owner,first,second){super(first.x,first.y,100,8);Object.assign(this,{owner,first,second,type:'mori_wire',life:5000});} }
+    class MechanicFanBlade extends Entity { constructor(owner,x,y,vx,vy){super(x,y,28,12);Object.assign(this,{owner,vx,vy,type:'mori_fan'});} }
+    class ThousandMechanisms extends Entity { constructor(owner){super(0,0,1280,660);Object.assign(this,{owner,type:'thousand_mechanisms',life:8000});} }
 
     const platforms = [
         { x: 300, y: 480, w: 400, h: 20, type: 'center' },
@@ -299,6 +304,10 @@ function loadPhysicsGame(heroName = 'Hunter') {
         D2FGiantRobot,
         UkonShadow,
         PeachTree,
+        MechanismNode,
+        MoriEnergyWire,
+        MechanicFanBlade,
+        ThousandMechanisms,
         Minion,
         CANVAS_W: 1280,
         CANVAS_H: 760,
@@ -318,7 +327,8 @@ function loadPhysicsGame(heroName = 'Hunter') {
             D2F1: { maxHp: 520, speed: 7.2, jump: 16, width: 40, height: 66, color: '#35d5e8', superCD: 35000 },
             Veyra: { maxHp: 700, speed: 6.2, jump: 14.5, width: 39, height: 69, color: '#9d5cff', superCD: 18000 },
             Axeron: { maxHp: 700, speed: 6.5, jump: 16, width: 39, height: 68, color: '#2468c9', superCD: 22000 },
-            Ukon: { maxHp: 850, speed: 7.4, jump: 17, width: 42, height: 72, color: '#b94b3f', superCD: 28000 }
+            Ukon: { maxHp: 850, speed: 7.4, jump: 17, width: 42, height: 72, color: '#b94b3f', superCD: 28000 },
+            Mori: { maxHp: 800, speed: 5.4, jump: 15, width: 40, height: 70, color: '#c58a32', superCD: 26000 }
         },
         keys: {},
         keysPressed: {},
@@ -566,7 +576,7 @@ test('every hero with a direct super can decide to use it', () => {
     const context = loadAI();
     const directSuperHeroes = [
         'Hason', 'Willi', 'Hunter', 'Macu', 'Artu', 'Duke', 'Kadaxi', 'Euclid',
-        'Lique', 'Kae', 'Kila', 'Volt', 'Gensan', 'Noae', 'Wolf', 'Kuro', 'Sola', 'Nyra', 'Orion', 'Archor', 'Itan', 'D2F1', 'Laegon', 'Veyra', 'Brom', 'Axeron', 'Ukon'
+        'Lique', 'Kae', 'Kila', 'Volt', 'Gensan', 'Noae', 'Wolf', 'Kuro', 'Sola', 'Nyra', 'Orion', 'Archor', 'Itan', 'D2F1', 'Laegon', 'Veyra', 'Brom', 'Axeron', 'Ukon', 'Mori'
     ];
 
     for (const heroName of directSuperHeroes) {
@@ -831,7 +841,8 @@ test('hero archetypes expose distinct tactical roles and low-health priorities',
         { hero: 'Veyra', role: 'chronomancer' },
         { hero: 'Brom', role: 'demolitionist' },
         { hero: 'Axeron', role: 'power_assassin' },
-        { hero: 'Ukon', role: 'dash_assassin' }
+        { hero: 'Ukon', role: 'dash_assassin' },
+        { hero: 'Mori', role: 'mechanist' }
     ];
 
     for (const testCase of cases) {
@@ -2215,4 +2226,57 @@ test('Heavenly Peach Tree requires a second press and scales Heavenly Drop by ac
     assert.equal(shortFall.ai.resolveUkonDropImpact(), true);
     assert.ok(shortFall.ai.ukonLastDropDamage >= 60 && shortFall.ai.ukonLastDropDamage < 100);
     assert.equal(shortFall.target.hp, shortHp - shortFall.ai.ukonLastDropDamage);
+});
+
+test('Mori caps Mechanism Nodes at three and links active pairs', () => {
+    const simulation = loadPhysicsGame('Mori');
+    const { ai, context } = simulation;
+    ai.isCPU = false;
+    ai.createMoriNode(100, 500);
+    ai.createMoriNode(220, 500);
+    ai.createMoriNode(340, 500);
+    ai.createMoriNode(460, 500);
+
+    const nodes = context.game.minions.filter(item => item.type === 'mori_node' && !item.dead);
+    const wires = context.game.minions.filter(item => item.type === 'mori_wire' && !item.dead);
+    assert.equal(nodes.length, 3);
+    assert.equal(nodes.some(node => node.serial === 1), false, 'oldest node was not retired');
+    assert.ok(wires.length >= 2, 'active nodes did not form linked mechanisms');
+});
+
+test('Mori Energy Wire triggers once for damage and slow', () => {
+    const context = loadProjectileContext();
+    const owner = { id: 'mori', heroName: 'Mori', dead: false, moriNodeSerial: 0 };
+    const target = { id: 'target', x: 145, y: 92, w: 40, h: 70, hp: 300, dead: false, buffs: {}, vx: 0, vy: 0, takeDamage(amount) { this.hp -= amount; } };
+    context.game.opponents = [target];
+    const first = new context.window.MechanismNode(owner, 100, 130);
+    const second = new context.window.MechanismNode(owner, 240, 130);
+    const wire = new context.window.MoriEnergyWire(owner, first, second);
+
+    wire.update(16);
+    assert.equal(target.hp, 290);
+    assert.equal(target.buffs.slow, 1000);
+    assert.equal(wire.dead, true);
+});
+
+test('Mori Grappling Wire disrupts enemies and Thousand Mechanisms rotates all trap types', () => {
+    const simulation = loadPhysicsGame('Mori');
+    const { ai, target } = simulation;
+    ai.isCPU = false;
+    target.x = ai.x + 260;
+    target.y = ai.y;
+    target.vx = 0;
+    assert.equal(ai.fireMoriGrapple(), true);
+    assert.ok(target.vx < 0, 'enemy was not pulled toward Mori');
+    assert.equal(ai.moriGrappleCooldown, 3000);
+
+    const entityContext = loadProjectileContext();
+    entityContext.PLATFORMS.push({ x: 100, y: 500, w: 500, h: 20, type: 'center' });
+    const owner = { id: 'mori', heroName: 'Mori', dead: false };
+    const field = new entityContext.window.ThousandMechanisms(owner);
+    entityContext.game.hazards = [field];
+    field.update(2000);
+    const kinds = entityContext.game.hazards.filter(item => item.type === 'mori_ultimate_trap').map(item => item.kind);
+    assert.deepEqual(kinds.slice(0, 4), ['spear', 'spring', 'blade', 'bomb']);
+    assert.ok(kinds.length <= 12);
 });
