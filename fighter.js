@@ -138,6 +138,17 @@ class Fighter extends Entity {
             this.d2fDroneCooldown = 0;
             this.d2fDroneSerial = 0;
         }
+
+        if (this.heroName === 'Laegon') {
+            this.laegonEnergy = 100; this.laegonMaxEnergy = 100; this.laegonSwitchCooldown = 0;
+            this.thunderCharges = 0; this.thunderChargeTimer = 0; this.laegonLastHitTarget = null;
+            this.thunderGodTimer = 0; this.laegonHammerInFlight = false;
+        }
+        if (this.heroName === 'Veyra') {
+            this.veyraAnchors = []; this.veyraHistory = []; this.veyraHistoryTimer = 0;
+            this.veyraEchoTimer = 0; this.veyraReversalTimer = 0;
+        }
+        if (this.heroName === 'Brom') this.bromStickyBomb = null;
     }
 
     takeDamage(amt, attacker, isDoT = false, noKnockback = false, noHitReaction = false) {
@@ -508,6 +519,21 @@ class Fighter extends Entity {
     update(dt) {
         if (this.dead) return;
 
+        if (this.heroName === 'Laegon') {
+            this.laegonEnergy = Math.min(this.laegonMaxEnergy, this.laegonEnergy + dt / 30);
+            if (this.laegonSwitchCooldown > 0) this.laegonSwitchCooldown = Math.max(0, this.laegonSwitchCooldown - dt);
+            if (this.thunderGodTimer > 0) this.thunderGodTimer = Math.max(0, this.thunderGodTimer - dt);
+            if (this.thunderChargeTimer > 0) {
+                this.thunderChargeTimer = Math.max(0, this.thunderChargeTimer - dt);
+                if (this.thunderChargeTimer <= 0) {
+                    this.thunderCharges = Math.max(0, this.thunderCharges - 1);
+                    if (this.thunderCharges > 0) this.thunderChargeTimer = 400;
+                }
+            }
+        }
+        if (this.heroName === 'Veyra') this.updateVeyraTime(dt);
+        if (this.heroName === 'Brom' && this.bromStickyBomb?.dead) this.bromStickyBomb = null;
+
         if (this.heroName === 'Archor') {
             if (this.archorSpeedCooldown > 0) this.archorSpeedCooldown = Math.max(0, this.archorSpeedCooldown - dt);
             if (keysPressed[this.controls.switch] && this.archorSpeedCooldown <= 0) this.cleanseHoinDebuffs();
@@ -610,7 +636,7 @@ class Fighter extends Entity {
         let hasPuppet = this.heroName === 'Ugo' && game.minions.some(m => m.type === 'puppet' && m.owner === this && !m.dead);
         const isSolaForceLocked = !!(this.solaForceActive || this.solaForceHeld);
         const isSolaCharging = this.heroName === 'Sola' && this.solaChargeTimer > 0;
-        let canAct = (this.stunTimer <= 0 && this.buffs.dizzy <= 0 && this.grapplePhase !== 1 && this.superWindupTimer <= 0 && this.euclidSwitchTimer <= 0 && !(this.itanSuperWindupTimer > 0) && !isKilaSwitching && !isSolaForceLocked && !isSolaCharging);
+        let canAct = (this.stunTimer <= 0 && this.buffs.dizzy <= 0 && this.grapplePhase !== 1 && this.superWindupTimer <= 0 && this.euclidSwitchTimer <= 0 && !(this.itanSuperWindupTimer > 0) && !(this.veyraReversalTimer > 0) && !isKilaSwitching && !isSolaForceLocked && !isSolaCharging);
         let canMoveAndAttack = canAct && !hasPuppet;
 
         if (this.heroName === 'Gensan') {
@@ -1015,6 +1041,9 @@ class Fighter extends Entity {
                         if (this.heroName === 'Orion') activeTime = 170;
                         if (this.heroName === 'Archor') activeTime = 25;
                         if (this.heroName === 'Itan') activeTime = this.buffs.nuMode > 0 ? 110 : 220;
+                        if (this.heroName === 'Laegon') activeTime = this.thunderGodTimer > 0 ? 170 : 45;
+                        if (this.heroName === 'Veyra') activeTime = 90;
+                        if (this.heroName === 'Brom') activeTime = 130;
 
                         this.attackState = 'active';
                         this.stateTimer = activeTime;
@@ -1078,6 +1107,7 @@ class Fighter extends Entity {
 
                         if (this.heroName === 'Sola' && this.solaFocus > 0) this.solaFocus--;
                         if (this.heroName === 'Orion') this.orionCharges = Math.min(3, this.orionCharges + 1);
+                        if (this.heroName === 'Laegon') targetsHit.forEach(target => this.onLaegonHit(target, this.getMeleeDamage(), true));
 
                         if (this.heroName === 'Kae') {
                             this.kaeComboCount++;
@@ -1132,6 +1162,9 @@ class Fighter extends Entity {
                     if (this.heroName === 'Archor') recTime = 55;
                     if (this.heroName === 'Itan') recTime = this.buffs.nuMode > 0 ? 125 : 250;
                     if (this.heroName === 'D2F1') recTime = 110;
+                    if (this.heroName === 'Laegon') recTime = this.thunderGodTimer > 0 ? 170 : 45;
+                    if (this.heroName === 'Veyra') recTime = 180;
+                    if (this.heroName === 'Brom') recTime = 420;
 
                     this.attackState = 'recovery';
                     this.stateTimer = recTime;
@@ -1262,6 +1295,26 @@ class Fighter extends Entity {
                 } else if (this.heroName === 'D2F1' && this.attackState === 'idle' && this.d2fDroneCooldown <= 0) {
                     this.spawnD2FDrones(3);
                     this.d2fDroneCooldown = 10000;
+                } else if (this.heroName === 'Laegon' && this.attackState === 'idle' && this.laegonSwitchCooldown <= 0) {
+                    const target = game.getEnemyOf(this);
+                    if (target) {
+                        game.hazards.push(new HeavensThunder(this, target.x + target.w/2, target.y + target.h/2));
+                        this.laegonSwitchCooldown = 8000;
+                    }
+                } else if (this.heroName === 'Veyra' && this.attackState === 'idle') {
+                    const anchor = new TimeAnchor(this, this.x + this.w/2, this.y + this.h/2);
+                    this.veyraAnchors = this.veyraAnchors.filter(item => item && !item.dead);
+                    if (this.veyraAnchors.length >= 2) this.veyraAnchors.shift().dead = true;
+                    this.veyraAnchors.push(anchor);
+                    game.minions.push(anchor);
+                } else if (this.heroName === 'Brom' && this.attackState === 'idle') {
+                    if (this.bromStickyBomb && !this.bromStickyBomb.dead) {
+                        this.bromStickyBomb.detonate(new Set());
+                        this.bromStickyBomb = null;
+                    } else {
+                        this.bromStickyBomb = new BromStickyBomb(this, this.x + this.w/2, this.y + 20, this.facing * 10, -6);
+                        game.projectiles.push(this.bromStickyBomb);
+                    }
                 }
             }
             if (keysPressed[this.controls.attack] && this.attackState === 'idle') {
@@ -1326,7 +1379,8 @@ class Fighter extends Entity {
     }
 
     isMeleeAttack() {
-        if (this.heroName === 'Hason' || this.heroName === 'Willi' || this.heroName === 'Ugo' || this.heroName === 'Kila' || this.heroName === 'Volt' || this.heroName === 'Noae' || this.heroName === 'Kuro' || this.heroName === 'Nyra' || this.heroName === 'Archor' || this.heroName === 'D2F1') return false;
+        if (this.heroName === 'Hason' || this.heroName === 'Willi' || this.heroName === 'Ugo' || this.heroName === 'Kila' || this.heroName === 'Volt' || this.heroName === 'Noae' || this.heroName === 'Kuro' || this.heroName === 'Nyra' || this.heroName === 'Archor' || this.heroName === 'D2F1' || this.heroName === 'Veyra' || this.heroName === 'Brom') return false;
+        if (this.heroName === 'Laegon') return this.thunderGodTimer > 0;
         if (this.heroName === 'Euclid' && this.euclidWeapon === 'magic') return false;
         if (this.heroName === 'Hunter' && this.hunterWeapon === 'musket') return false;
         if (this.heroName === 'Kadaxi' && this.comboCount === 3) return false;
@@ -1346,6 +1400,7 @@ class Fighter extends Entity {
         if (this.heroName === 'Sola') range = 65;
         if (this.heroName === 'Orion') { range = 88; yOffset = 6; h = 54; }
         if (this.heroName === 'Itan') { range = 132; yOffset = -12; h = 92; }
+        if (this.heroName === 'Laegon') { range = 82; yOffset = 2; h = 58; }
 
         if (this.heroName === 'Macu') {
             range = 110;
@@ -1374,6 +1429,7 @@ class Fighter extends Entity {
         if (this.heroName === 'Sola') return 56 + (this.solaFocus || 0) * 8;
         if (this.heroName === 'Orion') return 30;
         if (this.heroName === 'Itan') return 32;
+        if (this.heroName === 'Laegon') return 30;
         return 13;
     }
 
@@ -1388,6 +1444,10 @@ class Fighter extends Entity {
                 if (this.energy < 25) return;
                 this.energy -= 25;
             }
+        }
+        if (this.heroName === 'Laegon' && this.thunderGodTimer <= 0) {
+            if (this.laegonEnergy < 10) return;
+            this.laegonEnergy -= 10;
         }
         if (this.heroName === 'Kuro') {
             this.attackState = 'charging';
@@ -1419,6 +1479,9 @@ class Fighter extends Entity {
         if (this.heroName === 'Archor') this.stateTimer = 20;
         if (this.heroName === 'Itan') this.stateTimer = this.buffs.nuMode > 0 ? 90 : 180;
         if (this.heroName === 'D2F1') this.stateTimer = 60;
+        if (this.heroName === 'Laegon') this.stateTimer = this.thunderGodTimer > 0 ? 135 : Math.max(25, 55 / (1 + this.thunderCharges * 0.03));
+        if (this.heroName === 'Veyra') this.stateTimer = 110;
+        if (this.heroName === 'Brom') this.stateTimer = 180;
         if (this.heroName === 'Wolf') {
             this.stateTimer = 50;
             this.wolfPassiveReady = this.wolfAttackTimer >= 1500;
@@ -1438,7 +1501,7 @@ class Fighter extends Entity {
             : null;
         let target = combatTarget || game.getEnemyOf(this);
 
-        if (!combatTarget && (this.heroName === 'Hason' || this.heroName === 'Willi' || this.heroName === 'Euclid' || this.heroName === 'Ugo' || this.heroName === 'Kila' || this.heroName === 'Volt' || this.heroName === 'Noae' || this.heroName === 'Nyra' || this.heroName === 'Archor' || this.heroName === 'D2F1')) {
+        if (!combatTarget && (this.heroName === 'Hason' || this.heroName === 'Willi' || this.heroName === 'Euclid' || this.heroName === 'Ugo' || this.heroName === 'Kila' || this.heroName === 'Volt' || this.heroName === 'Noae' || this.heroName === 'Nyra' || this.heroName === 'Archor' || this.heroName === 'D2F1' || this.heroName === 'Laegon' || this.heroName === 'Veyra' || this.heroName === 'Brom')) {
             let minDist = target ? Math.hypot(target.x - this.x, target.y - this.y) : 9999;
             for (let m of game.minions) {
                 if (m && m.owner !== this && !m.dead) {
@@ -1561,6 +1624,69 @@ class Fighter extends Entity {
             game.projectiles.push(new Projectile(px, py - 5, 16, 16, Math.cos(aimAngle)*speed, Math.sin(aimAngle)*speed, 5, this, '#35d5e8', 'em_ball'));
             for (let i = 0; i < 5; i++) game.particles.push(new Particle(px, py, '#dffcff', Math.cos(aimAngle)*(2+Math.random()*3), Math.sin(aimAngle)*(2+Math.random()*3), 160, 3));
         }
+        else if (this.heroName === 'Laegon') {
+            if (this.thunderGodTimer > 0) {
+                const distance = target ? Math.hypot(tx-px, ty-py) : 0;
+                if (distance > 105 && !this.laegonHammerInFlight) {
+                    this.laegonHammerInFlight = true;
+                    game.projectiles.push(new LaegonHammer(this, px, py, Math.cos(aimAngle)*18, Math.sin(aimAngle)*18, 'combat'));
+                }
+            } else game.projectiles.push(new LaegonLightning(this, px, py, Math.cos(aimAngle)*25, Math.sin(aimAngle)*25));
+        }
+        else if (this.heroName === 'Veyra') {
+            game.projectiles.push(new Projectile(px, py, 18, 9, Math.cos(aimAngle)*15, Math.sin(aimAngle)*15, 30, this, '#a66cff', 'chrono_bolt'));
+        }
+        else if (this.heroName === 'Brom') {
+            game.projectiles.push(new BromBlastCharge(this, px, py, Math.cos(aimAngle)*10, Math.sin(aimAngle)*10));
+        }
+    }
+
+    updateVeyraTime(dt) {
+        this.veyraAnchors = this.veyraAnchors.filter(anchor => anchor && !anchor.dead);
+        this.veyraHistoryTimer += dt;
+        this.veyraEchoTimer += dt;
+        if (this.veyraHistoryTimer >= 100) {
+            this.veyraHistoryTimer %= 100;
+            this.veyraHistory.push({ x: this.x, y: this.y, hp: this.hp, age: 0 });
+        }
+        this.veyraHistory.forEach(sample => sample.age += dt);
+        this.veyraHistory = this.veyraHistory.filter(sample => sample.age <= 3400);
+        if (this.veyraEchoTimer >= 700 && Math.hypot(this.vx || 0, this.vy || 0) > 1.2) {
+            this.veyraEchoTimer = 0;
+            const echoes = game.minions.filter(item => item?.type === 'temporal_echo' && item.owner === this && !item.dead);
+            if (echoes.length >= 3) echoes[0].dead = true;
+            game.minions.push(new TemporalEcho(this, this.x, this.y));
+        }
+        if (this.veyraReversalTimer > 0) {
+            this.veyraReversalTimer = Math.max(0, this.veyraReversalTimer - dt);
+            this.vx = 0;
+            if (this.veyraReversalTimer <= 0) this.completeTimeReversal();
+        }
+    }
+
+    completeTimeReversal() {
+        const old = this.veyraHistory.reduce((best, sample) => !best || Math.abs(sample.age - 3000) < Math.abs(best.age - 3000) ? sample : best, null);
+        const recentAnchor = [...this.veyraAnchors].reverse().find(anchor => !anchor.dead && anchor.age <= 3000);
+        if (!old && !recentAnchor) return;
+        const destination = recentAnchor || old;
+        const historicalHp = old?.hp ?? this.hp;
+        this.x = Math.max(0, Math.min(CANVAS_W - this.w, destination.x - (recentAnchor ? this.w/2 : 0)));
+        this.y = Math.max(0, Math.min(GROUND_Y - this.h, destination.y - (recentAnchor ? this.h/2 : 0)));
+        this.hp = Math.min(this.maxHp, this.hp + Math.max(0, historicalHp - this.hp) * 0.5);
+        this.vx = 0; this.vy = 0; this.attackState = 'idle';
+        for (let i=0; i<28; i++) game.particles.push(new Particle(this.x+this.w/2, this.y+this.h/2, '#b78aff', (Math.random()-0.5)*15, (Math.random()-0.5)*15, 500, 5));
+    }
+
+    onLaegonHit(target, damage, hammer = false) {
+        if (!target) return;
+        if (hammer && this.thunderGodTimer > 0) {
+            this.hp = Math.min(this.maxHp, this.hp + damage * 0.2 * (target.heroName ? 1 : 0.5));
+        }
+        if (!hammer && target !== this.laegonLastHitTarget) {
+            this.laegonLastHitTarget = target;
+            this.thunderCharges = Math.min(5, this.thunderCharges + 1);
+            this.thunderChargeTimer = 2000;
+        }
     }
 
     spawnD2FDrones(count) {
@@ -1658,6 +1784,30 @@ class Fighter extends Entity {
     }
 
     performSuper() {
+        if (this.heroName === 'Laegon') {
+            const target = game.getEnemyOf(this);
+            if (this.superCooldown <= 0 && target) {
+                this.superCooldown = this.superCooldownMax;
+                game.hazards.push(new LaegonHammerStrike(this, target.x + target.w/2, target.y + target.h/2));
+            }
+            return;
+        }
+        if (this.heroName === 'Veyra') {
+            if (this.superCooldown <= 0 && this.veyraReversalTimer <= 0 && this.veyraHistory.length) {
+                this.superCooldown = this.superCooldownMax;
+                this.veyraReversalTimer = 1000;
+                this.attackState = 'windup'; this.stateTimer = 1000; this.maxStateTimer = 1000; this.vx = 0;
+            }
+            return;
+        }
+        if (this.heroName === 'Brom') {
+            const target = game.getEnemyOf(this);
+            if (this.superCooldown <= 0 && target) {
+                this.superCooldown = this.superCooldownMax;
+                game.hazards.push(new DemolitionZone(this, target.x + target.w/2, target.y + target.h/2));
+            }
+            return;
+        }
         if (this.heroName === 'D2F1') {
             if (this.superCooldown <= 0) {
                 const opponents = typeof game.getOpponentsOf === 'function'
@@ -2220,6 +2370,18 @@ class Fighter extends Entity {
             ctx.fillRect(hw - 12, 11, 8, 5);
             ctx.fillRect(-5, 28, 10, 10);
             ctx.shadowBlur = 0;
+        } else if (this.heroName === 'Laegon') {
+            ctx.fillStyle='#26183f';ctx.fillRect(-hw-3,-3,this.w+6,h+6);ctx.fillStyle=this.color;ctx.fillRect(-hw,0,this.w,h);
+            ctx.fillStyle='#ffd75a';ctx.fillRect(-hw,26,this.w,7);ctx.fillStyle='#e8dcff';ctx.fillRect(-hw+6,8,this.w-12,13);
+            if(this.thunderGodTimer>0){ctx.strokeStyle='#ffd75a';ctx.shadowBlur=14;ctx.shadowColor='#9d5cff';ctx.lineWidth=4;ctx.strokeRect(-hw-6,-6,this.w+12,h+12);ctx.shadowBlur=0;}
+        } else if (this.heroName === 'Veyra') {
+            ctx.fillStyle='#25143d';ctx.fillRect(-hw-3,-3,this.w+6,h+6);ctx.fillStyle=this.color;ctx.fillRect(-hw,0,this.w,h);
+            ctx.fillStyle='#d9c0ff';ctx.fillRect(-hw+5,8,this.w-10,14);ctx.fillStyle='#3d2360';ctx.fillRect(-hw,31,this.w,8);
+            ctx.strokeStyle='#e0c8ff';ctx.lineWidth=2;ctx.beginPath();ctx.arc(0,48,10,0,Math.PI*2);ctx.stroke();
+        } else if (this.heroName === 'Brom') {
+            ctx.fillStyle='#382116';ctx.fillRect(-hw-3,-3,this.w+6,h+6);ctx.fillStyle=this.color;ctx.fillRect(-hw,0,this.w,h);
+            ctx.fillStyle='#f5d29b';ctx.fillRect(-hw+5,8,this.w-10,14);ctx.fillStyle='#30251f';ctx.fillRect(-hw,30,this.w,10);
+            ctx.fillStyle='#ffdf5d';ctx.fillRect(-hw+5,44,8,8);ctx.fillRect(hw-13,44,8,8);
         } else if (this.heroName === 'Wolf') {
             ctx.fillStyle = "#404040"; ctx.fillRect(-hw - 2, -2, this.w + 4, h + 4);
             ctx.fillStyle = this.color; ctx.fillRect(-hw, 0, this.w, h);
@@ -2431,6 +2593,18 @@ class Fighter extends Entity {
             ctx.fillRect(38 + recoil, -3, 8, 6);
             ctx.shadowBlur = 0;
             ctx.restore();
+        }
+        else if (this.heroName === 'Laegon') {
+            ctx.save();ctx.translate(hw-2,28);
+            if(this.thunderGodTimer>0){const angle=this.attackState==='active'?-1.2+2.6*phaseProg:.35;ctx.rotate(angle);ctx.fillStyle='#ffd75a';ctx.fillRect(-5,-58,10,65);ctx.fillStyle='#6f42c1';ctx.fillRect(-20,-70,40,18);}
+            else{ctx.strokeStyle='#d8c0ff';ctx.shadowBlur=10;ctx.shadowColor='#9d5cff';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(24,-4);ctx.lineTo(35,4);ctx.stroke();}
+            ctx.restore();
+        }
+        else if (this.heroName === 'Veyra') {
+            ctx.save();ctx.translate(hw-2,28);ctx.strokeStyle='#d8c0ff';ctx.lineWidth=4;ctx.beginPath();ctx.arc(16,0,12,0,Math.PI*1.7);ctx.stroke();ctx.fillStyle='#9d5cff';ctx.beginPath();ctx.arc(16,0,4,0,Math.PI*2);ctx.fill();ctx.restore();
+        }
+        else if (this.heroName === 'Brom') {
+            ctx.save();ctx.translate(hw-2,28);const recoil=this.attackState==='active'?-6*Math.sin(phaseProg*Math.PI):0;ctx.fillStyle='#4b3426';ctx.fillRect(recoil,-8,38,16);ctx.fillStyle='#ff9f1c';ctx.fillRect(28+recoil,-6,15,12);ctx.restore();
         }
         else if (this.heroName === 'Volt') {
             ctx.save(); ctx.translate(hw, 25);

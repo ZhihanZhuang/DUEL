@@ -615,7 +615,7 @@ class Projectile extends Entity {
                             game.createExplosion(this.x + this.w/2, this.y + this.h/2, 180, 70, this.owner, false, 2500);
                             return;
                         }
-                        let noKnockback = (this.type === "bullet" || this.type === "homing_bullet" || this.type === "ki_blast" || this.type === "magic_burst" || this.type === "paper_plane" || this.type === "blue_paper_plane" || this.type === "fire_bolt" || this.type === "water_bolt" || this.type === "tidal_wave" || this.type === "volt_laser" || this.type === "pickaxe" || this.type === "chiq_blade" || this.type === "em_ball");
+                        let noKnockback = (this.type === "bullet" || this.type === "homing_bullet" || this.type === "ki_blast" || this.type === "magic_burst" || this.type === "paper_plane" || this.type === "blue_paper_plane" || this.type === "fire_bolt" || this.type === "water_bolt" || this.type === "tidal_wave" || this.type === "volt_laser" || this.type === "pickaxe" || this.type === "chiq_blade" || this.type === "em_ball" || this.type === "chrono_bolt");
                         t.takeDamage(this.damage, this.owner, false, noKnockback);
                         if (this.damage > 0 && this.owner?.heroName === 'Archor' && typeof this.owner.onArchorHit === 'function') this.owner.onArchorHit(t);
 
@@ -652,6 +652,7 @@ class Projectile extends Entity {
                                 t.buffs.dizzy = Math.max(t.buffs.dizzy || 0, 1000);
                                 this.phantomDizzyApplied = true;
                             }
+                            if (this.type === "chrono_bolt") t.buffs.slow = Math.max(t.buffs.slow || 0, 400);
                             if (this.type === "chiq_blade") {
                                 t.buffs.slow = Math.max(t.buffs.slow || 0, this.chiqNu ? 7000 : 3500);
                                 t.buffs.bleed = Math.max(t.buffs.bleed || 0, 6000);
@@ -750,6 +751,11 @@ class Projectile extends Entity {
             ctx.fill();
             ctx.restore();
             if (this.type === "blue_paper_plane" && Math.random() < 0.5) game.particles.push(new Particle(this.x+this.w/2, this.y+this.h/2, "#88ccff", 0, 0, 150, 3));
+        } else if (this.type === "chrono_bolt") {
+            ctx.save(); ctx.strokeStyle = 'rgba(166,108,255,.45)'; ctx.lineWidth = 7;
+            ctx.beginPath(); ctx.moveTo(this.x - this.vx * 2, this.y - this.vy * 2); ctx.lineTo(this.x + this.w/2, this.y + this.h/2); ctx.stroke();
+            ctx.fillStyle = '#e0c8ff'; ctx.shadowBlur = 14; ctx.shadowColor = '#9d5cff';
+            ctx.beginPath(); ctx.ellipse(this.x+this.w/2,this.y+this.h/2,this.w/2,this.h/2,0,0,Math.PI*2); ctx.fill(); ctx.restore();
         } else if (this.type === "em_ball") {
             ctx.save();
             ctx.translate(this.x + this.w/2, this.y + this.h/2);
@@ -850,6 +856,154 @@ class Projectile extends Entity {
             ctx.fillRect(this.x, this.y, this.w, this.h);
         }
     }
+}
+
+function getHostileTargets(owner, exclude = null) {
+    return Array.from(new Set([
+        ...(typeof game.getOpponentsOf === 'function' ? game.getOpponentsOf(owner) : []),
+        ...(game.minions || []).filter(entity => entity && entity !== exclude && entity.owner !== owner && !entity.untargetable)
+    ])).filter(entity => entity && !entity.dead && entity !== exclude && !(entity.invincible > 0));
+}
+
+class TimeAnchor extends Entity {
+    constructor(owner, x, y) {
+        super(x, y, 1, 1); this.owner = owner; this.type = 'time_anchor';
+        this.life = 12000; this.maxLife = 12000; this.age = 0; this.untargetable = true;
+    }
+    update(dt) { this.age += dt; this.life -= dt; if (this.life <= 0 || !this.owner || this.owner.dead) this.dead = true; }
+    draw(ctx) {
+        const pulse = 28 + Math.sin(this.age * 0.012) * 5;
+        ctx.save(); ctx.translate(this.x, this.y); ctx.strokeStyle = 'rgba(185,120,255,0.9)';
+        ctx.shadowBlur = 15; ctx.shadowColor = '#9d5cff'; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.arc(0,0,pulse,0,Math.PI*2); ctx.stroke();
+        ctx.rotate(this.age * 0.002); ctx.beginPath(); ctx.arc(0,0,15,0,Math.PI*1.4); ctx.stroke(); ctx.restore();
+    }
+}
+
+class TemporalEcho extends Entity {
+    constructor(owner, x, y) {
+        super(x, y, owner.w, owner.h); this.owner = owner; this.type = 'temporal_echo';
+        this.life = 3000; this.maxLife = 3000; this.untargetable = true; this.touched = new Set();
+    }
+    update(dt) {
+        this.life -= dt;
+        for (const target of getHostileTargets(this.owner, this)) {
+            if (!this.touched.has(target) && checkAABB(this, target)) {
+                target.buffs = target.buffs || {}; target.buffs.slow = Math.max(target.buffs.slow || 0, 1000);
+                this.touched.add(target);
+            }
+        }
+        if (this.life <= 0 || !this.owner || this.owner.dead) this.dead = true;
+    }
+    draw(ctx) {
+        ctx.save(); ctx.globalAlpha = Math.max(0.12, this.life / this.maxLife * 0.42); ctx.fillStyle = '#a66cff';
+        ctx.shadowBlur = 12; ctx.shadowColor = '#9d5cff'; ctx.fillRect(this.x, this.y, this.w, this.h); ctx.restore();
+    }
+}
+
+class HeavensThunder extends Entity {
+    constructor(owner, x, y) { super(x-60, y-60, 120, 120); this.owner=owner; this.type='heavens_thunder'; this.life=600; this.maxLife=600; this.untargetable=true; }
+    update(dt) {
+        this.life -= dt;
+        if (this.life <= 0) {
+            for (const target of getHostileTargets(this.owner, this)) {
+                if (Math.hypot(target.x+target.w/2-(this.x+60), target.y+target.h/2-(this.y+60)) > 60) continue;
+                const damage = target.heroName ? 30 : 45; target.takeDamage(damage, this.owner, false, true);
+                target.buffs = target.buffs || {}; target.buffs.dizzy = Math.max(target.buffs.dizzy || 0, 250);
+            }
+            for(let i=0;i<28;i++) game.particles.push(new Particle(this.x+60, this.y+60+(Math.random()-.5)*120, i%2?'#fff':'#b06cff',(Math.random()-.5)*8,(Math.random()-.5)*8,350,4));
+            this.dead = true;
+        }
+    }
+    draw(ctx) { const a=0.18+0.3*(1-this.life/this.maxLife); ctx.save(); ctx.fillStyle=`rgba(176,108,255,${a})`; ctx.fillRect(this.x+48,0,24,this.y+this.h); ctx.strokeStyle='#fff'; ctx.lineWidth=3; ctx.beginPath(); ctx.arc(this.x+60,this.y+60,60,0,Math.PI*2); ctx.stroke(); ctx.restore(); }
+}
+
+class LaegonLightning extends Entity {
+    constructor(owner,x,y,vx,vy,generation=0,hitTargets=null) {
+        super(x,y,20,5); this.owner=owner; this.type='laegon_lightning'; this.vx=vx; this.vy=vy;
+        this.originX=x; this.originY=y; this.generation=generation; this.hitTargets=hitTargets || new Set(); this.life=900;
+    }
+    update(dt) {
+        this.x += this.vx; this.y += this.vy; this.life -= dt;
+        for (const target of getHostileTargets(this.owner, this)) {
+            if (this.hitTargets.has(target) || !checkAABB(this,target)) continue;
+            this.hitTargets.add(target); const damage=target.heroName?8:10; target.takeDamage(damage,this.owner,false,true);
+            this.owner?.onLaegonHit?.(target,damage,false);
+            if (this.generation < 2) {
+                const candidates=getHostileTargets(this.owner,this).filter(item=>!this.hitTargets.has(item)).sort((a,b)=>Math.hypot(a.x-this.x,a.y-this.y)-Math.hypot(b.x-this.x,b.y-this.y)).slice(0,2);
+                for(const next of candidates){const angle=Math.atan2(next.y+next.h/2-this.y,next.x+next.w/2-this.x); game.projectiles.push(new LaegonLightning(this.owner,this.x,this.y,Math.cos(angle)*24,Math.sin(angle)*24,this.generation+1,this.hitTargets));}
+            }
+            this.dead=true; break;
+        }
+        if(this.life<=0||this.x<-50||this.x>CANVAS_W+50||this.y<-50||this.y>CANVAS_H+50)this.dead=true;
+    }
+    draw(ctx){
+        const endX=this.x+this.w/2,endY=this.y+this.h/2,dx=endX-this.originX,dy=endY-this.originY;
+        const length=Math.hypot(dx,dy),segments=Math.max(4,Math.ceil(length/28)),normalX=-dy/Math.max(1,length),normalY=dx/Math.max(1,length);
+        ctx.save();ctx.strokeStyle='#d8c0ff';ctx.shadowBlur=16;ctx.shadowColor='#9d5cff';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(this.originX,this.originY);
+        for(let index=1;index<segments;index++){const ratio=index/segments;const jitter=(index%2?1:-1)*(6+((index*7+this.generation*3)%9));ctx.lineTo(this.originX+dx*ratio+normalX*jitter,this.originY+dy*ratio+normalY*jitter);}
+        ctx.lineTo(endX,endY);ctx.stroke();ctx.strokeStyle='#ffffff';ctx.shadowBlur=0;ctx.lineWidth=1.5;ctx.stroke();ctx.restore();
+    }
+}
+
+class LaegonHammerStrike extends Entity {
+    constructor(owner,x,y){super(x-100,0,200,GROUND_Y);this.owner=owner;this.type='laegon_hammer_strike';this.life=800;this.maxLife=800;this.targetX=x;this.targetY=y;this.untargetable=true;}
+    update(dt){this.life-=dt;if(this.life<=0){for(const target of getHostileTargets(this.owner,this)){if(Math.hypot(target.x+target.w/2-this.targetX,target.y+target.h/2-this.targetY)<=100)target.takeDamage(50,this.owner);}game.projectiles.push(new LaegonHammer(this.owner,this.targetX-18,this.targetY-15,0,0,'ultimate_return'));this.dead=true;}}
+    draw(ctx){ctx.save();ctx.strokeStyle='rgba(255,215,80,.9)';ctx.fillStyle='rgba(139,92,246,.18)';ctx.lineWidth=4;ctx.beginPath();ctx.arc(this.targetX,this.targetY,100,0,Math.PI*2);ctx.fill();ctx.stroke();ctx.fillStyle='#d9b84f';ctx.fillRect(this.targetX-18,-50,36,55);ctx.restore();}
+}
+
+class LaegonHammer extends Entity {
+    constructor(owner,x,y,vx,vy,phase){super(x,y,36,30);this.owner=owner;this.type='laegon_hammer';this.vx=vx;this.vy=vy;this.phase=phase;this.returning=phase==='ultimate_return';this.life=3500;this.hitTargets=new Set();this.outboundTime=0;}
+    update(dt){
+        this.life-=dt;this.outboundTime+=dt;
+        if(this.phase==='combat'&&!this.returning&&this.outboundTime>650){this.returning=true;this.hitTargets.clear();}
+        if(this.returning){const dx=this.owner.x+this.owner.w/2-(this.x+this.w/2),dy=this.owner.y+this.owner.h/2-(this.y+this.h/2),d=Math.hypot(dx,dy);if(d<34){this.dead=true;this.owner.laegonHammerInFlight=false;if(this.phase==='ultimate_return')this.owner.thunderGodTimer=8000;return;}this.vx=dx/Math.max(1,d)*20;this.vy=dy/Math.max(1,d)*20;}
+        this.x+=this.vx;this.y+=this.vy;
+        for(const target of getHostileTargets(this.owner,this)){if(!this.hitTargets.has(target)&&checkAABB(this,target)){const damage=this.phase==='combat'?40:30;target.takeDamage(damage,this.owner);this.owner?.onLaegonHit?.(target,damage,true);this.hitTargets.add(target);}}
+        if(this.life<=0){this.dead=true;this.owner.laegonHammerInFlight=false;}
+    }
+    draw(ctx){ctx.save();ctx.translate(this.x+18,this.y+15);ctx.rotate(Date.now()*.015);ctx.fillStyle='#6f42c1';ctx.shadowBlur=14;ctx.shadowColor='#ffd75a';ctx.fillRect(-15,-10,30,20);ctx.fillStyle='#ffd75a';ctx.fillRect(-3,8,6,25);ctx.restore();}
+}
+
+class BromExplosive extends Entity {
+    explode(radius,damage,stun,visited=new Set(),knockback=12){
+        if(this.dead||visited.has(this))return;visited.add(this);this.dead=true;const cx=this.x+this.w/2,cy=this.y+this.h/2;
+        for(const target of getHostileTargets(this.owner,this)){const dx=target.x+target.w/2-cx,dy=target.y+target.h/2-cy,d=Math.hypot(dx,dy);if(d>radius)continue;target.takeDamage(damage,this.owner,false,true);target.vx=dx/Math.max(1,d)*knockback;target.vy=Math.min(-3,dy/Math.max(1,d)*knockback-4);if(stun){target.buffs=target.buffs||{};target.buffs.dizzy=Math.max(target.buffs.dizzy||0,stun);}}
+        for(const bomb of [...(game.projectiles||[]),...(game.minions||[])])if(bomb instanceof BromExplosive&&!bomb.dead&&!visited.has(bomb)&&Math.hypot(bomb.x+bomb.w/2-cx,bomb.y+bomb.h/2-cy)<=radius)bomb.detonate(visited);
+        for(let i=0;i<30;i++)game.particles.push(new Particle(cx,cy,i%2?'#ffb020':'#3b2b22',(Math.random()-.5)*16,(Math.random()-.5)*16,550,6));
+    }
+}
+
+class BromBlastCharge extends BromExplosive {
+    constructor(owner,x,y,vx,vy){super(x,y,16,16);this.owner=owner;this.type='brom_blast';this.vx=vx;this.vy=vy;this.life=2200;}
+    detonate(visited){this.explode(65,60,120,visited,9);}
+    update(dt){this.x+=this.vx;this.y+=this.vy;this.vy+=GRAVITY*.08;this.life-=dt;for(const target of getHostileTargets(this.owner,this)){if(checkAABB(this,target)){target.takeDamage(60,this.owner,false,true);this.detonate(new Set());return;}}const surface=this.y+this.h>=GROUND_Y||this.x<=0||this.x+this.w>=CANVAS_W||PLATFORMS.some(p=>checkAABB(this,p));if(surface||this.life<=0)this.detonate(new Set());}
+    draw(ctx){ctx.save();ctx.fillStyle='#ff9f1c';ctx.shadowBlur=10;ctx.shadowColor='#ff5a1f';ctx.beginPath();ctx.arc(this.x+8,this.y+8,8,0,Math.PI*2);ctx.fill();ctx.restore();}
+}
+
+class BromStickyBomb extends BromExplosive {
+    constructor(owner,x,y,vx,vy){super(x,y,18,18);this.owner=owner;this.type='brom_sticky';this.vx=vx;this.vy=vy;this.life=4000;this.attached=null;this.offsetX=0;this.offsetY=0;}
+    detonate(visited){this.explode(100,150,300,visited,18);}
+    update(dt){
+        this.life-=dt;if(this.attached){if(this.attached.dead){this.attached=null;}else{this.x=this.attached.x+this.offsetX;this.y=this.attached.y+this.offsetY;}}
+        else{this.x+=this.vx;this.y+=this.vy;this.vy+=GRAVITY*.35;const target=getHostileTargets(this.owner,this).find(item=>checkAABB(this,item));if(target){this.attached=target;this.offsetX=this.x-target.x;this.offsetY=this.y-target.y;this.vx=0;this.vy=0;}else if(this.y+this.h>=GROUND_Y||this.x<=0||this.x+this.w>=CANVAS_W||PLATFORMS.some(p=>checkAABB(this,p))){this.vx=0;this.vy=0;this.y=Math.min(this.y,GROUND_Y-this.h);}}
+        if(this.life<=0)this.detonate(new Set());
+    }
+    draw(ctx){ctx.save();ctx.translate(this.x+9,this.y+9);ctx.rotate(Date.now()*.006);ctx.fillStyle=Math.floor(this.life/200)%2?'#ffdf5d':'#e34234';ctx.fillRect(-8,-8,16,16);ctx.fillStyle='#222';ctx.fillRect(-3,-3,6,6);ctx.restore();}
+}
+
+class DemolitionZone extends Entity {
+    constructor(owner,x,y){super(x-240,y-150,480,300);this.owner=owner;this.type='demolition_zone';this.life=3500;this.maxLife=3500;this.elapsed=0;this.nextBlast=2000;this.blastIndex=0;this.fieldPulseTimer=0;this.untargetable=true;}
+    update(dt){
+        this.elapsed+=dt;this.life-=dt;
+        if(this.elapsed>=2000){
+            this.fieldPulseTimer+=dt;const dizzyPulse=this.fieldPulseTimer>=500;if(dizzyPulse)this.fieldPulseTimer%=500;
+            const cx=this.x+this.w/2,cy=this.y+this.h/2;
+            for(const target of getHostileTargets(this.owner,this)){const nx=(target.x+target.w/2-cx)/(this.w/2),ny=(target.y+target.h/2-cy)/(this.h/2);if(nx*nx+ny*ny>1)continue;target.buffs=target.buffs||{};target.buffs.slow=Math.max(target.buffs.slow||0,420);if(dizzyPulse)target.buffs.dizzy=Math.max(target.buffs.dizzy||0,220);}
+        }
+        while(this.elapsed>=this.nextBlast&&this.blastIndex<8){const center=this.blastIndex===0;const angle=(this.blastIndex-1)*Math.PI*2/7;const radius=center?0:90+((this.blastIndex%2)*90);const x=this.x+this.w/2+Math.cos(angle)*radius,y=this.y+this.h/2+Math.sin(angle)*radius*.55;const marker=new BromBlastCharge(this.owner,x-8,y-8,0,0);marker.dead=false;marker.explode(center?115:80,center?300:120,center?350:160,new Set(),center?22:15);this.blastIndex++;this.nextBlast=2000+this.blastIndex*(1500/7);}if(this.life<=0)this.dead=true;
+    }
+    draw(ctx){ctx.save();const warning=this.elapsed<2000;ctx.fillStyle=warning?'rgba(255,90,30,.16)':'rgba(255,160,40,.09)';ctx.strokeStyle=warning?'#ff6a2a':'#ffb020';ctx.lineWidth=4;ctx.beginPath();ctx.ellipse(this.x+this.w/2,this.y+this.h/2,this.w/2,this.h/2,0,0,Math.PI*2);ctx.fill();ctx.stroke();ctx.restore();}
 }
 
 class GravityWell extends Entity {

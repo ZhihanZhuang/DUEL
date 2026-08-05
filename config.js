@@ -334,6 +334,21 @@ var HEROES = {
         name: "D2F-1", desc: "Autonomous Drone Consciousness",
         color: "#35d5e8", maxHp: 520, speed: 7.2, jump: 16, width: 40, height: 66, superCD: 35000,
         ui: { hp: "52 WRD", atk: "0.5 WRD (Electromagnetic Ball)", passive: "Fast ranged chassis. Press [Switch] to deploy 3 autonomous laser drones (10s CD). Drones evade incoming projectiles and maintain firing distance; their 2s beams cycle every 2.5s and inflict continuous burn damage.", super: "<span class='skill-tag'>Orbital Drop Unit</span> Deploys 4 laser drones and marks an enemy for 1s, slowing them while the target reticle blinks. A giant melee robot then drops onto the mark, dealing 8.5 WRD and 0.75s dizzy on landing before fighting for D2F-1. 35s CD." }
+    },
+    Laegon: {
+        name: "Laegon", desc: "Thunder God and Anti-Summon Mage",
+        color: "#8b5cf6", maxHp: 750, speed: 4.5, jump: 14, width: 42, height: 72, superCD: 26000,
+        ui: { hp: "75 WRD", atk: "0.8 WRD (Long Branching Lightning Current)", passive: "Lightning uses 10 Energy and projects a long current that splits 1 -> 2 -> 4 without hitting the same target twice. Different consecutive targets build up to 5 Thunder Charges (+3% attack speed each). Press [Switch] for Heaven's Thunder: a delayed 3 WRD strike with bonus summon damage (8s CD).", super: "<span class='skill-tag'>Purple-Gold Thunder Hammer</span> Calls a 5 WRD hammer impact that returns for 3 WRD piercing damage. Catching it grants 8s Thunder God Mode: melee/returning throws, 20% lifesteal, and infinite Energy." }
+    },
+    Veyra: {
+        name: "Veyra", desc: "Chronomancer Battlefield Controller",
+        color: "#9d5cff", maxHp: 700, speed: 6.2, jump: 14.5, width: 39, height: 69, superCD: 18000,
+        ui: { hp: "70 WRD", atk: "3 WRD (Chrono Bolt)", passive: "Movement leaves up to 3 temporal echoes that slow enemies on contact. Press [Switch] to place a visible 12s Time Anchor (max 2; oldest is replaced).", super: "<span class='skill-tag'>Time Reversal</span> After a 1s charge, returns Veyra to his position about 3s ago or a recent valid anchor, and restores half the HP lost during those 3s. Only Veyra's position and HP are reversed." }
+    },
+    Brom: {
+        name: "Brom", desc: "Demolitionist and Area Controller",
+        color: "#e67e22", maxHp: 800, speed: 5.8, jump: 14, width: 43, height: 71, superCD: 24000,
+        ui: { hp: "80 WRD", atk: "6 WRD Direct + 6 WRD Explosion", passive: "Slow Blast Charges explode on impact and trigger nearby Brom explosives. Press [Switch] to throw a 4s Sticky Bomb; press again to detonate it for 15 WRD, strong knockback, and 0.3s stun.", super: "<span class='skill-tag'>Demolition Zone</span> Marks a large area for 2s, then creates a slowing, dizzying field with staggered 30 WRD central and 12 WRD outer explosions over 1.5s." }
     }
 };
 

@@ -57,7 +57,7 @@ function loadProjectileContext() {
     };
     vm.createContext(context);
     const source = fs.readFileSync(path.join(__dirname, '..', 'entities.js'), 'utf8');
-    vm.runInContext(`${source}\nwindow.Projectile = Projectile; window.KuroDecoy = KuroDecoy; window.GiantSword = GiantSword; window.GravityWell = GravityWell; window.ChiqPath = ChiqPath; window.D2FDrone = D2FDrone; window.D2FTargetBeacon = D2FTargetBeacon; window.D2FGiantRobot = D2FGiantRobot;`, context, { filename: 'entities.js' });
+    vm.runInContext(`${source}\nwindow.Projectile = Projectile; window.KuroDecoy = KuroDecoy; window.GiantSword = GiantSword; window.GravityWell = GravityWell; window.ChiqPath = ChiqPath; window.D2FDrone = D2FDrone; window.D2FTargetBeacon = D2FTargetBeacon; window.D2FGiantRobot = D2FGiantRobot; window.TimeAnchor = TimeAnchor; window.TemporalEcho = TemporalEcho; window.LaegonLightning = LaegonLightning; window.LaegonHammer = LaegonHammer; window.LaegonHammerStrike = LaegonHammerStrike; window.BromBlastCharge = BromBlastCharge; window.BromStickyBomb = BromStickyBomb; window.DemolitionZone = DemolitionZone;`, context, { filename: 'entities.js' });
     return context;
 }
 
@@ -135,8 +135,17 @@ function makeFighter(heroName, id = 'cpu') {
         orionCharges: 0,
         orionPulseCooldown: 0,
         d2fDroneCooldown: 0,
+        laegonEnergy: 100,
+        laegonSwitchCooldown: 0,
+        thunderCharges: 0,
+        thunderGodTimer: 0,
+        veyraHistory: [],
+        veyraAnchors: [],
+        veyraReversalTimer: 0,
+        bromStickyBomb: null,
         isMeleeAttack() {
-            return !['Hason', 'Willi', 'Ugo', 'Kila', 'Volt', 'Noae', 'Kuro', 'Nyra', 'Archor', 'D2F1'].includes(this.heroName)
+            if (this.heroName === 'Laegon') return this.thunderGodTimer > 0;
+            return !['Hason', 'Willi', 'Ugo', 'Kila', 'Volt', 'Noae', 'Kuro', 'Nyra', 'Archor', 'D2F1', 'Veyra', 'Brom'].includes(this.heroName)
                 && !(this.heroName === 'Hunter' && this.hunterWeapon === 'musket')
                 && !(this.heroName === 'Euclid' && this.euclidWeapon === 'magic');
         }
@@ -286,7 +295,8 @@ function loadPhysicsGame(heroName = 'Hunter') {
             Orion: { maxHp: 900, speed: 4.6, jump: 13.5, width: 46, height: 74, color: '#4056a1', superCD: 28000 },
             Archor: { maxHp: 340, speed: 5.8, jump: 15, width: 38, height: 68, color: '#2f8f62', superCD: 18000 },
             Itan: { maxHp: 820, speed: 5, jump: 14.5, width: 42, height: 72, color: '#9f3347', superCD: 3000 },
-            D2F1: { maxHp: 520, speed: 7.2, jump: 16, width: 40, height: 66, color: '#35d5e8', superCD: 35000 }
+            D2F1: { maxHp: 520, speed: 7.2, jump: 16, width: 40, height: 66, color: '#35d5e8', superCD: 35000 },
+            Veyra: { maxHp: 700, speed: 6.2, jump: 14.5, width: 39, height: 69, color: '#9d5cff', superCD: 18000 }
         },
         keys: {},
         keysPressed: {},
@@ -534,7 +544,7 @@ test('every hero with a direct super can decide to use it', () => {
     const context = loadAI();
     const directSuperHeroes = [
         'Hason', 'Willi', 'Hunter', 'Macu', 'Artu', 'Duke', 'Kadaxi', 'Euclid',
-        'Lique', 'Kae', 'Kila', 'Volt', 'Gensan', 'Noae', 'Wolf', 'Kuro', 'Sola', 'Nyra', 'Orion', 'Archor', 'Itan', 'D2F1'
+        'Lique', 'Kae', 'Kila', 'Volt', 'Gensan', 'Noae', 'Wolf', 'Kuro', 'Sola', 'Nyra', 'Orion', 'Archor', 'Itan', 'D2F1', 'Laegon', 'Veyra', 'Brom'
     ];
 
     for (const heroName of directSuperHeroes) {
@@ -545,6 +555,9 @@ test('every hero with a direct super can decide to use it', () => {
         if (heroName === 'Kuro') target.hp = target.maxHp * 0.35;
         if (heroName === 'Sola') ai.solaFocus = 1;
         if (heroName === 'Artu') ai.superCooldown = 0;
+        if (heroName === 'Laegon') ai.hp = ai.maxHp * 0.4;
+        if (heroName === 'Veyra') { ai.veyraHistory = [{ x: ai.x, y: ai.y, hp: ai.hp, age: 3000 }]; ai.hp *= 0.5; }
+        if (heroName === 'Brom') target.buffs.dizzy = 1000;
         const game = makeGame(ai, target);
         if (heroName === 'Noae') {
             game.minions.push(
@@ -789,7 +802,10 @@ test('hero archetypes expose distinct tactical roles and low-health priorities',
         { hero: 'Lique', role: 'berserker', lowHealth: true },
         { hero: 'Sola', role: 'sentinel' },
         { hero: 'Nyra', role: 'skirmisher' },
-        { hero: 'Orion', role: 'gravity' }
+        { hero: 'Orion', role: 'gravity' },
+        { hero: 'Laegon', role: 'thunder_mage' },
+        { hero: 'Veyra', role: 'chronomancer' },
+        { hero: 'Brom', role: 'demolitionist' }
     ];
 
     for (const testCase of cases) {
@@ -1819,4 +1835,139 @@ test('online input synchronization preserves held and pressed Super states', () 
 
     context.window.applyRemoteOnlineInputs({ super: false });
     assert.equal(context.window.keys[p2.super], false);
+});
+
+test('Laegon lightning branches without duplicate hits and gains anti-summon damage', () => {
+    const context = loadProjectileContext();
+    const hits = [];
+    const owner = { id: 'laegon', heroName: 'Laegon', onLaegonHit(target) { hits.push(target.id); } };
+    const makeTarget = (id, x, heroName) => ({
+        id, heroName, x, y: 100, w: 30, h: 40, hp: 100, dead: false, invincible: 0, buffs: {},
+        takeDamage(amount) { this.hp -= amount; }
+    });
+    const fighter = makeTarget('fighter', 100, 'Hunter');
+    const summon = makeTarget('summon', 155, undefined);
+    const third = makeTarget('third', 215, 'Willi');
+    context.game.opponents = [fighter, third];
+    context.game.minions = [summon];
+    const bolt = new context.window.LaegonLightning(owner, 95, 115, 8, 0);
+    context.game.projectiles = [bolt];
+
+    bolt.update(16);
+    assert.equal(fighter.hp, 92);
+    assert.equal(context.game.projectiles.length, 3, 'first hit should create two branches');
+
+    for (let frame = 0; frame < 20; frame++) {
+        for (const projectile of [...context.game.projectiles]) if (!projectile.dead) projectile.update(16);
+        context.game.projectiles = context.game.projectiles.filter(projectile => !projectile.dead);
+    }
+    assert.equal(summon.hp, 90, 'summoned units should take 25% bonus damage');
+    assert.equal(new Set(hits).size, hits.length, 'one lightning attack hit the same target more than once');
+});
+
+test('Laegon CPU prioritizes nearby hostile summons for anti-summon pressure', () => {
+    const context = loadAI();
+    const ai = makeFighter('Laegon', 'cpu_laegon');
+    const target = makeFighter('Artu', 'target_artu');
+    target.x = 850;
+    const summon = { id: 'summon', type: 'minion', owner: target, x: 560, y: 580, w: 30, h: 60, hp: 30, maxHp: 30, dead: false, untargetable: false, takeDamage() {} };
+    const game = makeGame(ai, target);
+    game.minions.push(summon);
+    ai.superCooldown = 5000;
+    ai.laegonSwitchCooldown = 5000;
+    readyBrain(ai, target);
+
+    context.window.runAI(game, 16);
+
+    assert.equal(ai.aiCombatTarget, summon);
+});
+
+test('Brom chain reactions detonate each explosive once and preserve strong control', () => {
+    const context = loadProjectileContext();
+    const owner = { id: 'brom', heroName: 'Brom' };
+    const target = {
+        id: 'target', heroName: 'Hunter', x: 105, y: 100, w: 40, h: 70, vx: 0, vy: 0,
+        hp: 200, dead: false, invincible: 0, buffs: {}, takeDamage(amount) { this.hp -= amount; }
+    };
+    context.game.opponents = [target];
+    const first = new context.window.BromStickyBomb(owner, 100, 120, 0, 0);
+    const second = new context.window.BromStickyBomb(owner, 155, 120, 0, 0);
+    context.game.projectiles = [first, second];
+
+    first.detonate(new Set());
+
+    assert.equal(first.dead, true);
+    assert.equal(second.dead, true);
+    assert.equal(target.hp, -100, 'both tripled-damage bombs should damage once during the chain');
+    assert.equal(target.buffs.dizzy, 300);
+    assert.ok(Math.abs(target.vx) > 0);
+});
+
+test('Veyra anchors expire and temporal echoes slow only on contact', () => {
+    const context = loadProjectileContext();
+    const owner = { id: 'veyra', heroName: 'Veyra', dead: false, w: 39, h: 69 };
+    const target = {
+        id: 'target', heroName: 'Hunter', x: 100, y: 100, w: 40, h: 70,
+        dead: false, invincible: 0, buffs: {}, takeDamage() {}
+    };
+    context.game.opponents = [target];
+    const anchor = new context.window.TimeAnchor(owner, 200, 200);
+    anchor.update(11999);
+    assert.equal(anchor.dead, false);
+    anchor.update(1);
+    assert.equal(anchor.dead, true);
+
+    const echo = new context.window.TemporalEcho(owner, 100, 100);
+    echo.update(16);
+    assert.equal(target.buffs.slow, 1000);
+    target.buffs.slow = 0;
+    echo.update(16);
+    assert.equal(target.buffs.slow, 0, 'one echo repeatedly reapplied its slow to the same target');
+    echo.update(2968);
+    assert.equal(echo.dead, true);
+});
+
+test('Veyra reversal restores position and half of recent HP loss only', () => {
+    const simulation = loadPhysicsGame('Veyra');
+    simulation.ai.x = 700;
+    simulation.ai.y = 500;
+    simulation.ai.hp = 400;
+    simulation.ai.veyraHistory = [{ x: 220, y: 360, hp: 600, age: 3000 }];
+    simulation.ai.veyraAnchors = [];
+
+    simulation.ai.completeTimeReversal();
+
+    assert.equal(simulation.ai.x, 220);
+    assert.equal(simulation.ai.y, 360);
+    assert.equal(simulation.ai.hp, 500);
+    assert.equal(simulation.ai.superCooldown, 999999, 'reversal should not restore spent abilities');
+});
+
+test('Veyra has increased movement speed and doubled Chrono Bolt damage', () => {
+    const simulation = loadPhysicsGame('Veyra');
+    simulation.ai.facing = 1;
+    simulation.ai.executeActiveAttack();
+
+    assert.equal(simulation.ai.baseSpeed, 6.2);
+    assert.equal(simulation.context.game.projectiles.length, 1);
+    assert.equal(simulation.context.game.projectiles[0].type, 'chrono_bolt');
+    assert.equal(simulation.context.game.projectiles[0].damage, 30);
+});
+
+test('Brom Demolition Zone triples damage and applies field slow and dizzy pulses', () => {
+    const context = loadProjectileContext();
+    const owner = { id: 'brom', heroName: 'Brom' };
+    const target = {
+        id: 'target', heroName: 'Hunter', x: 450, y: 170, w: 40, h: 70, vx: 0, vy: 0,
+        hp: 1000, dead: false, invincible: 0, buffs: {}, takeDamage(amount) { this.hp -= amount; }
+    };
+    context.game.opponents = [target];
+    const zone = new context.window.DemolitionZone(owner, 300, 200);
+
+    zone.update(2000);
+    assert.ok(target.buffs.slow >= 400, 'active field did not apply slowdown');
+    zone.update(500);
+
+    assert.ok(target.buffs.dizzy >= 220, 'active field did not apply its dizzy pulse');
+    assert.ok(target.hp <= 880, 'outer explosion did not use tripled damage');
 });

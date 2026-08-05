@@ -456,8 +456,8 @@ class Game {
         const arenaNameplate = document.getElementById('arena-nameplate');
         if (arenaNameplate) arenaNameplate.innerText = this.activeArena.name;
 
-        document.getElementById('p1-horse-container').classList.toggle('hidden', this.p1Choice !== 'Duke' && this.p1Choice !== 'Volt');
-        document.getElementById('p2-horse-container').classList.toggle('hidden', this.p2Choice !== 'Duke' && this.p2Choice !== 'Volt');
+        document.getElementById('p1-horse-container').classList.toggle('hidden', !['Duke', 'Volt', 'Laegon'].includes(this.p1Choice));
+        document.getElementById('p2-horse-container').classList.toggle('hidden', !['Duke', 'Volt', 'Laegon'].includes(this.p2Choice));
 
         this.state = 'PLAYING';
         this.lastTime = performance.now();
@@ -518,8 +518,8 @@ class Game {
         document.getElementById('game-ui')?.classList.remove('survival-mode');
         document.getElementById('game-ui')?.classList.add('boss-mode');
         document.getElementById('btn-pause-menu')?.classList.remove('hidden');
-        document.getElementById('p1-horse-container').classList.toggle('hidden', this.p1Choice !== 'Duke' && this.p1Choice !== 'Volt');
-        document.getElementById('p2-horse-container').classList.toggle('hidden', this.bossPlayerCount === 1 || (this.p2Choice !== 'Duke' && this.p2Choice !== 'Volt'));
+        document.getElementById('p1-horse-container').classList.toggle('hidden', !['Duke', 'Volt', 'Laegon'].includes(this.p1Choice));
+        document.getElementById('p2-horse-container').classList.toggle('hidden', this.bossPlayerCount === 1 || !['Duke', 'Volt', 'Laegon'].includes(this.p2Choice));
         this.updateBossHUD();
 
         this.state = 'PLAYING';
@@ -610,6 +610,9 @@ class Game {
         } else if (this.p1.heroName === 'Volt') {
             document.getElementById('p1-horse-hp').style.width = `${Math.max(0, (this.p1.energy / this.p1.maxEnergy) * 100)}%`;
             document.getElementById('p1-horse-hp').style.background = this.p1.isOverloaded ? '#ff0000' : (this.p1.energy <= 20 && Math.floor(Date.now()/200)%2===0 ? '#ff0000' : '#FFFF00');
+        } else if (this.p1.heroName === 'Laegon') {
+            document.getElementById('p1-horse-hp').style.width = `${Math.max(0, this.p1.laegonEnergy)}%`;
+            document.getElementById('p1-horse-hp').style.background = '#9d5cff';
         }
 
         let p1Sup = 100 - (this.p1.superCooldown / this.p1.superCooldownMax) * 100;
@@ -707,6 +710,17 @@ class Game {
             if (this.p1.d2fDroneCooldown > 0) p1Stat += ` [DEPLOY CD ${(this.p1.d2fDroneCooldown/1000).toFixed(1)}s]`;
             else p1Stat += ' [DEPLOY READY]';
         }
+        if (this.p1.heroName === 'Laegon') {
+            p1Stat += `[ENERGY: ${Math.floor(this.p1.laegonEnergy)}/100] [CHARGE: ${this.p1.thunderCharges}/5]`;
+            if (this.p1.thunderGodTimer > 0) p1Stat += ` [THUNDER GOD ${(this.p1.thunderGodTimer/1000).toFixed(1)}s]`;
+            if (this.p1.laegonSwitchCooldown > 0) p1Stat += ` [THUNDER CD ${(this.p1.laegonSwitchCooldown/1000).toFixed(1)}s]`;
+        }
+        if (this.p1.heroName === 'Veyra') {
+            const anchors = this.minions.filter(item => item?.type === 'time_anchor' && item.owner === this.p1 && !item.dead).length;
+            p1Stat += `[ANCHORS: ${anchors}/2]`;
+            if (this.p1.veyraReversalTimer > 0) p1Stat += ` [REVERSING ${(this.p1.veyraReversalTimer/1000).toFixed(1)}s]`;
+        }
+        if (this.p1.heroName === 'Brom') p1Stat += this.p1.bromStickyBomb && !this.p1.bromStickyBomb.dead ? '[STICKY: DETONATE]' : '[STICKY: READY]';
 
         if (this.p1.buffs.poison > 0) p1Stat += " [POISONED]";
         if (this.p1.buffs.burn > 0) p1Stat += " [BURN]";
@@ -722,6 +736,9 @@ class Game {
         } else if (this.p2.heroName === 'Volt') {
             document.getElementById('p2-horse-hp').style.width = `${Math.max(0, (this.p2.energy / this.p2.maxEnergy) * 100)}%`;
             document.getElementById('p2-horse-hp').style.background = this.p2.isOverloaded ? '#ff0000' : (this.p2.energy <= 20 && Math.floor(Date.now()/200)%2===0 ? '#ff0000' : '#FFFF00');
+        } else if (this.p2.heroName === 'Laegon') {
+            document.getElementById('p2-horse-hp').style.width = `${Math.max(0, this.p2.laegonEnergy)}%`;
+            document.getElementById('p2-horse-hp').style.background = '#9d5cff';
         }
 
         let p2Sup = 100 - (this.p2.superCooldown / this.p2.superCooldownMax) * 100;
@@ -819,6 +836,17 @@ class Game {
             if (this.p2.d2fDroneCooldown > 0) p2Stat += ` [DEPLOY CD ${(this.p2.d2fDroneCooldown/1000).toFixed(1)}s]`;
             else p2Stat += ' [DEPLOY READY]';
         }
+        if (this.p2.heroName === 'Laegon') {
+            p2Stat += `[ENERGY: ${Math.floor(this.p2.laegonEnergy)}/100] [CHARGE: ${this.p2.thunderCharges}/5]`;
+            if (this.p2.thunderGodTimer > 0) p2Stat += ` [THUNDER GOD ${(this.p2.thunderGodTimer/1000).toFixed(1)}s]`;
+            if (this.p2.laegonSwitchCooldown > 0) p2Stat += ` [THUNDER CD ${(this.p2.laegonSwitchCooldown/1000).toFixed(1)}s]`;
+        }
+        if (this.p2.heroName === 'Veyra') {
+            const anchors = this.minions.filter(item => item?.type === 'time_anchor' && item.owner === this.p2 && !item.dead).length;
+            p2Stat += `[ANCHORS: ${anchors}/2]`;
+            if (this.p2.veyraReversalTimer > 0) p2Stat += ` [REVERSING ${(this.p2.veyraReversalTimer/1000).toFixed(1)}s]`;
+        }
+        if (this.p2.heroName === 'Brom') p2Stat += this.p2.bromStickyBomb && !this.p2.bromStickyBomb.dead ? '[STICKY: DETONATE]' : '[STICKY: READY]';
 
         if (this.p2.buffs.poison > 0) p2Stat += " [POISONED]";
         if (this.p2.buffs.burn > 0) p2Stat += " [BURN]";

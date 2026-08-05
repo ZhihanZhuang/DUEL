@@ -55,7 +55,10 @@ const HERO_TACTICS = {
     Orion:   { role: 'gravity', aggression: 1.12, caution: 0.55, burst: 1.25, kite: 0.08, setup: 0.95, highGround: 0.38, retreatHp: 0.24, retreatFireChance: 0.10 },
     Archor:  { role: 'rapid_archer', aggression: 0.82, caution: 1.18, burst: 1.45, kite: 1.38, setup: 0.20, highGround: 1.28, retreatHp: 0.38, retreatFireChance: 0.62 },
     Itan:    { role: 'polearm', aggression: 0.92, caution: 0.68, burst: 1.35, kite: 0.18, setup: 0.45, highGround: 0.55, retreatHp: 0.28, retreatFireChance: 0.12 },
-    D2F1:    { role: 'drone_commander', aggression: 0.68, caution: 1.22, burst: 1.28, kite: 1.42, setup: 1.55, highGround: 1.24, retreatHp: 0.40, retreatFireChance: 0.56 }
+    D2F1:    { role: 'drone_commander', aggression: 0.68, caution: 1.22, burst: 1.28, kite: 1.42, setup: 1.55, highGround: 1.24, retreatHp: 0.40, retreatFireChance: 0.56 },
+    Laegon:  { role: 'thunder_mage', aggression: 0.86, caution: 0.90, burst: 1.42, kite: 1.20, setup: 0.72, highGround: 1.18, retreatHp: 0.34, retreatFireChance: 0.55 },
+    Veyra:   { role: 'chronomancer', aggression: 0.48, caution: 1.42, burst: 0.72, kite: 1.38, setup: 1.75, highGround: 1.30, retreatHp: 0.45, retreatFireChance: 0.35 },
+    Brom:    { role: 'demolitionist', aggression: 0.52, caution: 1.08, burst: 1.55, kite: 1.18, setup: 1.85, highGround: 0.92, retreatHp: 0.36, retreatFireChance: 0.30 }
 };
 
 function getHeroTactic(ai) {
@@ -231,6 +234,14 @@ function getTargetEntity(game, ai, target, source) {
             const bestScore = distanceBetween(source, best) - (best.laserActive ? 240 : 0) + (best.hp / Math.max(1, best.maxHp)) * 35;
             return score < bestScore ? drone : best;
         });
+    }
+    if (ai.heroName === 'Laegon') {
+        const summons = game.minions.filter(minion => minion && minion.owner !== ai && !minion.dead && !minion.untargetable
+            && minion.type !== 'time_anchor' && minion.type !== 'temporal_echo' && typeof minion.takeDamage === 'function');
+        if (summons.length) {
+            const closest = summons.reduce((best, summon) => distanceBetween(source, summon) < distanceBetween(source, best) ? summon : best);
+            if (distanceBetween(source, closest) <= distanceBetween(source, target) + 260) return closest;
+        }
     }
     const decoy = game.minions.find(minion => minion.type === 'kuro_decoy' && minion.owner === target && !minion.dead);
     if (decoy && (target.kuroCloaked || distanceBetween(source, decoy) < distanceBetween(source, target) * 0.9)) return decoy;
@@ -440,6 +451,9 @@ function getCombatProfile(ai, source = ai) {
         case 'Archor': range = 620; preferred = 390; break;
         case 'Itan': range = 155; preferred = 105; break;
         case 'D2F1': range = 700; preferred = 420; break;
+        case 'Laegon': range = ai.thunderGodTimer > 0 ? 360 : 650; preferred = ai.thunderGodTimer > 0 ? 150 : 390; break;
+        case 'Veyra': range = 430; preferred = 285; break;
+        case 'Brom': range = 390; preferred = 255; break;
     }
     return { range, preferred, ranged: !ai.isMeleeAttack(), tactics };
 }
@@ -469,6 +483,9 @@ function hasSetupOpportunity(game, ai) {
         case 'Kila': return ai.kilaSwitchCD <= 0 && ai.kilaSwitchTimer <= 0;
         case 'Kuro': return ai.kuroDecoyCooldown <= 0 && owned('kuro_decoy') === 0;
         case 'D2F1': return ai.d2fDroneCooldown <= 0 && owned('d2f_drone') < 3;
+        case 'Veyra': return owned('time_anchor') < 2;
+        case 'Brom': return !ai.bromStickyBomb || ai.bromStickyBomb.dead;
+        case 'Laegon': return ai.laegonSwitchCooldown <= 0;
         default: return false;
     }
 }
@@ -645,6 +662,9 @@ function chooseDefensiveAction(game, ai, target, threat) {
         case 'D2F1':
             if (ai.d2fDroneCooldown <= 0 && game.minions.filter(minion => minion && minion.owner === ai && minion.type === 'd2f_drone' && !minion.dead).length < 3) return 'switch';
             break;
+        case 'Veyra':
+            if (ai.superCooldown <= 0 && (ai.hp < ai.maxHp * 0.65 || threat.kind === 'melee')) return 'super';
+            break;
     }
     return null;
 }
@@ -780,6 +800,26 @@ function chooseHeroAction(game, ai, target, targetEntity, dist, verticalDistance
             const drones = minions.filter(minion => minion && minion.owner === ai && minion.type === 'd2f_drone' && !minion.dead).length;
             if (superReady && dist < 900 && Math.abs(verticalDistance) < 330) return 'super';
             if (ai.d2fDroneCooldown <= 0 && (drones < 3 || combatState === 'setup' || combatState === 'pressure')) return 'switch';
+            break;
+        }
+        case 'Laegon': {
+            const enemySummons = minions.filter(minion => minion && minion.owner !== ai && !minion.dead && !minion.untargetable).length;
+            if (superReady && (enemySummons >= 2 || combatState === 'burst' || ai.hp < ai.maxHp * 0.42)) return 'super';
+            if (ai.laegonSwitchCooldown <= 0 && (isVulnerableTarget(target) || dist < 620)) return 'switch';
+            break;
+        }
+        case 'Veyra': {
+            const anchors = minions.filter(minion => minion?.type === 'time_anchor' && minion.owner === ai && !minion.dead).length;
+            if (superReady && ai.veyraHistory?.length && (ai.hp < ai.maxHp * 0.58 || combatState === 'retreat' || combatState === 'evade')) return 'super';
+            if (anchors < 2 && (combatState === 'setup' || combatState === 'highground' || dist > 180)) return 'switch';
+            break;
+        }
+        case 'Brom': {
+            if (superReady && dist < 650 && (combatState === 'burst' || isVulnerableTarget(target))) return 'super';
+            if (ai.bromStickyBomb && !ai.bromStickyBomb.dead) {
+                const bombDistance = Math.hypot(ai.bromStickyBomb.x - target.x, ai.bromStickyBomb.y - target.y);
+                if (bombDistance < 115) return 'switch';
+            } else if (combatState === 'setup' || (dist > 120 && dist < 430)) return 'switch';
             break;
         }
     }
