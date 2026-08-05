@@ -2090,7 +2090,7 @@ test('Ukon replaces walking with discrete dashes that stop at platforms', () => 
         dashCooldown: ai.ukonDashCooldown, x: ai.x, y: ai.y, vx: ai.vx, vy: ai.vy,
         pressed: context.keysPressed[ai.controls.right]
     }));
-    assert.ok(ai.vx > 20);
+    assert.ok(ai.vx > 16);
 
     ai.update(16);
     ai.update(16);
@@ -2105,6 +2105,15 @@ test('Ukon replaces walking with discrete dashes that stop at platforms', () => 
     context.keys[ai.controls.right] = true;
     ai.update(16);
     assert.equal(ai.x, 100, 'held movement produced ordinary walking during dash cooldown');
+
+    context.keys[ai.controls.right] = false;
+    ai.ukonDashCooldown = 0;
+    ai.isGrounded = true;
+    ai.y = context.GROUND_Y - ai.h;
+    context.keysPressed[ai.controls.jump] = true;
+    ai.update(16);
+    assert.ok(ai.vy < 0, 'Jump no longer uses the shared fighter jump behavior');
+    assert.equal(ai.isGrounded, false);
 });
 
 test('Ukon Iron Rod Charge hits only when the target begins within reach', () => {

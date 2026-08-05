@@ -156,7 +156,7 @@ class Fighter extends Entity {
         if (this.heroName === 'Ukon') {
             this.ukonDashCooldown = 0;
             this.ukonDashTimer = 0;
-            this.ukonDashDuration = 175;
+            this.ukonDashDuration = 135;
             this.ukonBurstOriginX = this.x;
             this.ukonBurstOriginY = this.y;
             this.ukonBurstMaxDistance = 0;
@@ -572,8 +572,7 @@ class Fighter extends Entity {
                 && !this.ukonUltimatePhase && this.ukonDashTimer <= 0 && this.ukonChargeTimer <= 0 && this.ukonDashCooldown <= 0;
             if (ukonCanDash) {
                 const cpuHeld = action => this.isCPU && keys[this.controls[action]];
-                if (keysPressed[this.controls.jump] || cpuHeld('jump')) this.startUkonDirectionalDash(0, -1);
-                else if (keysPressed[this.controls.down] || cpuHeld('down')) this.startUkonDirectionalDash(0, 1);
+                if (keysPressed[this.controls.down] || cpuHeld('down')) this.startUkonDirectionalDash(0, 1);
                 else if (keysPressed[this.controls.left] || cpuHeld('left')) this.startUkonDirectionalDash(-1, 0);
                 else if (keysPressed[this.controls.right] || cpuHeld('right')) this.startUkonDirectionalDash(1, 0);
             }
@@ -885,7 +884,7 @@ class Fighter extends Entity {
                 if (!this.isGrounded && Math.random() < 0.3) game.particles.push(new Particle(this.x+this.w/2, this.y+this.h, "#00FFFF", (Math.random()-0.5)*2, Math.random()*2, 200, 3));
             }
         } else {
-            if (keysPressed[this.controls.jump] && this.heroName !== 'Ukon') {
+            if (keysPressed[this.controls.jump]) {
                 if (hasPuppet && canAct) {
                     activePuppet.doJump();
                 } else {
@@ -1739,12 +1738,12 @@ class Fighter extends Entity {
         const distance = Math.hypot(dx, dy);
         if (distance <= 0) return false;
         this.ukonDashTimer = this.ukonDashDuration;
-        this.ukonDashCooldown = 275;
+        this.ukonDashCooldown = 150;
         this.ukonBurstOriginX = this.x;
         this.ukonBurstOriginY = this.y;
-        this.ukonBurstMaxDistance = 250;
-        this.vx = dx / distance * 23;
-        this.vy = dy / distance * 23;
+        this.ukonBurstMaxDistance = 165;
+        this.vx = dx / distance * 18;
+        this.vy = dy / distance * 18;
         if (dx) this.facing = dx > 0 ? 1 : -1;
         this.isGrounded = false;
         this.jumpBuffer = 0;
