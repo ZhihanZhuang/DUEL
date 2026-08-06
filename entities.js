@@ -2170,7 +2170,7 @@ class DogelChainHook extends Entity {
         }
         if(this.life<=0||this.x<-60||this.x>CANVAS_W+60||this.y<-80||this.y>GROUND_Y+80)this.dead=true;
     }
-    draw(ctx){ctx.save();ctx.strokeStyle='#b9a17a';ctx.lineWidth=3;ctx.setLineDash([7,4]);ctx.beginPath();ctx.moveTo(this.owner.x+this.owner.w/2,this.owner.y+30);ctx.lineTo(this.x+9,this.y+9);ctx.stroke();ctx.setLineDash([]);ctx.translate(this.x+9,this.y+9);ctx.rotate(Date.now()*.02);ctx.fillStyle='#d8d3c4';ctx.beginPath();ctx.arc(0,0,9,.35,Math.PI*1.65);ctx.lineTo(2,0);ctx.fill();ctx.restore();}
+    draw(ctx){ctx.save();ctx.strokeStyle='#b9a17a';ctx.lineWidth=3;ctx.setLineDash([7,4]);ctx.beginPath();ctx.moveTo(this.owner.x+this.owner.w/2,this.owner.y+30);ctx.lineTo(this.x+9,this.y+9);ctx.stroke();ctx.setLineDash([]);ctx.translate(this.x+9,this.y+9);let angle=Math.atan2(this.vy,this.vx);if(this.phase==='pull'&&this.hitTarget)angle=Math.atan2(this.owner.y+this.owner.h/2-this.y,this.owner.x+this.owner.w/2-this.x);ctx.rotate(angle);ctx.fillStyle='#4a2818';ctx.fillRect(-12,-3,16,6);ctx.fillStyle='#d8d3c4';ctx.strokeStyle='#747f86';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(3,-3);ctx.lineTo(27,-3);ctx.lineTo(34,0);ctx.lineTo(27,3);ctx.lineTo(3,3);ctx.closePath();ctx.fill();ctx.stroke();ctx.restore();}
 }
 
 class LapisStone extends Entity {
