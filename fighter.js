@@ -3858,7 +3858,7 @@ class Fighter extends Entity {
             ctx.fill();
             ctx.stroke();
             ctx.fillStyle = reaperActive ? '#ff8294' : '#a9bac4';
-            ctx.beginPath();ctx.arc(8,0,4,0,Math.PI*2);ctx.fill();
+            ctx.fillRect(7,-2,4,4);
             ctx.restore();
             ctx.shadowBlur = 0;
 
@@ -3881,7 +3881,7 @@ class Fighter extends Entity {
             ctx.fillRect(-7, -9, 14, 8);
             ctx.strokeStyle = reaperActive ? '#ff6077' : '#aeb9bd';
             ctx.lineWidth = 3;
-            ctx.beginPath();ctx.arc(0,-7,8,0,Math.PI*2);ctx.stroke();
+            ctx.strokeRect(-7,-14,14,14);
             ctx.restore();
             ctx.restore();
         }
