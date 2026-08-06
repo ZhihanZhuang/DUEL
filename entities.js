@@ -3283,3 +3283,101 @@ class Hurricane extends Entity {
         ctx.globalAlpha = 1.0;
     }
 }
+
+class LakEarthWall extends Entity {
+    constructor(owner) {
+        const surfaceY = owner.currentPlatform?.y || GROUND_Y;
+        const x = Math.max(4, Math.min(CANVAS_W - 56, owner.facing > 0 ? owner.x + owner.w + 32 : owner.x - 84));
+        super(x, surfaceY - 112, 52, 112);
+        this.owner = owner; this.type = 'lak_earth_wall'; this.life = 4000; this.maxLife = 4000;
+        this.platform = { x: this.x, y: this.y, w: this.w, h: 12, type: 'lak_wall' };
+        this.spawnHit = new Set(); this.untargetable = true;
+        PLATFORMS.push(this.platform);
+    }
+    removePlatform() { const index = PLATFORMS.indexOf(this.platform); if (index >= 0) PLATFORMS.splice(index, 1); }
+    update(dt) {
+        this.life -= dt;
+        if (this.life <= 0 || !this.owner || this.owner.dead) { this.removePlatform(); this.dead = true; return; }
+        for (const projectile of game.projectiles) {
+            if (projectile && !projectile.dead && checkAABB(this, projectile)) {
+                projectile.dead = true;
+                for (let i = 0; i < 5; i++) game.particles.push(new Particle(projectile.x, projectile.y, '#a99b83', (Math.random()-.5)*7, (Math.random()-.5)*7, 260, 4));
+            }
+        }
+        const fighters = typeof game.getFighters === 'function' ? game.getFighters() : [];
+        for (const target of fighters) {
+            if (!target || target.dead || target === this.owner || !checkAABB(this, target)) continue;
+            if (!this.spawnHit.has(target)) { this.spawnHit.add(target); target.takeDamage(20, this.owner, false, true); target.vy = -16; }
+            if (target.y + target.h <= this.y + 24) continue;
+            if (target.x + target.w/2 < this.x + this.w/2) target.x = this.x - target.w;
+            else target.x = this.x + this.w;
+            target.vx = 0;
+        }
+    }
+    draw(ctx) {
+        const shake = Math.sin(Date.now()*.025) * Math.min(3, this.life / 900);
+        ctx.save(); ctx.translate(shake, 0); ctx.fillStyle = '#625b50'; ctx.strokeStyle = '#b2a58d'; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.moveTo(this.x+5,this.y+this.h); ctx.lineTo(this.x,this.y+28); ctx.lineTo(this.x+13,this.y); ctx.lineTo(this.x+38,this.y+7); ctx.lineTo(this.x+this.w,this.y+35); ctx.lineTo(this.x+this.w-4,this.y+this.h); ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.strokeStyle = '#3f3a34'; ctx.lineWidth = 2;
+        for (let y=this.y+25;y<this.y+this.h;y+=24){ctx.beginPath();ctx.moveTo(this.x+5,y);ctx.lineTo(this.x+this.w-5,y+8);ctx.stroke();}
+        ctx.restore();
+    }
+}
+
+class LakShockwave extends Entity {
+    constructor(owner, damage = 12, radius = 115) {
+        super(owner.x + owner.w/2 - radius, owner.y + owner.h - 24, radius*2, 34);
+        this.owner=owner;this.type='lak_shockwave';this.damage=damage;this.radius=radius;this.life=360;this.maxLife=360;this.hitTargets=new Set();this.untargetable=true;
+    }
+    update(dt) {
+        this.life -= dt;
+        for (const target of getHostileTargets(this.owner, this)) {
+            if (!target || target.dead || this.hitTargets.has(target) || !checkAABB(this,target)) continue;
+            this.hitTargets.add(target); target.takeDamage(this.damage,this.owner,false,true);
+            const direction=target.x+target.w/2<this.owner.x+this.owner.w/2?-1:1; target.vx=direction*9; target.vy=-5;
+        }
+        if(this.life<=0)this.dead=true;
+    }
+    draw(ctx){const p=1-this.life/this.maxLife;ctx.save();ctx.strokeStyle=`rgba(190,174,142,${1-p})`;ctx.lineWidth=7;ctx.beginPath();ctx.ellipse(this.x+this.w/2,this.y+this.h/2,18+p*this.radius,8+p*15,0,0,Math.PI*2);ctx.stroke();ctx.restore();}
+}
+
+class LakMountainBreaker extends Entity {
+    constructor(owner) {
+        super(0,0,CANVAS_W,CANVAS_H);this.owner=owner;this.type='lak_mountain_breaker';this.direction=owner.facing;this.originX=owner.x+owner.w/2;
+        this.elapsed=0;this.waveInterval=260;this.waveCount=5;this.hitByWave=Array.from({length:5},()=>new Set());this.untargetable=true;this.life=1900;
+    }
+    update(dt) {
+        const previous=this.elapsed;this.elapsed+=dt;this.life-=dt;
+        for(let wave=0;wave<this.waveCount;wave++){
+            const start=wave*this.waveInterval;if(previous>=start+700||this.elapsed<start)continue;
+            const progress=Math.min(1,(this.elapsed-start)/700);const x=this.originX+this.direction*(45+progress*(CANVAS_W*.72));
+            for(const target of getHostileTargets(this.owner,this)){
+                if(!target||target.dead||this.hitByWave[wave].has(target))continue;
+                const surfaceGap=Math.abs(target.y+target.h-(target.currentPlatform?.y||GROUND_Y));
+                if(Math.abs(target.x+target.w/2-x)>58||surfaceGap>45)continue;
+                this.hitByWave[wave].add(target);target.takeDamage(16,this.owner,false,true);target.buffs=target.buffs||{};target.buffs.slow=Math.max(target.buffs.slow||0,900);
+                target.vx=this.direction*(6+wave*2);if(wave===this.waveCount-1)target.vy=-19;
+            }
+        }
+        if(this.life<=0)this.dead=true;
+    }
+    draw(ctx){ctx.save();for(let wave=0;wave<this.waveCount;wave++){const progress=Math.max(0,Math.min(1,(this.elapsed-wave*this.waveInterval)/700));if(progress<=0||progress>=1)continue;const x=this.originX+this.direction*(45+progress*(CANVAS_W*.72));const y=GROUND_Y;ctx.strokeStyle=`rgba(205,188,151,${1-progress*.55})`;ctx.lineWidth=5+wave;ctx.beginPath();ctx.moveTo(x-36,y);ctx.lineTo(x-19,y-13-wave*2);ctx.lineTo(x,y-3);ctx.lineTo(x+18,y-20-wave*3);ctx.lineTo(x+38,y);ctx.stroke();if(wave===4){ctx.fillStyle='#706758';ctx.beginPath();ctx.moveTo(x-25,y);ctx.lineTo(x-14,y-55*progress);ctx.lineTo(x+4,y-90*progress);ctx.lineTo(x+22,y-43*progress);ctx.lineTo(x+29,y);ctx.fill();}}ctx.restore();}
+}
+
+class PatThread extends Entity {
+    constructor(owner, target, binding = false) {
+        const x=owner.facing>0?owner.x+owner.w:owner.x-18;const y=owner.y+25;
+        super(x,y,18,6);this.owner=owner;this.target=target;this.binding=binding;this.type=binding?'pat_binding_thread':'pat_thread_lash';
+        const tx=target?target.x+target.w/2:x+owner.facing*600,ty=target?target.y+target.h/2:y;const angle=Math.atan2(ty-y,tx-x);
+        this.vx=Math.cos(angle)*(binding?14:22);this.vy=Math.sin(angle)*(binding?14:22);this.life=binding?1500:900;this.untargetable=true;
+    }
+    update(dt){this.x+=this.vx;this.y+=this.vy;this.life-=dt;for(const target of getHostileTargets(this.owner,this)){if(!target||target.dead||!checkAABB(this,target))continue;target.takeDamage(this.binding?15:12,this.owner,false,true);target.buffs=target.buffs||{};if(this.binding){target.buffs.root=Math.max(target.buffs.root||0,1500);const empowered=this.owner.consumePatMarks?.(target);if(empowered){const direction=this.owner.x+this.owner.w/2<target.x+target.w/2?-1:1;target.vx=direction*12;}}else{target.buffs.slow=Math.max(target.buffs.slow||0,500);this.owner.addPatMark?.(target);}this.dead=true;break;}if(this.life<=0||this.x<-40||this.x>CANVAS_W+40||this.y<-40||this.y>CANVAS_H+40)this.dead=true;}
+    draw(ctx){ctx.save();ctx.strokeStyle=this.binding?'#ff8ad8':'#d5a5ff';ctx.shadowBlur=9;ctx.shadowColor=ctx.strokeStyle;ctx.lineWidth=this.binding?5:3;ctx.beginPath();ctx.moveTo(this.x,this.y);ctx.lineTo(this.x-this.vx*2.8,this.y-this.vy*2.8);ctx.stroke();ctx.restore();}
+}
+
+class PatMarionette extends Entity {
+    constructor(owner,target){super(0,0,CANVAS_W,CANVAS_H);this.owner=owner;this.target=target;this.type='pat_marionette';this.life=3000;this.maxLife=3000;this.tickTimer=0;this.untargetable=true;}
+    finish(){if(this.dead)return;const target=this.target;if(target&&!target.dead){target.takeDamage(30,this.owner,false,true);target.buffs=target.buffs||{};target.buffs.dizzy=Math.max(target.buffs.dizzy||0,1000);const dx=this.owner.x+this.owner.w/2-(target.x+target.w/2);target.vx=Math.sign(dx||1)*22;target.vy=-9;}this.dead=true;}
+    update(dt){if(!this.owner||this.owner.dead||!this.target||this.target.dead){this.dead=true;return;}this.life-=dt;this.tickTimer+=dt;const horizontal=(keys[this.owner.controls.right]?1:0)-(keys[this.owner.controls.left]?1:0);const vertical=(keys[this.owner.controls.down]?1:0)-(keys[this.owner.controls.jump]?1:0);this.target.vx=horizontal*5.5;this.target.vy+=vertical*.7;while(this.tickTimer>=500){this.tickTimer-=500;this.target.takeDamage(8,this.owner,true,true);}if(this.life<=0)this.finish();}
+    draw(ctx){if(!this.target||this.target.dead)return;const ox=this.owner.x+this.owner.w/2,oy=this.owner.y+8,tx=this.target.x+this.target.w/2,ty=this.target.y+this.target.h/2;ctx.save();ctx.strokeStyle='rgba(255,138,216,.8)';ctx.shadowBlur=10;ctx.shadowColor='#ff8ad8';ctx.lineWidth=2;for(let offset=-16;offset<=16;offset+=16){ctx.beginPath();ctx.moveTo(ox+offset,oy);ctx.quadraticCurveTo((ox+tx)/2+Math.sin(Date.now()*.012+offset)*18,(oy+ty)/2-55,tx+offset*.6,ty);ctx.stroke();}ctx.translate(tx,ty-70);ctx.strokeStyle='#ffd3f0';ctx.lineWidth=4;ctx.beginPath();ctx.arc(0,0,34,0,Math.PI*2);ctx.stroke();ctx.beginPath();ctx.moveTo(-22,-22);ctx.lineTo(0,12);ctx.lineTo(22,-22);ctx.stroke();ctx.restore();}
+}

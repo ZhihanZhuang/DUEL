@@ -759,6 +759,9 @@ class Game {
         if (this.p1.heroName === 'Dogel') p1Stat += `${this.p1.attackState==='dogel_charging'?`[SPIN ${Math.round(this.p1.dogelCharge/this.p1.dogelChargeMax*100)}%] `:''}${this.p1.dogelReaperTimer>0?`[BLOOD REAPER ${(this.p1.dogelReaperTimer/1000).toFixed(1)}s] `:''}${this.p1.dogelChainCooldown>0?`[CHAIN ${(this.p1.dogelChainCooldown/1000).toFixed(1)}s]`:'[CHAIN READY]'}`;
         if (this.p1.heroName === 'Lapis') p1Stat += `[STONES ${this.p1.lapisStoneAvailable.filter(Boolean).length}/5] ${this.p1.lapisWhipTimer>0?`[STONE WHIP ${(this.p1.lapisWhipTimer/1000).toFixed(1)}s]`:this.p1.lapisJudgmentCooldown>0?`[JUDGMENT ${(this.p1.lapisJudgmentCooldown/1000).toFixed(1)}s]`:'[JUDGMENT READY]'}`;
         if (this.p1.heroName === 'Tonia') p1Stat += `[HEAT ${Math.round(this.p1.toniaHeat)}%] ${this.p1.toniaOverheated?'[OVERHEATED]':this.p1.toniaGrenadeCooldown>0?`[GRENADES ${(this.p1.toniaGrenadeCooldown/1000).toFixed(1)}s]`:'[GRENADES READY]'}`;
+        if (this.p1.heroName === 'Ge') p1Stat += `${this.p1.geGodTimer>0?`[BRONZE GOD ${(this.p1.geGodTimer/1000).toFixed(1)}s] `:this.p1.geDanceTimer>0?`[RITUAL ${(this.p1.geDanceTimer/1000).toFixed(1)}s] `:''}${this.p1.geThrustCooldown>0?`[THRUST ${(this.p1.geThrustCooldown/1000).toFixed(1)}s]`:'[THRUST READY]'}`;
+        if (this.p1.heroName === 'Lak') p1Stat += `[HAMMER ${this.p1.lakCombo}/3] ${this.p1.lakWallCooldown>0?`[WALL ${(this.p1.lakWallCooldown/1000).toFixed(1)}s]`:'[WALL READY]'}`;
+        if (this.p1.heroName === 'Pat') p1Stat += `${this.p1.patBindingCooldown>0?`[BIND ${(this.p1.patBindingCooldown/1000).toFixed(1)}s]`:'[BIND READY]'}${this.p1.patMarionette&&!this.p1.patMarionette.dead?' [MARIONETTE]':''}`;
 
         if (this.p1.buffs.poison > 0) p1Stat += " [POISONED]";
         if (this.p1.buffs.burn > 0) p1Stat += " [BURN]";
@@ -913,6 +916,9 @@ class Game {
         if (this.p2.heroName === 'Dogel') p2Stat += `${this.p2.attackState==='dogel_charging'?`[SPIN ${Math.round(this.p2.dogelCharge/this.p2.dogelChargeMax*100)}%] `:''}${this.p2.dogelReaperTimer>0?`[BLOOD REAPER ${(this.p2.dogelReaperTimer/1000).toFixed(1)}s] `:''}${this.p2.dogelChainCooldown>0?`[CHAIN ${(this.p2.dogelChainCooldown/1000).toFixed(1)}s]`:'[CHAIN READY]'}`;
         if (this.p2.heroName === 'Lapis') p2Stat += `[STONES ${this.p2.lapisStoneAvailable.filter(Boolean).length}/5] ${this.p2.lapisWhipTimer>0?`[STONE WHIP ${(this.p2.lapisWhipTimer/1000).toFixed(1)}s]`:this.p2.lapisJudgmentCooldown>0?`[JUDGMENT ${(this.p2.lapisJudgmentCooldown/1000).toFixed(1)}s]`:'[JUDGMENT READY]'}`;
         if (this.p2.heroName === 'Tonia') p2Stat += `[HEAT ${Math.round(this.p2.toniaHeat)}%] ${this.p2.toniaOverheated?'[OVERHEATED]':this.p2.toniaGrenadeCooldown>0?`[GRENADES ${(this.p2.toniaGrenadeCooldown/1000).toFixed(1)}s]`:'[GRENADES READY]'}`;
+        if (this.p2.heroName === 'Ge') p2Stat += `${this.p2.geGodTimer>0?`[BRONZE GOD ${(this.p2.geGodTimer/1000).toFixed(1)}s] `:this.p2.geDanceTimer>0?`[RITUAL ${(this.p2.geDanceTimer/1000).toFixed(1)}s] `:''}${this.p2.geThrustCooldown>0?`[THRUST ${(this.p2.geThrustCooldown/1000).toFixed(1)}s]`:'[THRUST READY]'}`;
+        if (this.p2.heroName === 'Lak') p2Stat += `[HAMMER ${this.p2.lakCombo}/3] ${this.p2.lakWallCooldown>0?`[WALL ${(this.p2.lakWallCooldown/1000).toFixed(1)}s]`:'[WALL READY]'}`;
+        if (this.p2.heroName === 'Pat') p2Stat += `${this.p2.patBindingCooldown>0?`[BIND ${(this.p2.patBindingCooldown/1000).toFixed(1)}s]`:'[BIND READY]'}${this.p2.patMarionette&&!this.p2.patMarionette.dead?' [MARIONETTE]':''}`;
 
         if (this.p2.buffs.poison > 0) p2Stat += " [POISONED]";
         if (this.p2.buffs.burn > 0) p2Stat += " [BURN]";

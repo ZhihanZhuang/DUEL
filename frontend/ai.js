@@ -68,7 +68,10 @@ const HERO_TACTICS = {
     Gelann:  { role: 'flame_zoner', aggression: 1.08, caution: 0.72, burst: 1.24, kite: 0.52, setup: 1.18, highGround: 0.78, retreatHp: 0.32, retreatFireChance: 0.18 },
     Dogel:   { role: 'chain_bruiser', aggression: 1.28, caution: 0.52, burst: 1.55, kite: 0.12, setup: 1.05, highGround: 0.48, retreatHp: 0.24, retreatFireChance: 0.08 },
     Lapis:   { role: 'stone_mage', aggression: 0.68, caution: 1.08, burst: 1.45, kite: 1.25, setup: 1.32, highGround: 1.08, retreatHp: 0.38, retreatFireChance: 0.42 },
-    Tonia:   { role: 'suppressor', aggression: 0.78, caution: 1.02, burst: 1.35, kite: 1.28, setup: 0.78, highGround: 1.02, retreatHp: 0.36, retreatFireChance: 0.68 }
+    Tonia:   { role: 'suppressor', aggression: 0.78, caution: 1.02, burst: 1.35, kite: 1.28, setup: 0.78, highGround: 1.02, retreatHp: 0.36, retreatFireChance: 0.68 },
+    Ge:      { role: 'initiator', aggression: 1.24, caution: 0.52, burst: 1.48, kite: 0.12, setup: 0.78, highGround: 0.48, retreatHp: 0.24, retreatFireChance: 0.08 },
+    Lak:     { role: 'terrain_tank', aggression: 0.82, caution: 0.82, burst: 1.18, kite: 0.08, setup: 1.72, highGround: 0.62, retreatHp: 0.18, retreatFireChance: 0.06 },
+    Pat:     { role: 'controller', aggression: 0.48, caution: 1.32, burst: 1.08, kite: 1.38, setup: 1.62, highGround: 1.12, retreatHp: 0.42, retreatFireChance: 0.56 }
 };
 
 function getHeroTactic(ai) {
@@ -486,6 +489,9 @@ function getCombatProfile(ai, source = ai) {
         case 'Dogel': range = 205; preferred = 105; break;
         case 'Lapis': range = ai.lapisWhipTimer > 0 ? 185 : 520; preferred = ai.lapisWhipTimer > 0 ? 105 : 330; break;
         case 'Tonia': range = 560; preferred = 350; break;
+        case 'Ge': range = 142; preferred = 92; break;
+        case 'Lak': range = 110; preferred = 72; break;
+        case 'Pat': range = 620; preferred = 390; break;
     }
     return { range, preferred, ranged: !ai.isMeleeAttack(), tactics };
 }
@@ -525,6 +531,8 @@ function hasSetupOpportunity(game, ai) {
         case 'Voss': return ai.vossCopyTimer <= 0 && ai.vossCopyCooldown <= 0;
         case 'Raigo': return ai.raigoEnergy >= 30;
         case 'Gelann': return ai.gelannBreathCooldown <= 0;
+        case 'Lak': return ai.lakWallCooldown <= 0;
+        case 'Pat': return ai.patBindingCooldown <= 0;
         default: return false;
     }
 }
@@ -921,6 +929,18 @@ function chooseHeroAction(game, ai, target, targetEntity, dist, verticalDistance
         case 'Tonia':
             if(superReady&&dist<700)return 'super';
             if(ai.toniaGrenadeCooldown<=0&&dist<520)return 'switch';
+            break;
+        case 'Ge':
+            if(superReady&&dist<320)return 'super';
+            if(ai.geThrustCooldown<=0&&dist>75&&dist<430)return 'switch';
+            break;
+        case 'Lak':
+            if(superReady&&dist<650)return 'super';
+            if(ai.lakWallCooldown<=0&&(dist>100||combatState==='setup'))return 'switch';
+            break;
+        case 'Pat':
+            if(superReady&&dist<700)return 'super';
+            if(ai.patBindingCooldown<=0&&dist<700)return 'switch';
             break;
     }
     return null;

@@ -57,7 +57,7 @@ function loadProjectileContext() {
     };
     vm.createContext(context);
     const source = fs.readFileSync(path.join(__dirname, '..', 'entities.js'), 'utf8');
-    vm.runInContext(`${source}\nwindow.Projectile = Projectile; window.KuroDecoy = KuroDecoy; window.UkonShadow = UkonShadow; window.PeachTree = PeachTree; window.GiantSword = GiantSword; window.GravityWell = GravityWell; window.ChiqPath = ChiqPath; window.D2FDrone = D2FDrone; window.D2FTargetBeacon = D2FTargetBeacon; window.D2FGiantRobot = D2FGiantRobot; window.TimeAnchor = TimeAnchor; window.TemporalEcho = TemporalEcho; window.LaegonLightning = LaegonLightning; window.LaegonHammer = LaegonHammer; window.LaegonHammerStrike = LaegonHammerStrike; window.BromBlastCharge = BromBlastCharge; window.BromStickyBomb = BromStickyBomb; window.DemolitionZone = DemolitionZone; window.TitanAxe = TitanAxe; window.MechanismNode = MechanismNode; window.MoriEnergyWire = MoriEnergyWire; window.MechanicFanBlade = MechanicFanBlade; window.MoriTrap = MoriTrap; window.ThousandMechanisms = ThousandMechanisms; window.GelannFlameCone = GelannFlameCone; window.GelannArrowRain = GelannArrowRain; window.RokaCannonball = RokaCannonball; window.RokaMortarShell = RokaMortarShell; window.TemporalBolt = TemporalBolt; window.VossTemporalDouble = VossTemporalDouble; window.DogelChainHook = DogelChainHook; window.LapisStone = LapisStone; window.ToniaGrenade = ToniaGrenade; window.ToniaMissile = ToniaMissile;`, context, { filename: 'entities.js' });
+    vm.runInContext(`${source}\nwindow.Projectile = Projectile; window.KuroDecoy = KuroDecoy; window.UkonShadow = UkonShadow; window.PeachTree = PeachTree; window.GiantSword = GiantSword; window.GravityWell = GravityWell; window.ChiqPath = ChiqPath; window.D2FDrone = D2FDrone; window.D2FTargetBeacon = D2FTargetBeacon; window.D2FGiantRobot = D2FGiantRobot; window.TimeAnchor = TimeAnchor; window.TemporalEcho = TemporalEcho; window.LaegonLightning = LaegonLightning; window.LaegonHammer = LaegonHammer; window.LaegonHammerStrike = LaegonHammerStrike; window.BromBlastCharge = BromBlastCharge; window.BromStickyBomb = BromStickyBomb; window.DemolitionZone = DemolitionZone; window.TitanAxe = TitanAxe; window.MechanismNode = MechanismNode; window.MoriEnergyWire = MoriEnergyWire; window.MechanicFanBlade = MechanicFanBlade; window.MoriTrap = MoriTrap; window.ThousandMechanisms = ThousandMechanisms; window.GelannFlameCone = GelannFlameCone; window.GelannArrowRain = GelannArrowRain; window.RokaCannonball = RokaCannonball; window.RokaMortarShell = RokaMortarShell; window.TemporalBolt = TemporalBolt; window.VossTemporalDouble = VossTemporalDouble; window.DogelChainHook = DogelChainHook; window.LapisStone = LapisStone; window.ToniaGrenade = ToniaGrenade; window.ToniaMissile = ToniaMissile; window.LakEarthWall = LakEarthWall; window.LakShockwave = LakShockwave; window.LakMountainBreaker = LakMountainBreaker; window.PatThread = PatThread; window.PatMarionette = PatMarionette;`, context, { filename: 'entities.js' });
     return context;
 }
 
@@ -308,6 +308,11 @@ function loadPhysicsGame(heroName = 'Hunter') {
     class LapisStone extends Entity { constructor(owner,index,target,judgment=false){super(owner.x,owner.y,20,20);Object.assign(this,{owner,index,target,judgment,type:'lapis_stone'});owner.lapisStoneInFlight[index]++;owner.lapisStoneAvailable[index]=false;} finish(){this.owner.lapisStoneInFlight[this.index]=Math.max(0,this.owner.lapisStoneInFlight[this.index]-1);this.owner.lapisStoneAvailable[this.index]=this.owner.lapisStoneInFlight[this.index]===0;this.dead=true;} }
     class ToniaGrenade extends Entity { constructor(owner,vx,vy){super(owner.x,owner.y,14,14);Object.assign(this,{owner,vx,vy,type:'tonia_grenade'});} }
     class ToniaMissile extends Entity { constructor(owner,target,offset){super(owner.x,owner.y,30,12);Object.assign(this,{owner,target,offset,type:'tonia_missile'});} }
+    class LakEarthWall extends Entity { constructor(owner){super(owner.x,owner.y,52,112);Object.assign(this,{owner,type:'lak_earth_wall',life:4000});} }
+    class LakShockwave extends Entity { constructor(owner,damage=12,radius=115){super(owner.x-radius,owner.y,radius*2,34);Object.assign(this,{owner,damage,radius,type:'lak_shockwave'});} }
+    class LakMountainBreaker extends Entity { constructor(owner){super(0,0,1280,760);Object.assign(this,{owner,type:'lak_mountain_breaker',waveCount:5});} }
+    class PatThread extends Entity { constructor(owner,target,binding=false){super(owner.x,owner.y,18,6);Object.assign(this,{owner,target,binding,type:binding?'pat_binding_thread':'pat_thread_lash'});} }
+    class PatMarionette extends Entity { constructor(owner,target){super(0,0,1280,760);Object.assign(this,{owner,target,type:'pat_marionette',life:3000});} }
     class RokaCannonball extends Entity { constructor(owner,x,y,vx,vy,artillery){super(x,y,28,28);Object.assign(this,{owner,vx,vy,artillery,type:'roka_cannonball',damage:artillery?50:40,radius:artillery?165:110});} }
     class RokaMortarShell extends Entity { constructor(owner,x,y){super(x,y,20,26);Object.assign(this,{owner,targetX:x,targetY:y,type:'roka_mortar'});} }
     class TemporalBolt extends Entity { constructor(owner,x,y,vx,vy,damage,kind){super(x,y,18,14);Object.assign(this,{owner,vx,vy,damage,kind,type:kind==='copy'?'voss_copy_bolt':'temporal_shard'});} }
@@ -343,6 +348,11 @@ function loadPhysicsGame(heroName = 'Hunter') {
         LapisStone,
         ToniaGrenade,
         ToniaMissile,
+        LakEarthWall,
+        LakShockwave,
+        LakMountainBreaker,
+        PatThread,
+        PatMarionette,
         RokaCannonball,
         RokaMortarShell,
         TemporalBolt,
@@ -376,7 +386,10 @@ function loadPhysicsGame(heroName = 'Hunter') {
             Gelann: { maxHp: 750, speed: 6.1, jump: 15.5, width: 40, height: 70, color: '#b6422b', superCD: 24000 },
             Dogel: { maxHp: 800, speed: 5.8, jump: 15, width: 42, height: 72, color: '#7c2538', superCD: 26000 },
             Lapis: { maxHp: 650, speed: 5.2, jump: 14.5, width: 40, height: 68, color: '#4066b1', superCD: 24000 },
-            Tonia: { maxHp: 700, speed: 4.9, jump: 14, width: 44, height: 70, color: '#61706e', superCD: 25000 }
+            Tonia: { maxHp: 700, speed: 4.9, jump: 14, width: 44, height: 70, color: '#61706e', superCD: 25000 },
+            Ge: { maxHp: 850, speed: 5.5, jump: 15, width: 43, height: 72, color: '#9a6a2f', superCD: 26000 },
+            Lak: { maxHp: 1000, speed: 4.2, jump: 13, width: 48, height: 76, color: '#6f6759', superCD: 30000 },
+            Pat: { maxHp: 700, speed: 5.2, jump: 14.5, width: 39, height: 69, color: '#a34887', superCD: 28000 }
         },
         keys: {},
         keysPressed: {},
@@ -624,7 +637,7 @@ test('every hero with a direct super can decide to use it', () => {
     const context = loadAI();
     const directSuperHeroes = [
         'Hason', 'Willi', 'Hunter', 'Macu', 'Artu', 'Duke', 'Kadaxi', 'Euclid',
-        'Lique', 'Kae', 'Kila', 'Volt', 'Gensan', 'Noae', 'Wolf', 'Kuro', 'Sola', 'Nyra', 'Orion', 'Archor', 'Itan', 'D2F1', 'Laegon', 'Veyra', 'Brom', 'Axeron', 'Ukon', 'Mori', 'Roka', 'Voss', 'Raigo', 'Gelann', 'Dogel', 'Lapis', 'Tonia'
+        'Lique', 'Kae', 'Kila', 'Volt', 'Gensan', 'Noae', 'Wolf', 'Kuro', 'Sola', 'Nyra', 'Orion', 'Archor', 'Itan', 'D2F1', 'Laegon', 'Veyra', 'Brom', 'Axeron', 'Ukon', 'Mori', 'Roka', 'Voss', 'Raigo', 'Gelann', 'Dogel', 'Lapis', 'Tonia', 'Ge', 'Lak', 'Pat'
     ];
 
     for (const heroName of directSuperHeroes) {
@@ -2792,4 +2805,60 @@ test('Tonia builds Heat with held fire, launches six grenades, and resets with m
     assert.equal(ai.toniaHeat, 0);
     assert.equal(ai.toniaOverheated, false);
     assert.equal(context.game.projectiles.filter(entity => entity.type === 'tonia_missile').length, 3);
+});
+
+test('Ge hooks an enemy back and completes the Bronze God transformation', () => {
+    const { ai, context, target } = loadPhysicsGame('Ge');
+    ai.attackState = 'idle';
+    context.checkAABB = (first, second) => second === target;
+    assert.equal(ai.startGeHookingThrust(), true);
+    ai.updateGeHookingThrust(16);
+    assert.equal(target.hp, 730);
+    assert.equal(target.buffs.dizzy, 1000);
+    assert.equal(ai.geThrustPhase, 'return');
+
+    ai.geThrustTimer = 0; ai.geThrustPhase = null; ai.superCooldown = 0;
+    ai.performSuper();
+    assert.equal(ai.geDanceTimer, 2500);
+    const before = ai.hp;
+    ai.takeDamage(20, target);
+    assert.equal(ai.hp, before - 20, 'ritual incorrectly prevented damage');
+    assert.equal(ai.stunTimer, 0, 'ritual was interrupted by hit reaction');
+    ai.geDanceTimer = 1; ai.update(16);
+    assert.equal(ai.geGodTimer, 10000);
+    assert.equal(ai.getMeleeDamage(), 60);
+});
+
+test('Lak resists grounded damage and turns hammer combos into arena control', () => {
+    const { ai, context, target } = loadPhysicsGame('Lak');
+    ai.attackState = 'idle'; ai.isGrounded = true;
+    ai.takeDamage(100, target);
+    assert.equal(ai.hp, 915);
+    assert.ok(Math.abs(ai.vx) < 15, 'Heavy Ground did not reduce displacement');
+
+    for (let hit = 0; hit < 3; hit++) ai.executeActiveAttack();
+    assert.equal(context.game.hazards.filter(entity => entity.type === 'lak_shockwave').length, 1);
+    ai.lakWallCooldown = 0; ai.stunTimer = 0;
+    context.keysPressed[ai.controls.switch] = true; ai.update(16); delete context.keysPressed[ai.controls.switch];
+    assert.equal(context.game.hazards.some(entity => entity.type === 'lak_earth_wall'), true);
+    ai.superCooldown = 0; ai.performSuper();
+    assert.equal(context.game.hazards.some(entity => entity.type === 'lak_mountain_breaker'), true);
+});
+
+test('Pat builds three Puppet Marks, empowers Binding Thread, and summons Marionette', () => {
+    const { ai, context, target } = loadPhysicsGame('Pat');
+    ai.attackState = 'active'; ai.executeActiveAttack();
+    assert.equal(context.game.projectiles.at(-1).type, 'pat_thread_lash');
+
+    ai.addPatMark(target); ai.addPatMark(target); ai.addPatMark(target);
+    assert.equal(ai.patMarks.get(target).length, 3);
+    assert.equal(ai.consumePatMarks(target), true);
+    assert.equal(ai.patMarks.has(target), false);
+
+    ai.attackState = 'idle'; ai.patBindingCooldown = 0;
+    context.keysPressed[ai.controls.switch] = true; ai.update(16); delete context.keysPressed[ai.controls.switch];
+    assert.equal(context.game.projectiles.at(-1).type, 'pat_binding_thread');
+    ai.superCooldown = 0; ai.performSuper();
+    assert.equal(ai.patMarionette.type, 'pat_marionette');
+    assert.equal(ai.patMarionette.target, target);
 });

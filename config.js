@@ -411,6 +411,21 @@ var HEROES = {
         name: "Tonia", desc: "The Iron Rain",
         color: "#61706e", maxHp: 700, speed: 4.9, jump: 14, width: 44, height: 70, superCD: 25000,
         ui: { hp: "70 WRD", atk: "0.25 WRD (Held Gatling Fire)", passive: "Hold Attack for rapid suppressive fire. Each bullet builds Heat; at 100 Heat the gun overheats and cannot fire until it cools. Press [Switch] to launch six arcing 1.5 WRD grenades (7s CD).", super: "<span class='skill-tag'>Missile Salvo</span> Clears all Heat and launches three 4 WRD explosive missiles that track for 1.5s before flying straight." }
+    },
+    Ge: {
+        name: "Ge", desc: "The Bronze Shaman",
+        color: "#9a6a2f", maxHp: 850, speed: 5.5, jump: 15, width: 43, height: 72, superCD: 26000,
+        ui: { hp: "85 WRD", atk: "3 WRD (Long Bronze Ge)", passive: "<span class='skill-tag'>Hooking Thrust</span> Press [Switch] to charge through walls. A hit deals 2 WRD, stuns for 1s, and drags the victim back to Ge's starting point (7s CD).", super: "<span class='skill-tag'>Bronze God</span> Perform an uninterruptible 2.5s ritual, then transform for 10s. Damage doubles, movement speed rises by 30%, and actual damage heals Ge for 25%." }
+    },
+    Lak: {
+        name: "Lak", desc: "The Earthshaker",
+        color: "#6f6759", maxHp: 1000, speed: 4.2, jump: 13, width: 48, height: 76, superCD: 30000,
+        ui: { hp: "100 WRD", atk: "2.5 WRD (Stone Hammer)", passive: "<span class='skill-tag'>Heavy Ground</span> While grounded, Lak takes 15% less damage and greatly resists knockback. Every third attack creates a shockwave; hard landings create a small earthquake. Press [Switch] to raise a 4s projectile-blocking stone wall that can be stood on (8s CD).", super: "<span class='skill-tag'>Mountain Breaker</span> Sends five connected-surface shockwaves forward for 8 WRD total, slowing on every hit before the final wave launches enemies and erupts into a giant pillar." }
+    },
+    Pat: {
+        name: "Pat", desc: "The Puppet Master",
+        color: "#a34887", maxHp: 700, speed: 5.2, jump: 14.5, width: 39, height: 69, superCD: 28000,
+        ui: { hp: "70 WRD", atk: "1.2 WRD (Thread Lash)", passive: "Thread hits apply up to 3 Puppet Marks for 5s. Press [Switch] to fire Binding Thread for 1.5 WRD and a 1.5s root (9s CD); at 3 marks it also pulls the victim toward Pat and consumes the marks.", super: "<span class='skill-tag'>Marionette</span> Controls the enemy's movement for 3s while a puppet lashes for 0.8 WRD every 0.5s. The finale deals 3 WRD, stuns for 1s, and violently pulls the enemy toward Pat." }
     }
 };
 

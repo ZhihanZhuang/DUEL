@@ -442,7 +442,10 @@ DuelAudio.HERO_PROFILES = Object.freeze({
     Gelann:  { root: 698.46, wave: 'triangle', accent: 'sawtooth', texture: 1180, filter: 'bandpass', q: 2.3, direction: 1 },
     Dogel:   { root: 739.99, wave: 'sawtooth', accent: 'triangle', texture: 680, filter: 'lowpass', q: 1.4, direction: -1 },
     Lapis:   { root: 783.99, wave: 'sine', accent: 'square', texture: 2140, filter: 'bandpass', q: 2.5, direction: 1 },
-    Tonia:   { root: 830.61, wave: 'square', accent: 'sawtooth', texture: 330, filter: 'lowpass', q: 0.8, direction: -1 }
+    Tonia:   { root: 830.61, wave: 'square', accent: 'sawtooth', texture: 330, filter: 'lowpass', q: 0.8, direction: -1 },
+    Ge:      { root: 176.20, wave: 'triangle', accent: 'sawtooth', texture: 610, filter: 'lowpass', q: 1.2, direction: 1 },
+    Lak:     { root: 111.70, wave: 'square', accent: 'triangle', texture: 180, filter: 'lowpass', q: 0.5, direction: -1 },
+    Pat:     { root: 905.30, wave: 'sine', accent: 'triangle', texture: 3100, filter: 'bandpass', q: 2.7, direction: 1 }
 });
 
 window.DuelAudio = DuelAudio;
