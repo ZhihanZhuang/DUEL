@@ -2645,9 +2645,9 @@ test('Gelann Rain of Arrows telegraphs then deals 6 WRD with an exact 45% slow',
     assert.equal(target.buffs.gelannArrowSlow, 2000);
 });
 
-test('Dogel charges while mobile, throws Chain Pull, and enters Blood Reaper', () => {
+test('Dogel holds a capped charge and attacks immediately on release', () => {
     const simulation = loadPhysicsGame('Dogel');
-    const { ai, context } = simulation;
+    const { ai, context, target } = simulation;
     ai.attackState = 'idle';
     context.keys[ai.controls.attack] = true;
     ai.performAttack();
@@ -2655,10 +2655,25 @@ test('Dogel charges while mobile, throws Chain Pull, and enters Blood Reaper', (
     assert.equal(ai.attackState, 'dogel_charging');
     assert.ok(ai.dogelCharge >= 900);
 
+    ai.update(ai.dogelChargeMax);
+    assert.equal(ai.attackState, 'dogel_charging', 'full charge released while attack was held');
+    assert.equal(ai.dogelCharge, ai.dogelChargeMax);
+
+    context.checkAABB = () => true;
+    const hpBeforeRelease = target.hp;
     context.keys[ai.controls.attack] = false;
     ai.update(16);
-    assert.equal(ai.attackState, 'windup');
-    assert.ok(ai.dogelChargedDamage > 35 && ai.dogelChargedDamage <= 50);
+    assert.equal(ai.attackState, 'active');
+    assert.equal(ai.dogelChargedDamage, 50);
+    assert.equal(target.hp, hpBeforeRelease - 50, 'release did not activate the swing hitbox immediately');
+
+    ai.attackState = 'idle';
+    context.keys[ai.controls.attack] = true;
+    ai.performAttack();
+    ai.update(800);
+    context.keys[ai.controls.attack] = false;
+    ai.update(16);
+    assert.ok(ai.dogelChargedDamage > 20 && ai.dogelChargedDamage < 50);
 
     ai.attackState = 'idle';
     assert.equal(ai.fireDogelChain(), true);
@@ -2671,21 +2686,92 @@ test('Dogel charges while mobile, throws Chain Pull, and enters Blood Reaper', (
 
 test('Lapis launches available stones, converges all five, and forms Stone Whip', () => {
     const simulation = loadPhysicsGame('Lapis');
-    const { ai, context } = simulation;
+    const { ai, context, target } = simulation;
+    ai.x = 300;
+    ai.y = 500;
+    target.x = 850;
+    target.y = 500;
+    const summon = {
+        id: 'nearby_summon', type: 'skeleton', owner: target,
+        x: 430, y: 500, w: 35, h: 60, hp: 100, maxHp: 100,
+        dead: false, untargetable: false, buffs: {}, vx: 0, vy: 0,
+        takeDamage(amount) { this.hp -= amount; }
+    };
+    context.game.minions.push(summon);
     ai.attackState = 'idle';
     ai.executeActiveAttack();
     assert.equal(context.game.projectiles.filter(entity => entity.type === 'lapis_stone').length, 1);
     assert.equal(ai.lapisStoneAvailable.filter(Boolean).length, 4);
+    assert.equal(context.game.projectiles.at(-1).target, summon, 'Basic Attack ignored the nearest summon');
 
     ai.lapisStoneAvailable.fill(true);
     assert.equal(ai.fireLapisJudgment(), true);
     assert.equal(context.game.projectiles.filter(entity => entity.type === 'lapis_stone' && entity.judgment).length, 5);
+    assert.ok(context.game.projectiles.filter(entity => entity.judgment).every(stone => stone.target === summon), 'Judgment ignored the nearest summon');
 
     ai.superCooldown = 0;
     ai.performSuper();
     assert.equal(ai.lapisWhipTimer, 9000);
     assert.equal(ai.isMeleeAttack(), true);
     assert.equal(ai.getMeleeDamage(), 24);
+
+    ai.attackState = 'active';
+    ai.maxStateTimer = 95;
+    ai.stateTimer = 95;
+    const startPoints = ai.getLapisWhipPoints(0);
+    ai.stateTimer = 20;
+    const snapPoints = ai.getLapisWhipPoints(40);
+    assert.equal(snapPoints.length, 6);
+    for (let segment = 1; segment < snapPoints.length; segment++) {
+        assert.ok(Math.abs(Math.hypot(snapPoints[segment].x-snapPoints[segment-1].x,snapPoints[segment].y-snapPoints[segment-1].y)-30)<.001, 'whip segments disconnected');
+    }
+    const baseTravel = Math.hypot(snapPoints[1].x-startPoints[1].x,snapPoints[1].y-startPoints[1].y);
+    const tipTravel = Math.hypot(snapPoints[5].x-startPoints[5].x,snapPoints[5].y-startPoints[5].y);
+    assert.ok(tipTravel > baseTravel * 2, 'whip tip did not amplify the delayed base motion');
+});
+
+test('Lapis stones can be destroyed and Sola deflects them back to their caster', () => {
+    const context = loadProjectileContext();
+    const lapis = {
+        id: 'lapis', heroName: 'Lapis', x: 100, y: 500, w: 40, h: 68, dead: false,
+        hp: 650, lapisStoneInFlight: [0,0,0,0,0], lapisStoneAvailable: [true,true,true,true,true],
+        getLapisOrbitPosition: () => ({ x: 120, y: 530 }),
+        takeDamage(amount) { this.hp -= amount; }
+    };
+    const sola = {
+        id: 'sola', heroName: 'Sola', x: 300, y: 500, w: 40, h: 70, dead: false,
+        hp: 780, solaFocus: 0, solaChargeTimer: 0, attackState: 'active',
+        isMeleeAttack: () => true,
+        takeDamage(amount) { this.hp -= amount; }
+    };
+    context.game.opponents = [sola];
+
+    const blockedStone = new context.window.LapisStone(lapis, 0, sola);
+    blockedStone.castTimer = 0;
+    context.game.projectiles.push(blockedStone);
+    const blocker = new context.window.Projectile(blockedStone.x, blockedStone.y, blockedStone.w, blockedStone.h, 0, 0, 20, sola, '#fff', 'bullet');
+    context.game.projectiles.push(blocker);
+    blocker.update(16);
+    assert.equal(blockedStone.dead, true, 'hostile projectile did not destroy the stone');
+    assert.equal(lapis.lapisStoneAvailable[0], true, 'destroyed stone did not return to Lapis');
+
+    const reflectedStone = new context.window.LapisStone(lapis, 1, sola);
+    reflectedStone.castTimer = 0;
+    reflectedStone.x = sola.x;
+    reflectedStone.y = sola.y;
+    context.game.projectiles.push(reflectedStone);
+    reflectedStone.update(16);
+    assert.equal(reflectedStone.owner, sola);
+    assert.equal(reflectedStone.target, lapis);
+    assert.equal(reflectedStone.deflected, true);
+    assert.equal(sola.solaFocus, 1);
+    assert.equal(sola.hp, 780, 'Sola took damage while deflecting the stone');
+
+    reflectedStone.x = lapis.x;
+    reflectedStone.y = lapis.y;
+    reflectedStone.update(16);
+    assert.ok(lapis.hp < 650, 'deflected stone did not damage its original caster');
+    assert.equal(lapis.lapisStoneAvailable[1], true, 'deflected stone did not restore its original orbit slot');
 });
 
 test('Tonia builds Heat with held fire, launches six grenades, and resets with missiles', () => {

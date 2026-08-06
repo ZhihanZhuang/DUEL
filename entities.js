@@ -791,7 +791,11 @@ class Projectile extends Entity {
         }
 
         if (!this.dead && this.type !== "dynamite") {
-            let targets = Array.from(new Set([...game.getOpponentsOf(this.owner), ...game.minions.filter(m => m && m.owner !== this.owner)]));
+            let targets = Array.from(new Set([
+                ...game.getOpponentsOf(this.owner),
+                ...game.minions.filter(m => m && m.owner !== this.owner),
+                ...game.projectiles.filter(projectile => projectile && projectile !== this && projectile.type === 'lapis_stone' && projectile.owner !== this.owner)
+            ]));
             for (let t of targets) {
                 if (!t || t.untargetable) continue;
 
@@ -828,7 +832,7 @@ class Projectile extends Entity {
                             game.createExplosion(this.x + this.w/2, this.y + this.h/2, 180, 70, this.owner, false, 2500);
                             return;
                         }
-                        let noKnockback = (this.type === "bullet" || this.type === "homing_bullet" || this.type === "ki_blast" || this.type === "magic_burst" || this.type === "paper_plane" || this.type === "blue_paper_plane" || this.type === "fire_bolt" || this.type === "water_bolt" || this.type === "tidal_wave" || this.type === "volt_laser" || this.type === "pickaxe" || this.type === "chiq_blade" || this.type === "em_ball" || this.type === "chrono_bolt");
+                        let noKnockback = (this.type === "bullet" || this.type === "skeleton_arrow" || this.type === "homing_bullet" || this.type === "ki_blast" || this.type === "magic_burst" || this.type === "paper_plane" || this.type === "blue_paper_plane" || this.type === "fire_bolt" || this.type === "water_bolt" || this.type === "tidal_wave" || this.type === "volt_laser" || this.type === "pickaxe" || this.type === "chiq_blade" || this.type === "em_ball" || this.type === "chrono_bolt");
                         t.takeDamage(this.damage, this.owner, false, noKnockback);
                         if (this.damage > 0 && this.owner?.heroName === 'Archor' && typeof this.owner.onArchorHit === 'function') this.owner.onArchorHit(t);
 
@@ -2173,20 +2177,42 @@ class LapisStone extends Entity {
     constructor(owner,index,target,judgment=false) {
         const sizes=[14,20,28,38,50], orbit=owner.getLapisOrbitPosition?owner.getLapisOrbitPosition(index):{x:owner.x,y:owner.y};
         super(orbit.x-sizes[index]/2,orbit.y-sizes[index]/2,sizes[index],sizes[index]);
-        this.owner=owner;this.target=target;this.index=index;this.type='lapis_stone';this.judgment=judgment;
+        this.owner=owner;this.sourceOwner=owner;this.target=target;this.index=index;this.type='lapis_stone';this.judgment=judgment;
         this.damage=[15,20,30,40,50][index];this.speed=[20,17,14,11,8][index];this.castTimer=judgment?180:360;
-        this.life=4000;this.angle=index;this.hit=false;this.untargetable=true;
+        this.maxHp=[10,14,18,24,32][index];this.hp=this.maxHp;
+        this.life=4000;this.angle=index;this.hit=false;this.untargetable=false;this.deflected=false;
         if(owner.lapisStoneInFlight){owner.lapisStoneInFlight[index]++;owner.lapisStoneAvailable[index]=false;}
     }
-    finish(){if(this.dead)return;if(this.owner?.lapisStoneInFlight){this.owner.lapisStoneInFlight[this.index]=Math.max(0,this.owner.lapisStoneInFlight[this.index]-1);this.owner.lapisStoneAvailable[this.index]=this.owner.lapisStoneInFlight[this.index]===0;}this.dead=true;}
+    finish(){if(this.dead)return;if(this.sourceOwner?.lapisStoneInFlight){this.sourceOwner.lapisStoneInFlight[this.index]=Math.max(0,this.sourceOwner.lapisStoneInFlight[this.index]-1);this.sourceOwner.lapisStoneAvailable[this.index]=this.sourceOwner.lapisStoneInFlight[this.index]===0;}this.dead=true;}
+    takeDamage(amount,attacker){
+        if(this.dead||attacker===this.owner)return false;
+        this.hp-=Math.max(0,amount||0);
+        for(let i=0;i<6;i++)game.particles.push(new Particle(this.x+this.w/2,this.y+this.h/2,'#b9d1ff',(Math.random()-.5)*9,(Math.random()-.5)*9,220,3));
+        if(this.hp<=0)this.finish();
+        return true;
+    }
+    canBeDeflectedBy(fighter){
+        return fighter?.heroName==='Sola'&&(fighter.solaChargeTimer>0||((fighter.attackState==='windup'||fighter.attackState==='active')&&fighter.isMeleeAttack?.()));
+    }
+    deflect(deflector){
+        if(this.dead||!this.canBeDeflectedBy(deflector))return false;
+        const previousOwner=this.owner;
+        this.owner=deflector;this.target=previousOwner;this.castTimer=0;this.judgment=false;this.hit=false;this.deflected=true;
+        this.life=Math.max(this.life,2400);this.speed=Math.max(this.speed,18);
+        deflector.solaFocus=Math.min(3,(deflector.solaFocus||0)+1);
+        for(let i=0;i<14;i++)game.particles.push(new Particle(this.x+this.w/2,this.y+this.h/2,'#8ffcff',(Math.random()-.5)*16,(Math.random()-.5)*16,280,4));
+        return true;
+    }
     update(dt){
         if(!this.owner||this.owner.dead){this.finish();return;}this.life-=dt;this.angle+=dt*.008;
         if(this.castTimer>0){this.castTimer-=dt;const p=1-Math.max(0,this.castTimer)/(this.judgment?180:360);const origin=this.owner.getLapisOrbitPosition(this.index);this.x=origin.x-this.w/2;this.y=origin.y-this.h/2-45*Math.sin(p*Math.PI);return;}
         if(!this.target||this.target.dead){this.finish();return;}
+        if(this.canBeDeflectedBy(this.target)&&checkAABB(this,this.target)){this.deflect(this.target);return;}
         const tx=this.target.x+this.target.w/2,ty=this.target.y+this.target.h/2;
         let dx=tx-(this.x+this.w/2),dy=ty-(this.y+this.h/2),dist=Math.max(1,Math.hypot(dx,dy));
         if(this.judgment){const a=this.index*Math.PI*2/5;dx+=Math.cos(a)*Math.min(80,dist*.25);dy+=Math.sin(a)*Math.min(80,dist*.25);dist=Math.max(1,Math.hypot(dx,dy));}
         this.x+=dx/dist*this.speed;this.y+=dy/dist*this.speed;
+        if(this.canBeDeflectedBy(this.target)&&checkAABB(this,this.target)){this.deflect(this.target);return;}
         if((dist<this.speed+Math.max(this.w,this.h)*.5||checkAABB(this,this.target))&&!this.hit){
             this.hit=true;this.target.takeDamage(this.judgment?Math.max(10,this.damage*.45):this.damage,this.owner);
             if(this.target.buffs&&this.judgment)this.target.buffs.dizzy=Math.max(this.target.buffs.dizzy||0,420);
@@ -2195,7 +2221,7 @@ class LapisStone extends Entity {
             this.finish();
         } else if(this.life<=0)this.finish();
     }
-    draw(ctx){ctx.save();ctx.translate(this.x+this.w/2,this.y+this.h/2);ctx.rotate(this.angle);ctx.shadowBlur=12;ctx.shadowColor='#7ca6ff';ctx.fillStyle=['#c5dbff','#9dbde9','#7193ce','#4e70ad','#354c86'][this.index];ctx.fillRect(-this.w/2,-this.h/2,this.w,this.h);ctx.strokeStyle='#e8f1ff';ctx.lineWidth=2;ctx.strokeRect(-this.w/2+2,-this.h/2+2,this.w-4,this.h-4);ctx.restore();}
+    draw(ctx){ctx.save();ctx.translate(this.x+this.w/2,this.y+this.h/2);ctx.rotate(this.angle);ctx.shadowBlur=12;ctx.shadowColor=this.deflected?'#8ffcff':'#7ca6ff';ctx.fillStyle=this.deflected?'#bffaff':['#c5dbff','#9dbde9','#7193ce','#4e70ad','#354c86'][this.index];ctx.fillRect(-this.w/2,-this.h/2,this.w,this.h);ctx.strokeStyle='#e8f1ff';ctx.lineWidth=2;ctx.strokeRect(-this.w/2+2,-this.h/2+2,this.w-4,this.h-4);if(this.hp<this.maxHp){ctx.strokeStyle='#33496f';ctx.beginPath();ctx.moveTo(-this.w*.25,-this.h*.45);ctx.lineTo(this.w*.08,-this.h*.08);ctx.lineTo(-this.w*.12,this.h*.2);ctx.lineTo(this.w*.3,this.h*.45);ctx.stroke();}ctx.restore();}
 }
 
 class ToniaGrenade extends Entity {
@@ -2884,7 +2910,7 @@ class ChronosBoss extends BossBase {
 class MortemSkeleton extends Entity {
     constructor(owner,x,kind='melee',elite=false){super(x,GROUND_Y-(elite?88:66),elite?50:36,elite?88:66);this.owner=owner;this.kind=kind;this.elite=elite;this.type='mortem_skeleton';this.hp=elite?120:(kind==='shield'?48:30);this.maxHp=this.hp;this.speed=(elite?4.8:(kind==='shield'?2.3:4.2))*(owner.phaseTwo?1.25:1);this.attackTimer=500;this.life=26000;this.buffs={dizzy:0,slow:0};}
     takeDamage(amount,attacker){if(this.kind==='shield'&&attacker&&((attacker.x<this.x&&this.facing<0)||(attacker.x>this.x&&this.facing>0)))amount*=.35;this.hp-=amount||0;if(this.hp<=0){this.dead=true;if(this.owner?.deadSkeletons)this.owner.deadSkeletons.push({x:this.x,kind:this.kind});}window.audioManager?.playEntityHit(this,attacker,amount);}
-    update(dt){this.life-=dt;if(this.life<=0||!this.owner||this.owner.dead){this.dead=true;return;}if(this.buffs.dizzy>0){this.buffs.dizzy-=dt;return;}this.attackTimer-=dt;const target=game.getOpponentsOf(this.owner).filter(t=>!t.dead).sort((a,b)=>Math.abs(a.x-this.x)-Math.abs(b.x-this.x))[0];if(!target)return;const dx=target.x+target.w/2-(this.x+this.w/2);this.facing=dx>=0?1:-1;if(this.kind==='archer'){if(Math.abs(dx)<520&&this.attackTimer<=0){game.projectiles.push(new Projectile(this.x+this.w/2,this.y+20,12,5,this.facing*9,-1,12,this.owner,'#b9a4cf','bullet'));this.attackTimer=1450;}if(Math.abs(dx)<260)this.x-=this.facing*this.speed;}else if(Math.abs(dx)>55)this.x+=this.facing*this.speed;else if(this.attackTimer<=0){target.takeDamage(this.elite?32:16,this.owner);target.vx=this.facing*(this.elite?11:5);this.attackTimer=this.elite?800:1050;}this.x=Math.max(0,Math.min(CANVAS_W-this.w,this.x));}
+    update(dt){this.life-=dt;if(this.life<=0||!this.owner||this.owner.dead){this.dead=true;return;}if(this.buffs.dizzy>0){this.buffs.dizzy-=dt;return;}this.attackTimer-=dt;const target=game.getOpponentsOf(this.owner).filter(t=>!t.dead).sort((a,b)=>Math.abs(a.x-this.x)-Math.abs(b.x-this.x))[0];if(!target)return;const dx=target.x+target.w/2-(this.x+this.w/2);this.facing=dx>=0?1:-1;if(this.kind==='archer'){if(Math.abs(dx)<520&&this.attackTimer<=0){game.projectiles.push(new Projectile(this.x+this.w/2,this.y+20,12,5,this.facing*9,-1,12,this.owner,'#b9a4cf','skeleton_arrow'));this.attackTimer=1450;}if(Math.abs(dx)<260)this.x-=this.facing*this.speed;}else if(Math.abs(dx)>55)this.x+=this.facing*this.speed;else if(this.attackTimer<=0){target.takeDamage(this.elite?32:16,this.owner);target.vx=this.facing*(this.elite?11:5);this.attackTimer=this.elite?800:1050;}this.x=Math.max(0,Math.min(CANVAS_W-this.w,this.x));}
     draw(ctx){ctx.save();ctx.translate(this.x+this.w/2,this.y);if(this.facing<0)ctx.scale(-1,1);ctx.fillStyle=this.elite?'#51335f':'#d8d2c4';ctx.fillRect(-this.w/2,14,this.w,this.h-14);ctx.fillStyle='#202024';ctx.fillRect(-this.w/2,34,this.w,8);if(this.kind==='shield'){ctx.fillStyle='#56496b';ctx.fillRect(12,25,18,35);}else if(this.kind==='archer'){ctx.strokeStyle='#8d6b45';ctx.lineWidth=3;ctx.beginPath();ctx.arc(18,34,18,-Math.PI/2,Math.PI/2);ctx.stroke();}else{ctx.fillStyle='#353039';ctx.fillRect(12,30,35,5);}ctx.restore();}
 }
 

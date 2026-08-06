@@ -573,6 +573,10 @@ class Fighter extends Entity {
         this.vx = this.solaChargeDirection * 18;
 
         const hitbox = this.getSolaChargeHitbox();
+        for (const stone of game.projectiles) {
+            if (!stone || stone.type !== 'lapis_stone' || stone.owner === this || stone.dead || this.solaChargeHitTargets.has(stone) || !checkAABB(hitbox, stone)) continue;
+            if (typeof stone.deflect === 'function' && stone.deflect(this)) this.solaChargeHitTargets.add(stone);
+        }
         const targets = Array.from(new Set([
             ...game.getOpponentsOf(this),
             ...game.minions.filter(minion => minion && minion.owner !== this && !minion.dead && !minion.untargetable)
@@ -705,7 +709,7 @@ class Fighter extends Entity {
                 this.dogelCharge = Math.min(this.dogelChargeMax, this.dogelCharge + dt);
                 this.stateTimer = this.dogelCharge;
                 this.maxStateTimer = this.dogelChargeMax;
-                if (!keys[this.controls.attack] || this.dogelCharge >= this.dogelChargeMax) this.releaseDogelCharge();
+                if (!keys[this.controls.attack]) this.releaseDogelCharge();
             }
         }
         if (this.heroName === 'Lapis') {
@@ -1275,6 +1279,12 @@ class Fighter extends Entity {
                 if (!this.hasHit && this.isMeleeAttack()) {
                     let hitBox = this.getMeleeHitbox();
                     let targetsHit = [];
+                    for (const stone of game.projectiles) {
+                        if (!stone || stone.type !== 'lapis_stone' || stone.owner === this || stone.dead || !checkAABB(hitBox, stone)) continue;
+                        if (this.heroName === 'Sola' && typeof stone.deflect === 'function') stone.deflect(this);
+                        else if (typeof stone.takeDamage === 'function') stone.takeDamage(stone.hp, this);
+                        targetsHit.push(stone);
+                    }
                     for (const enemy of game.getOpponentsOf(this)) {
                         if (!enemy.untargetable && checkAABB(hitBox, enemy)) {
                             const hpBefore = Number.isFinite(enemy.hp) ? enemy.hp : null;
@@ -1664,12 +1674,69 @@ class Fighter extends Entity {
         return { x: this.x + this.w/2 + Math.cos(angle)*radius, y: this.y + this.h/2 + Math.sin(angle)*30 };
     }
 
+    getLapisTarget() {
+        const candidates = Array.from(new Set([
+            ...game.getOpponentsOf(this),
+            ...game.minions.filter(minion => minion && minion.owner !== this && !minion.dead && !minion.untargetable)
+        ])).filter(target => target && target !== this && !target.dead && !target.untargetable);
+        if (!candidates.length) return null;
+        const centerX = this.x + this.w / 2;
+        const centerY = this.y + this.h / 2;
+        return candidates.reduce((nearest, target) => {
+            const distance = Math.hypot(target.x + target.w/2 - centerX, target.y + target.h/2 - centerY);
+            const nearestDistance = Math.hypot(nearest.x + nearest.w/2 - centerX, nearest.y + nearest.h/2 - centerY);
+            return distance < nearestDistance ? target : nearest;
+        });
+    }
+
+    getLapisWhipPoints(now = Date.now()) {
+        const target = this.getLapisTarget();
+        const centerX = this.x + this.w / 2;
+        const centerY = this.y + this.h / 2;
+        const localTargetX = target ? (target.x + target.w/2 - centerX) * this.facing : 180;
+        const localTargetY = target ? target.y + target.h/2 - centerY : 0;
+        const aimAngle = Math.max(-.72, Math.min(.72, Math.atan2(localTargetY, Math.max(24, localTargetX))));
+        const rawProgress = this.maxStateTimer > 0 ? Math.max(0, Math.min(1, 1 - this.stateTimer / this.maxStateTimer)) : 0;
+        const points = [{ x: 0, y: 0, angle: aimAngle }];
+        const segmentLength = 30;
+
+        for (let segment = 1; segment <= 5; segment++) {
+            const delay = segment * .055;
+            const delayedProgress = Math.max(0, Math.min(1, (rawProgress - delay) / (1 - delay)));
+            const easedProgress = delayedProgress * delayedProgress * (3 - 2 * delayedProgress);
+            const flexibility = segment / 5;
+            let angle;
+
+            if (this.attackState === 'active') {
+                const snapWave = Math.sin(easedProgress * Math.PI) * .38 * flexibility;
+                angle = aimAngle - 1.28 + easedProgress * 1.28 + snapWave;
+            } else if (this.attackState === 'windup') {
+                angle = aimAngle - rawProgress * (.75 + flexibility * .4) + Math.sin(segment * .8) * .08;
+            } else if (this.attackState === 'recovery') {
+                angle = aimAngle + (1 - rawProgress) * (.48 - flexibility * .18) + Math.sin(now * .012 - segment * .7) * .08 * flexibility;
+            } else {
+                angle = aimAngle + Math.sin(now * .009 - segment * .72) * (.08 + flexibility * .13);
+            }
+
+            const previous = points[segment - 1];
+            points.push({
+                x: previous.x + Math.cos(angle) * segmentLength,
+                y: previous.y + Math.sin(angle) * segmentLength,
+                angle
+            });
+        }
+        return points;
+    }
+
     releaseDogelCharge() {
         if (this.heroName !== 'Dogel' || this.attackState !== 'dogel_charging') return;
         const ratio = Math.min(1, this.dogelCharge / this.dogelChargeMax);
         this.dogelChargedDamage = 20 + ratio * 30;
-        this.attackState = 'windup'; this.stateTimer = this.dogelReaperTimer > 0 ? 45 : 80; this.maxStateTimer = this.stateTimer;
+        this.attackState = 'active';
+        this.stateTimer = this.dogelReaperTimer > 0 ? 90 : 130;
+        this.maxStateTimer = this.stateTimer;
         this.hasHit = false;
+        this.executeActiveAttack();
     }
 
     fireDogelChain() {
@@ -1681,8 +1748,9 @@ class Fighter extends Entity {
 
     fireLapisJudgment() {
         if (this.lapisJudgmentCooldown > 0) return false;
-        const target = this.aiCombatTarget && !this.aiCombatTarget.dead ? this.aiCombatTarget : game.getEnemyOf(this);
+        const target = this.getLapisTarget();
         if (!target) return false;
+        this.facing = target.x + target.w/2 >= this.x + this.w/2 ? 1 : -1;
         this.lapisJudgmentCooldown = 8000;
         for(let index=0;index<5;index++)game.projectiles.push(new LapisStone(this,index,target,true));
         return true;
@@ -1894,7 +1962,12 @@ class Fighter extends Entity {
 
         if (this.heroName === 'Lapis' && this.lapisWhipTimer <= 0) {
             const available=this.lapisStoneAvailable.map((ready,index)=>ready?index:-1).filter(index=>index>=0);
-            if(available.length){const index=available[Math.floor(Math.random()*available.length)];game.projectiles.push(new LapisStone(this,index,target));}
+            const lapisTarget = this.getLapisTarget();
+            if(available.length && lapisTarget){
+                const index=available[Math.floor(Math.random()*available.length)];
+                this.facing=lapisTarget.x+lapisTarget.w/2>=this.x+this.w/2?1:-1;
+                game.projectiles.push(new LapisStone(this,index,lapisTarget));
+            }
             return;
         }
 
@@ -3698,11 +3771,149 @@ class Fighter extends Entity {
             ctx.rotate(angle);ctx.fillStyle='#5b646a';ctx.fillRect(-3,-14,6,24);ctx.fillStyle='#ffd166';ctx.beginPath();ctx.moveTo(0,-12);ctx.arc(0,-12,34,-2.7,-.44);ctx.closePath();ctx.fill();ctx.strokeStyle='#31383c';ctx.lineWidth=2;for(let rib=-2.5;rib<-.55;rib+=.38){ctx.beginPath();ctx.moveTo(0,-12);ctx.lineTo(Math.cos(rib)*32,Math.sin(rib)*32-12);ctx.stroke();}ctx.restore();
         }
         else if (this.heroName === 'Dogel') {
-            ctx.save();ctx.translate(0,30);const charging=this.attackState==='dogel_charging';const charge=Math.min(1,(this.dogelCharge||0)/this.dogelChargeMax);const angle=charging?Date.now()*(.01+charge*.018):(this.attackState==='active'?-1.5+phaseProg*3.8:.55);const radius=58+charge*45+(this.dogelReaperTimer>0?16:0);ctx.rotate(angle);ctx.strokeStyle=this.dogelReaperTimer>0?'#ff4b68':'#a99375';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(radius,0);ctx.stroke();ctx.fillStyle='#d9d6ca';ctx.beginPath();ctx.arc(radius,0,14,0,Math.PI*1.45);ctx.lineTo(radius,0);ctx.fill();if(charging){ctx.strokeStyle=`rgba(255,74,96,${.25+charge*.5})`;ctx.lineWidth=9;ctx.beginPath();ctx.arc(0,0,radius,0,Math.PI*2);ctx.stroke();}ctx.restore();
+            ctx.save();
+            const charging = this.attackState === 'dogel_charging';
+            const active = this.attackState === 'active';
+            const reaperActive = this.dogelReaperTimer > 0;
+            const charge = Math.min(1, (this.dogelCharge || 0) / this.dogelChargeMax);
+            const handX = hw - 5;
+            const handY = 31;
+            let weightAngle = .7;
+            let chainRadius = 50;
+            let chainDrop = 42;
+
+            if (charging) {
+                weightAngle = Date.now() * (.011 + charge * .018);
+                chainRadius = 62 + charge * 48 + (reaperActive ? 14 : 0);
+                chainDrop = 12;
+            } else if (active) {
+                weightAngle = -1.75 + phaseProg * 4.55;
+                chainRadius = 104 + charge * 54 + (reaperActive ? 18 : 0);
+                chainDrop = 4;
+            } else if (this.attackState === 'recovery') {
+                weightAngle = 2.8 - phaseProg * 2.1;
+                chainRadius = 72 - phaseProg * 22;
+                chainDrop = 24 + phaseProg * 18;
+            }
+
+            const weightX = handX + Math.cos(weightAngle) * chainRadius;
+            const weightY = handY + Math.sin(weightAngle) * chainRadius * .72 + chainDrop;
+            const controlX = (handX + weightX) / 2;
+            const controlY = (handY + weightY) / 2 + (charging || active ? 0 : 20);
+            const chainColor = reaperActive ? '#ff6578' : '#aaa49a';
+
+            if (charging || active) {
+                ctx.strokeStyle = reaperActive
+                    ? `rgba(255, 45, 72, ${.28 + charge * .35})`
+                    : `rgba(210, 220, 215, ${.16 + charge * .28})`;
+                ctx.lineWidth = active ? 15 : 8 + charge * 5;
+                ctx.beginPath();
+                const trailEnd = active ? weightAngle - 1.2 : weightAngle - .8;
+                ctx.arc(handX, handY, chainRadius, trailEnd, weightAngle);
+                ctx.stroke();
+            }
+
+            // Draw individual links so the flexible weapon remains readable in motion.
+            const linkCount = Math.max(8, Math.round(chainRadius / 9));
+            ctx.strokeStyle = chainColor;
+            ctx.lineWidth = 2;
+            ctx.shadowBlur = reaperActive ? 9 : 0;
+            ctx.shadowColor = '#ff304f';
+            for (let link = 0; link <= linkCount; link++) {
+                const t = link / linkCount;
+                const inv = 1 - t;
+                const x = inv * inv * handX + 2 * inv * t * controlX + t * t * weightX;
+                const y = inv * inv * handY + 2 * inv * t * controlY + t * t * weightY;
+                const dx = 2 * inv * (controlX - handX) + 2 * t * (weightX - controlX);
+                const dy = 2 * inv * (controlY - handY) + 2 * t * (weightY - controlY);
+                ctx.save();
+                ctx.translate(x, y);
+                ctx.rotate(Math.atan2(dy, dx) + (link % 2 ? Math.PI / 2 : 0));
+                ctx.beginPath();
+                ctx.ellipse(0, 0, 5, 2.8, 0, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            ctx.shadowBlur = reaperActive ? 13 : 4;
+            ctx.shadowColor = reaperActive ? '#ff304f' : '#77736d';
+            ctx.fillStyle = reaperActive ? '#7d1728' : '#3e4142';
+            ctx.strokeStyle = reaperActive ? '#ff9aa8' : '#c7c2b8';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(weightX, weightY, 9 + charge * 2, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+
+            // Kama: wrapped wooden handle with a broad, hooked steel blade.
+            ctx.save();
+            ctx.translate(handX, handY);
+            let kamaAngle = -.35;
+            if (charging) kamaAngle = -.7 + Math.sin(Date.now() * .012) * .08;
+            else if (active) kamaAngle = -1.2 + phaseProg * 2.75;
+            else if (this.attackState === 'recovery') kamaAngle = 1.55 - phaseProg * 1.9;
+            ctx.rotate(kamaAngle);
+            ctx.fillStyle = '#4a2818';
+            ctx.fillRect(-4, -7, 8, 57);
+            ctx.strokeStyle = '#c59658';
+            ctx.lineWidth = 2;
+            for (let wrap = 2; wrap < 44; wrap += 8) {
+                ctx.beginPath(); ctx.moveTo(-4, wrap); ctx.lineTo(4, wrap + 5); ctx.stroke();
+            }
+            ctx.fillStyle = '#8c6239';
+            ctx.fillRect(-7, -9, 14, 8);
+            ctx.fillStyle = reaperActive ? '#ffe3e6' : '#e7e9e6';
+            ctx.strokeStyle = reaperActive ? '#ff6077' : '#747b7b';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(-2, -7);
+            ctx.quadraticCurveTo(28, -15, 38, -45);
+            ctx.quadraticCurveTo(42, -18, 18, -2);
+            ctx.quadraticCurveTo(8, 4, -2, -1);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+            ctx.restore();
+            ctx.restore();
         }
         else if (this.heroName === 'Lapis') {
-            for(let i=0;i<5;i++){if(!this.lapisStoneAvailable[i])continue;const angle=Date.now()*.0014+i*Math.PI*2/5,radius=48+(i%2)*10,size=[7,9,12,15,19][i];ctx.save();ctx.translate(Math.cos(angle)*radius,35+Math.sin(angle)*30);ctx.rotate(Date.now()*.002+i);ctx.fillStyle=['#c5dbff','#9dbde9','#7193ce','#4e70ad','#354c86'][i];ctx.shadowBlur=8;ctx.shadowColor='#7ca6ff';ctx.fillRect(-size/2,-size/2,size,size);ctx.restore();}
-            if(this.lapisWhipTimer>0){ctx.save();ctx.translate(hw-2,31);const swing=this.attackState==='active'?-1.7+phaseProg*3.5:Math.sin(Date.now()*.008)*.3;ctx.rotate(swing);ctx.strokeStyle='#91b6ff';ctx.shadowBlur=12;ctx.shadowColor='#5f86dd';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(0,0);for(let i=1;i<=5;i++)ctx.lineTo(i*30,Math.sin(i*.9)*12);ctx.stroke();for(let i=1;i<=5;i++){ctx.fillStyle=['#c5dbff','#9dbde9','#7193ce','#4e70ad','#354c86'][i-1];ctx.fillRect(i*30-7,Math.sin(i*.9)*12-7,14,14);}ctx.restore();}
+            if(this.lapisWhipTimer<=0){for(let i=0;i<5;i++){if(!this.lapisStoneAvailable[i])continue;const angle=Date.now()*.0014+i*Math.PI*2/5,radius=48+(i%2)*10,size=[7,9,12,15,19][i];ctx.save();ctx.translate(Math.cos(angle)*radius,35+Math.sin(angle)*30);ctx.rotate(Date.now()*.002+i);ctx.fillStyle=['#c5dbff','#9dbde9','#7193ce','#4e70ad','#354c86'][i];ctx.shadowBlur=8;ctx.shadowColor='#7ca6ff';ctx.fillRect(-size/2,-size/2,size,size);ctx.restore();}}
+            if(this.lapisWhipTimer>0){
+                ctx.save();
+                ctx.translate(hw-2,31);
+                const points=this.getLapisWhipPoints();
+                const colors=['#c5dbff','#9dbde9','#7193ce','#4e70ad','#354c86'];
+                const sizes=[10,12,15,18,22];
+                ctx.lineCap='round';
+                ctx.lineJoin='round';
+                for(let segment=1;segment<points.length;segment++){
+                    const previous=points[segment-1],point=points[segment];
+                    ctx.strokeStyle='rgba(111,151,225,.28)';
+                    ctx.shadowBlur=this.attackState==='active'?18:10;
+                    ctx.shadowColor='#79a5ff';
+                    ctx.lineWidth=this.attackState==='active'?11:8;
+                    ctx.beginPath();ctx.moveTo(previous.x,previous.y);ctx.lineTo(point.x,point.y);ctx.stroke();
+                    ctx.strokeStyle='#b9d1ff';ctx.lineWidth=3;
+                    ctx.beginPath();ctx.moveTo(previous.x,previous.y);ctx.lineTo(point.x,point.y);ctx.stroke();
+                }
+                if(this.attackState==='active'){
+                    const tip=points[5];
+                    ctx.strokeStyle='rgba(211,228,255,.48)';ctx.lineWidth=7;ctx.shadowBlur=16;
+                    ctx.beginPath();ctx.arc(0,0,Math.hypot(tip.x,tip.y),tip.angle-.48,tip.angle);ctx.stroke();
+                }
+                for(let segment=1;segment<points.length;segment++){
+                    const point=points[segment],size=sizes[segment-1];
+                    ctx.save();ctx.translate(point.x,point.y);ctx.rotate(point.angle+Date.now()*.0015*(segment%2?1:-1));
+                    ctx.fillStyle=colors[segment-1];ctx.strokeStyle='#e8f1ff';ctx.lineWidth=2;
+                    ctx.shadowBlur=segment===5?18:11;ctx.shadowColor='#7ca6ff';
+                    ctx.beginPath();ctx.moveTo(-size*.55,-size*.36);ctx.lineTo(size*.25,-size*.55);ctx.lineTo(size*.58,-size*.05);ctx.lineTo(size*.38,size*.52);ctx.lineTo(-size*.42,size*.42);ctx.closePath();ctx.fill();ctx.stroke();
+                    ctx.strokeStyle='rgba(255,255,255,.55)';ctx.lineWidth=1;
+                    ctx.beginPath();ctx.moveTo(-size*.2,-size*.25);ctx.lineTo(size*.12,0);ctx.lineTo(-size*.05,size*.25);ctx.stroke();
+                    ctx.restore();
+                }
+                ctx.shadowBlur=0;ctx.restore();
+            }
         }
         else if (this.heroName === 'Tonia') {
             ctx.save();ctx.translate(-hw+6,26);const recoil=keys[this.controls.attack]&&!this.toniaOverheated?Math.sin(Date.now()*.08)*3:0;ctx.fillStyle='#303938';ctx.fillRect(recoil,-10,70,20);ctx.fillStyle='#747f7d';ctx.fillRect(10+recoil,-15,48,10);ctx.fillRect(10+recoil,5,48,10);ctx.save();ctx.translate(63+recoil,0);ctx.rotate(this.toniaBarrelRotation);ctx.fillStyle=this.toniaHeat>70?'#e87948':'#a8b1ad';for(let i=0;i<6;i++){ctx.rotate(Math.PI/3);ctx.fillRect(0,-2,19,4);}ctx.restore();if(this.toniaOverheated||this.toniaHeat>60){ctx.fillStyle=`rgba(210,220,220,${.2+this.toniaHeat*.004})`;for(let i=0;i<3;i++){ctx.beginPath();ctx.arc(35+i*9,-22-i*6,5+i*2,0,Math.PI*2);ctx.fill();}}ctx.restore();

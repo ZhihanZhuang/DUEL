@@ -200,6 +200,26 @@ test('MORTEM builds a mixed army and marks players for Soul Harvest', () => {
     assert.equal(harness.context.game.hazards.filter(entity => entity.type === 'soul_harvest').length, 2);
 });
 
+test('MORTEM Skeleton Archer arrows deal damage without applying debuffs', () => {
+    const harness = loadBossHarness();
+    const player = makePlayer('p1', 620);
+    harness.players.push(player);
+    const boss = new harness.MortemBoss(1500, harness.context.GROUND_Y);
+    const archer = new harness.MortemSkeleton(boss, 580, 'archer');
+    harness.context.game.minions = [boss, archer];
+
+    archer.attackTimer = 0;
+    archer.update(16);
+    const arrow = harness.context.game.projectiles.at(-1);
+    assert.equal(arrow.type, 'skeleton_arrow');
+    for (let frame = 0; frame < 8 && !arrow.dead; frame++) arrow.update(16);
+
+    assert.equal(player.hp, 988);
+    assert.deepEqual(player.buffs, { slow: 0, burn: 0, dizzy: 0 });
+    assert.equal(player.vx, 0);
+    assert.equal(player.vy, 0);
+});
+
 test('boss factory maps every selectable boss to its encounter class', () => {
     const harness = loadBossHarness();
     assert.ok(harness.createBoss('abyss', 1000, harness.context.GROUND_Y) instanceof harness.AbyssBoss);
