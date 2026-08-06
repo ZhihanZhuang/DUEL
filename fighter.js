@@ -666,7 +666,6 @@ class Fighter extends Entity {
         }
         if (this.vossCopyActive) {
             this.vossCopyTimer = Math.max(0, this.vossCopyTimer - dt);
-            this.resetVossCopiedCooldowns();
             if (this.vossCopyTimer <= 0) this.endVossCopy();
         }
         if (this.heroName === 'Roka') {
@@ -1025,7 +1024,8 @@ class Fighter extends Entity {
             }
         }
 
-        if (this.superCooldown > 0 && !vossCopyWasActive) this.superCooldown -= dt;
+        // Copied Supers cool down normally; skip only the expiry frame after restoring Voss's frozen cooldown.
+        if (this.superCooldown > 0 && (!vossCopyWasActive || this.vossCopyActive)) this.superCooldown -= dt;
         if (this.stunTimer > 0) this.stunTimer -= dt;
         if (this.hunterMusketCD > 0) this.hunterMusketCD -= dt;
 
@@ -2157,7 +2157,7 @@ class Fighter extends Entity {
         this.vossCopyTimer=3000;this.vossCopyCooldown=7500;this.vossCopyActive=true;
         this.heroName=copiedHero;this.superCooldown=0;this.superCooldownMax=HEROES[copiedHero].superCD;
         this.attackState='idle';this.stateTimer=0;this.maxStateTimer=0;
-        this.resetVossCopiedCooldowns();
+        this.initializeVossCopiedCooldowns();
         for(let i=0;i<22;i++)game.particles.push(new Particle(this.x+this.w/2,this.y+this.h/2,i%2?'#c9b8ff':'#8be9ff',(Math.random()-.5)*12,(Math.random()-.5)*12,420,4));
         return true;
     }
@@ -2174,7 +2174,7 @@ class Fighter extends Entity {
         }
     }
 
-    resetVossCopiedCooldowns() {
+    initializeVossCopiedCooldowns() {
         if(!this.vossCopyActive)return;
         this.superCooldown=0;
         for(const key of Object.keys(this)){

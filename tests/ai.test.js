@@ -2522,8 +2522,8 @@ test('Voss gains the opponent kit for three seconds while her own cooldowns stay
 
     ai.hunterMusketCD = 1000;
     ai.update(984);
-    assert.equal(ai.hunterMusketCD, 0);
-    assert.equal(ai.superCooldown, 0);
+    assert.equal(ai.hunterMusketCD, 16, 'copied Basic Attack cooldown was reset during the copy interval');
+    assert.equal(ai.superCooldown, ai.superCooldownMax - 984, 'copied Super cooldown was reset during the copy interval');
     assert.equal(ai.vossCopyCooldown, 7500);
     assert.equal(ai.vossOwnSuperCooldown, 5000);
 
