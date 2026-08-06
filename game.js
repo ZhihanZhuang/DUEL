@@ -626,6 +626,9 @@ class Game {
         } else if (this.p1.heroName === 'Raigo') {
             document.getElementById('p1-horse-hp').style.width = `${Math.max(0, this.p1.raigoEnergy)}%`;
             document.getElementById('p1-horse-hp').style.background = this.p1.raigoEnergy >= 100 ? '#ffd84d' : '#58e6ff';
+        } else if (this.p1.heroName === 'Tonia') {
+            document.getElementById('p1-horse-hp').style.width = `${Math.max(0, this.p1.toniaHeat)}%`;
+            document.getElementById('p1-horse-hp').style.background = this.p1.toniaOverheated ? '#ff3d35' : '#f0a34a';
         }
 
         let p1Sup = 100 - (this.p1.superCooldown / this.p1.superCooldownMax) * 100;
@@ -753,6 +756,9 @@ class Game {
         if (this.p1.heroName === 'Voss' || this.p1.vossCopyActive) p1Stat += `${this.p1.vossCopyActive?`[COPIED: ${this.p1.vossCopiedHero} ${(this.p1.vossCopyTimer/1000).toFixed(1)}s] `:''}${this.p1.vossCopyCooldown>0?`[COPY ${(this.p1.vossCopyCooldown/1000).toFixed(1)}s]`:'[COPY READY]'}${this.p1.vossDouble&&!this.p1.vossDouble.dead?' [DOUBLE]':''}`;
         if (this.p1.heroName === 'Raigo') p1Stat += `[ENERGY: ${Math.floor(this.p1.raigoEnergy)}/100]${this.p1.raigoEnergy>=100?' [THUNDER STRIKE]':''}${this.p1.raigoArmorTimer>0?` [GOLDEN ARMOR ${(this.p1.raigoArmorTimer/1000).toFixed(1)}s]`:''}`;
         if (this.p1.heroName === 'Gelann') p1Stat += this.p1.gelannBreathCooldown>0?`[FLAME ${(this.p1.gelannBreathCooldown/1000).toFixed(1)}s]`:'[FLAME READY]';
+        if (this.p1.heroName === 'Dogel') p1Stat += `${this.p1.attackState==='dogel_charging'?`[SPIN ${Math.round(this.p1.dogelCharge/this.p1.dogelChargeMax*100)}%] `:''}${this.p1.dogelReaperTimer>0?`[BLOOD REAPER ${(this.p1.dogelReaperTimer/1000).toFixed(1)}s] `:''}${this.p1.dogelChainCooldown>0?`[CHAIN ${(this.p1.dogelChainCooldown/1000).toFixed(1)}s]`:'[CHAIN READY]'}`;
+        if (this.p1.heroName === 'Lapis') p1Stat += `[STONES ${this.p1.lapisStoneAvailable.filter(Boolean).length}/5] ${this.p1.lapisWhipTimer>0?`[STONE WHIP ${(this.p1.lapisWhipTimer/1000).toFixed(1)}s]`:this.p1.lapisJudgmentCooldown>0?`[JUDGMENT ${(this.p1.lapisJudgmentCooldown/1000).toFixed(1)}s]`:'[JUDGMENT READY]'}`;
+        if (this.p1.heroName === 'Tonia') p1Stat += `[HEAT ${Math.round(this.p1.toniaHeat)}%] ${this.p1.toniaOverheated?'[OVERHEATED]':this.p1.toniaGrenadeCooldown>0?`[GRENADES ${(this.p1.toniaGrenadeCooldown/1000).toFixed(1)}s]`:'[GRENADES READY]'}`;
 
         if (this.p1.buffs.poison > 0) p1Stat += " [POISONED]";
         if (this.p1.buffs.burn > 0) p1Stat += " [BURN]";
@@ -774,6 +780,9 @@ class Game {
         } else if (this.p2.heroName === 'Raigo') {
             document.getElementById('p2-horse-hp').style.width = `${Math.max(0, this.p2.raigoEnergy)}%`;
             document.getElementById('p2-horse-hp').style.background = this.p2.raigoEnergy >= 100 ? '#ffd84d' : '#58e6ff';
+        } else if (this.p2.heroName === 'Tonia') {
+            document.getElementById('p2-horse-hp').style.width = `${Math.max(0, this.p2.toniaHeat)}%`;
+            document.getElementById('p2-horse-hp').style.background = this.p2.toniaOverheated ? '#ff3d35' : '#f0a34a';
         }
 
         let p2Sup = 100 - (this.p2.superCooldown / this.p2.superCooldownMax) * 100;
@@ -901,6 +910,9 @@ class Game {
         if (this.p2.heroName === 'Voss' || this.p2.vossCopyActive) p2Stat += `${this.p2.vossCopyActive?`[COPIED: ${this.p2.vossCopiedHero} ${(this.p2.vossCopyTimer/1000).toFixed(1)}s] `:''}${this.p2.vossCopyCooldown>0?`[COPY ${(this.p2.vossCopyCooldown/1000).toFixed(1)}s]`:'[COPY READY]'}${this.p2.vossDouble&&!this.p2.vossDouble.dead?' [DOUBLE]':''}`;
         if (this.p2.heroName === 'Raigo') p2Stat += `[ENERGY: ${Math.floor(this.p2.raigoEnergy)}/100]${this.p2.raigoEnergy>=100?' [THUNDER STRIKE]':''}${this.p2.raigoArmorTimer>0?` [GOLDEN ARMOR ${(this.p2.raigoArmorTimer/1000).toFixed(1)}s]`:''}`;
         if (this.p2.heroName === 'Gelann') p2Stat += this.p2.gelannBreathCooldown>0?`[FLAME ${(this.p2.gelannBreathCooldown/1000).toFixed(1)}s]`:'[FLAME READY]';
+        if (this.p2.heroName === 'Dogel') p2Stat += `${this.p2.attackState==='dogel_charging'?`[SPIN ${Math.round(this.p2.dogelCharge/this.p2.dogelChargeMax*100)}%] `:''}${this.p2.dogelReaperTimer>0?`[BLOOD REAPER ${(this.p2.dogelReaperTimer/1000).toFixed(1)}s] `:''}${this.p2.dogelChainCooldown>0?`[CHAIN ${(this.p2.dogelChainCooldown/1000).toFixed(1)}s]`:'[CHAIN READY]'}`;
+        if (this.p2.heroName === 'Lapis') p2Stat += `[STONES ${this.p2.lapisStoneAvailable.filter(Boolean).length}/5] ${this.p2.lapisWhipTimer>0?`[STONE WHIP ${(this.p2.lapisWhipTimer/1000).toFixed(1)}s]`:this.p2.lapisJudgmentCooldown>0?`[JUDGMENT ${(this.p2.lapisJudgmentCooldown/1000).toFixed(1)}s]`:'[JUDGMENT READY]'}`;
+        if (this.p2.heroName === 'Tonia') p2Stat += `[HEAT ${Math.round(this.p2.toniaHeat)}%] ${this.p2.toniaOverheated?'[OVERHEATED]':this.p2.toniaGrenadeCooldown>0?`[GRENADES ${(this.p2.toniaGrenadeCooldown/1000).toFixed(1)}s]`:'[GRENADES READY]'}`;
 
         if (this.p2.buffs.poison > 0) p2Stat += " [POISONED]";
         if (this.p2.buffs.burn > 0) p2Stat += " [BURN]";
@@ -1337,13 +1349,14 @@ class Game {
             this.screenShakeTimer = Math.max(0, this.screenShakeTimer - dt);
             if (this.screenShakeTimer <= 0) this.screenShakeMagnitude = 0;
         }
-        this.getFighters().forEach(fighter => fighter.update(dt));
+        const timeStopped = this.boss?.type === 'boss_chronos' && this.boss.timeStopTimer > 0;
+        if (!timeStopped) this.getFighters().forEach(fighter => fighter.update(dt));
         if (this.hurricane && !this.hurricane.dead) this.hurricane.update(dt);
 
-        this.minions.forEach(m => m.update(dt));
-        this.projectiles.forEach(p => p.update(dt));
+        this.minions.forEach(m => { if (!timeStopped || m === this.boss) m.update(dt); });
+        if (!timeStopped) this.projectiles.forEach(p => p.update(dt));
         this.particles.forEach(p => p.update(dt));
-        this.hazards.forEach(h => h.update(dt));
+        if (!timeStopped) this.hazards.forEach(h => h.update(dt));
 
         this.minions = this.minions.filter(m => !m.dead);
         this.projectiles = this.projectiles.filter(p => !p.dead);

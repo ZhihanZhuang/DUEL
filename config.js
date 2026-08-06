@@ -214,6 +214,18 @@ var BOSSES = {
     libertus: {
         name: 'LIBERTUS', title: 'Titan Knight', color: '#e8d39c', maxHp: 8500,
         summary: 'Colossal Swing / Knight Legion'
+    },
+    abyss: {
+        name: 'ABYSS', title: 'The Leviathan', color: '#2aa8b8', maxHp: 8800,
+        summary: 'Abyssal Bite / Tidal Wave / Drowning'
+    },
+    chronos: {
+        name: 'CHRONOS', title: 'The Time Golem', color: '#d2b35c', maxHp: 8200,
+        summary: 'Time Hammer / Time Stop / Rewind'
+    },
+    mortem: {
+        name: 'MORTEM', title: 'Necromancer King', color: '#9a5ec4', maxHp: 8400,
+        summary: 'Death Cleave / Undead Army / Soul Harvest'
     }
 };
 
@@ -384,6 +396,21 @@ var HEROES = {
         name: "Gelann", desc: "Flameblade Archer",
         color: "#b6422b", maxHp: 750, speed: 6.1, jump: 15.5, width: 40, height: 70, superCD: 24000,
         ui: { hp: "75 WRD", atk: "2 WRD (Fast Scimitar)", passive: "<span class='skill-tag'>Flame Breath</span> Press [Switch] for a short wind-up, then breathe a close cone of fire for 1.5 WRD. The flame burns for 2s and slows enemies while they remain inside (6s CD).", super: "<span class='skill-tag'>Rain of Arrows</span> Telegraphs a large target area, then rains arrows for 2.5s. The full volley deals 6 WRD per target and refreshes a 45% slow for 2s." }
+    },
+    Dogel: {
+        name: "Dogel", desc: "Chain Reaper",
+        color: "#7c2538", maxHp: 800, speed: 5.8, jump: 15, width: 42, height: 72, superCD: 26000,
+        ui: { hp: "80 WRD", atk: "2-5 WRD (Charged Kusarigama)", passive: "<span class='skill-tag'>Chain Pull</span> Hold Attack while moving to spin and enlarge the kusarigama, then release for up to 5 WRD, Bleed, and Slow. Press [Switch] to hook and pull an enemy to Dogel (7s CD).", super: "<span class='skill-tag'>Blood Reaper</span> For 10s, gain 40% attack speed, 20% movement speed, larger attacks, and 25% lifesteal from actual damage dealt." }
+    },
+    Lapis: {
+        name: "Lapis", desc: "The Five Stones",
+        color: "#4066b1", maxHp: 650, speed: 5.2, jump: 14.5, width: 40, height: 68, superCD: 24000,
+        ui: { hp: "65 WRD", atk: "1.5-5 WRD (Random Arcane Stone)", passive: "Five differently sized stones always orbit Lapis. Basic Attack raises and launches a random available stone. Press [Switch] for Fivefold Judgment, converging all five stones on one enemy (8s CD).", super: "<span class='skill-tag'>Stone Whip</span> Connects all five stones for 9s, granting rapid extended melee attacks, stronger knockback, and 20% lifesteal." }
+    },
+    Tonia: {
+        name: "Tonia", desc: "The Iron Rain",
+        color: "#61706e", maxHp: 700, speed: 4.9, jump: 14, width: 44, height: 70, superCD: 25000,
+        ui: { hp: "70 WRD", atk: "0.25 WRD (Held Gatling Fire)", passive: "Hold Attack for rapid suppressive fire. Each bullet builds Heat; at 100 Heat the gun overheats and cannot fire until it cools. Press [Switch] to launch six arcing 1.5 WRD grenades (7s CD).", super: "<span class='skill-tag'>Missile Salvo</span> Clears all Heat and launches three 4 WRD explosive missiles that track for 1.5s before flying straight." }
     }
 };
 

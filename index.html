@@ -496,7 +496,9 @@
         }
 
         .boss-mode-panel {
+            box-sizing: border-box;
             width: min(900px, 92vw);
+            max-width: 100%;
             display: grid;
             gap: 20px;
         }
@@ -806,7 +808,9 @@
             }
 
             #boss-mode-screen {
+                box-sizing: border-box;
                 overflow-y: auto;
+                overflow-x: hidden;
                 justify-content: flex-start;
                 padding: 20px 10px;
             }
@@ -981,6 +985,9 @@
             <button type="button" class="boss-option selected" data-boss-id="tyrannt" aria-pressed="true"><strong>TYRANNT</strong><span>Drone Overlord<br>900 WRD</span></button>
             <button type="button" class="boss-option" data-boss-id="dragon" aria-pressed="false"><strong>DRAGON</strong><span>Infernal Sky Tyrant<br>750 WRD</span></button>
             <button type="button" class="boss-option" data-boss-id="libertus" aria-pressed="false"><strong>LIBERTUS</strong><span>Titan Knight<br>850 WRD</span></button>
+            <button type="button" class="boss-option" data-boss-id="abyss" aria-pressed="false"><strong>ABYSS</strong><span>The Leviathan<br>880 WRD</span></button>
+            <button type="button" class="boss-option" data-boss-id="chronos" aria-pressed="false"><strong>CHRONOS</strong><span>The Time Golem<br>820 WRD</span></button>
+            <button type="button" class="boss-option" data-boss-id="mortem" aria-pressed="false"><strong>MORTEM</strong><span>Necromancer King<br>840 WRD</span></button>
         </div>
         <div class="boss-mode-actions">
             <button id="btn-boss-start" type="button" style="background:#6b1010; border-color:#ffd93d">Start Fight</button>

@@ -213,6 +213,26 @@ class Fighter extends Entity {
             this.gelannBreathWindup = 0;
             this.gelannBreathTimer = 0;
         }
+        if (this.heroName === 'Dogel') {
+            this.dogelChainCooldown = 0; this.dogelCharge = 0; this.dogelChargeMax = 1600;
+            this.dogelChargedDamage = 20; this.dogelReaperTimer = 0;
+        }
+        if (this.heroName === 'Lapis') {
+            this.lapisStoneAvailable = [true,true,true,true,true]; this.lapisStoneSerial = 0;
+            this.lapisStoneInFlight = [0,0,0,0,0];
+            this.lapisJudgmentCooldown = 0; this.lapisWhipTimer = 0;
+        }
+        if (this.heroName === 'Tonia') {
+            this.toniaHeat = 0; this.toniaOverheated = false; this.toniaFireTimer = 0;
+            this.toniaGrenadeCooldown = 0; this.toniaBarrelRotation = 0;
+        }
+    }
+
+    heal(amount) {
+        const multiplier = (this.buffs?.curse || 0) > 0 ? 0.5 : 1;
+        const before = this.hp;
+        this.hp = Math.min(this.maxHp, this.hp + Math.max(0, amount || 0) * multiplier);
+        return this.hp - before;
     }
 
     takeDamage(amt, attacker, isDoT = false, noKnockback = false, noHitReaction = false) {
@@ -493,7 +513,7 @@ class Fighter extends Entity {
             target.takeDamage(5, this, true, true);
             const healthAfter = drainsHorse ? target.horseHp : target.hp;
             const stolen = Math.max(0, healthBefore - healthAfter);
-            this.hp = Math.min(this.maxHp, this.hp + stolen);
+            this.heal(stolen);
             for (let i = 0; i < 4; i++) {
                 game.particles.push(new Particle(target.x + target.w/2, target.y + target.h/2, '#ffffff', (Math.random()-0.5)*5, (Math.random()-0.5)*5, 220, 3));
             }
@@ -678,6 +698,29 @@ class Fighter extends Entity {
                 this.gelannBreathTimer = Math.max(0, this.gelannBreathTimer - dt);
             }
         }
+        if (this.heroName === 'Dogel') {
+            this.dogelChainCooldown = Math.max(0, this.dogelChainCooldown - dt);
+            this.dogelReaperTimer = Math.max(0, this.dogelReaperTimer - dt);
+            if (this.attackState === 'dogel_charging') {
+                this.dogelCharge = Math.min(this.dogelChargeMax, this.dogelCharge + dt);
+                this.stateTimer = this.dogelCharge;
+                this.maxStateTimer = this.dogelChargeMax;
+                if (!keys[this.controls.attack] || this.dogelCharge >= this.dogelChargeMax) this.releaseDogelCharge();
+            }
+        }
+        if (this.heroName === 'Lapis') {
+            this.lapisJudgmentCooldown = Math.max(0, this.lapisJudgmentCooldown - dt);
+            this.lapisWhipTimer = Math.max(0, this.lapisWhipTimer - dt);
+        }
+        if (this.heroName === 'Tonia') {
+            this.toniaGrenadeCooldown = Math.max(0, this.toniaGrenadeCooldown - dt);
+            this.toniaFireTimer = Math.max(0, this.toniaFireTimer - dt);
+            const firing = keys[this.controls.attack] && this.stunTimer <= 0 && this.buffs.dizzy <= 0 && !this.toniaOverheated;
+            if (firing && this.toniaFireTimer <= 0) this.fireToniaBullet();
+            else if (!firing) this.toniaHeat = Math.max(0, this.toniaHeat - dt * (this.toniaOverheated ? .045 : .026));
+            if (this.toniaOverheated && this.toniaHeat <= 35) this.toniaOverheated = false;
+            this.toniaBarrelRotation += dt * (.006 + this.toniaHeat * .00018);
+        }
 
         if (this.heroName === 'Archor') {
             if (this.archorSpeedCooldown > 0) this.archorSpeedCooldown = Math.max(0, this.archorSpeedCooldown - dt);
@@ -786,8 +829,9 @@ class Fighter extends Entity {
         const isUkonUltimateLocked = this.heroName === 'Ukon' && !!this.ukonUltimatePhase;
         const isMoriGrappling = this.heroName === 'Mori' && this.moriGrappleTimer > 0;
         const isRaigoCharging = this.heroName === 'Raigo' && this.raigoChargeTimer > 0;
-        let canAct = (this.stunTimer <= 0 && this.buffs.dizzy <= 0 && this.grapplePhase !== 1 && this.superWindupTimer <= 0 && this.euclidSwitchTimer <= 0 && !(this.itanSuperWindupTimer > 0) && !(this.veyraReversalTimer > 0) && !(this.axeronRushTimer > 0) && !(this.gelannBreathWindup > 0) && !isKilaSwitching && !isSolaForceLocked && !isSolaCharging && !isUkonBursting && !isUkonUltimateLocked && !isMoriGrappling && !isRaigoCharging);
-        let canMoveAndAttack = canAct && !hasPuppet;
+        const isDogelCharging = this.heroName === 'Dogel' && this.attackState === 'dogel_charging';
+        let canAct = (this.stunTimer <= 0 && this.buffs.dizzy <= 0 && this.grapplePhase !== 1 && this.superWindupTimer <= 0 && this.euclidSwitchTimer <= 0 && !(this.itanSuperWindupTimer > 0) && !(this.veyraReversalTimer > 0) && !(this.axeronRushTimer > 0) && !(this.gelannBreathWindup > 0) && !isKilaSwitching && !isSolaForceLocked && !isSolaCharging && !isUkonBursting && !isUkonUltimateLocked && !isMoriGrappling && !isRaigoCharging && !isDogelCharging);
+        let canMoveAndAttack = (canAct || isDogelCharging) && !hasPuppet;
 
         if (this.heroName === 'Gensan') {
             if (this.gensanSwitchCD > 0) this.gensanSwitchCD -= dt;
@@ -887,6 +931,7 @@ class Fighter extends Entity {
         if (this.buffs.msBoost > 0) currentSpeed *= (this.heroName === 'Wolf' ? 1.3 : 1.2);
         if (this.heroName === 'Itan' && this.buffs.nuMode > 0) currentSpeed *= 1.35;
         if (this.heroName === 'Gelann' && this.gelannBreathTimer > 0) currentSpeed *= 0.35;
+        if (this.heroName === 'Dogel' && this.dogelReaperTimer > 0) currentSpeed *= 1.2;
 
         if (this.buffs.dizzy > 0) {
             this.buffs.dizzy -= dt;
@@ -912,6 +957,7 @@ class Fighter extends Entity {
             this.buffs.gelannArrowSlow = Math.max(0, this.buffs.gelannArrowSlow - dt);
             slowMultiplier = Math.min(slowMultiplier, 0.55);
         }
+        if (this.buffs.curse > 0) this.buffs.curse = Math.max(0, this.buffs.curse - dt);
         currentSpeed *= slowMultiplier;
         if (this.buffs.burn > 0) {
             this.buffs.burn -= dt;
@@ -1214,6 +1260,8 @@ class Fighter extends Entity {
                         if (this.heroName === 'Veyra') activeTime = 90;
                         if (this.heroName === 'Brom') activeTime = 130;
                         if (this.heroName === 'Axeron') activeTime = 120;
+                        if (this.heroName === 'Dogel') activeTime = this.dogelReaperTimer > 0 ? 90 : 130;
+                        if (this.heroName === 'Lapis') activeTime = this.lapisWhipTimer > 0 ? 95 : 80;
 
                         this.attackState = 'active';
                         this.stateTimer = activeTime;
@@ -1231,6 +1279,8 @@ class Fighter extends Entity {
                         if (!enemy.untargetable && checkAABB(hitBox, enemy)) {
                             const hpBefore = Number.isFinite(enemy.hp) ? enemy.hp : null;
                             enemy.takeDamage(this.getMeleeDamage(), this);
+                            const actualDamage = hpBefore === null ? this.getMeleeDamage() : Math.max(0, hpBefore - Math.max(0, enemy.hp));
+                            if ((this.heroName === 'Dogel' && this.dogelReaperTimer > 0) || (this.heroName === 'Lapis' && this.lapisWhipTimer > 0)) this.heal(actualDamage * (this.heroName === 'Dogel' ? .25 : .2));
                             if (this.heroName === 'Raigo') this.onRaigoBasicHit(enemy, hpBefore === null ? this.getMeleeDamage() : Math.max(0, hpBefore - Math.max(0, enemy.hp)));
                             targetsHit.push(enemy);
                         }
@@ -1239,6 +1289,8 @@ class Fighter extends Entity {
                         if (m && !m.isBoss && m.owner !== this && !m.dead && !m.untargetable && checkAABB(hitBox, m)) {
                             const hpBefore = Number.isFinite(m.hp) ? m.hp : null;
                             m.takeDamage(this.getMeleeDamage(), this);
+                            const actualDamage = hpBefore === null ? this.getMeleeDamage() : Math.max(0, hpBefore - Math.max(0, m.hp));
+                            if ((this.heroName === 'Dogel' && this.dogelReaperTimer > 0) || (this.heroName === 'Lapis' && this.lapisWhipTimer > 0)) this.heal(actualDamage * (this.heroName === 'Dogel' ? .25 : .2));
                             if (this.heroName === 'Raigo') this.onRaigoBasicHit(m, hpBefore === null ? this.getMeleeDamage() : Math.max(0, hpBefore - Math.max(0, m.hp)));
                             targetsHit.push(m);
                         }
@@ -1251,9 +1303,10 @@ class Fighter extends Entity {
                             if (this.heroName === 'Macu' && this.buffs.battleCry > 0 && t.buffs) t.buffs.poison = 3000;
                             if (this.heroName === 'Duke' && this.isMounted && t.buffs) t.buffs.dizzy = 3000;
                             if (this.heroName === 'Gelann' && t.buffs) t.buffs.dizzy = Math.max(t.buffs.dizzy || 0, 140);
+                            if (this.heroName === 'Dogel' && t.buffs) { t.buffs.bleed = Math.max(t.buffs.bleed || 0, this.dogelReaperTimer > 0 ? 4200 : 3000); t.buffs.slow = Math.max(t.buffs.slow || 0, 850); }
 
                             if (this.heroName === 'Lique' && this.buffs.bloodFrenzy > 0 && t.heroName) {
-                                this.hp = Math.min(this.maxHp, this.hp + 5);
+                                this.heal(5);
                                 for(let i=0; i<5; i++) game.particles.push(new Particle(this.x + Math.random()*this.w, this.y + Math.random()*this.h, "#ff0000", 0, -2, 300, 3));
                             }
 
@@ -1320,7 +1373,7 @@ class Fighter extends Entity {
                         }
 
                         if (this.heroName === 'Duke' && !this.isMounted) {
-                            this.hp = Math.min(this.maxHp, this.hp + 15);
+                            this.heal(15);
                             for(let i=0; i<8; i++) game.particles.push(new Particle(this.x + Math.random()*this.w, this.y + Math.random()*this.h, "#32CD32", 0, -Math.random()*4, 500, 5));
                         }
                     }
@@ -1352,6 +1405,8 @@ class Fighter extends Entity {
                     if (this.heroName === 'Voss') recTime = 210;
                     if (this.heroName === 'Raigo') recTime = 115;
                     if (this.heroName === 'Gelann') recTime = 130;
+                    if (this.heroName === 'Dogel') recTime = this.dogelReaperTimer > 0 ? 150 : 330;
+                    if (this.heroName === 'Lapis') recTime = this.lapisWhipTimer > 0 ? 115 : 260;
 
                     this.attackState = 'recovery';
                     this.stateTimer = recTime;
@@ -1518,6 +1573,12 @@ class Fighter extends Entity {
                     this.startRaigoCharge();
                 } else if (this.heroName === 'Gelann' && this.attackState === 'idle') {
                     this.startGelannFlameBreath();
+                } else if (this.heroName === 'Dogel' && this.attackState === 'idle') {
+                    this.fireDogelChain();
+                } else if (this.heroName === 'Lapis' && this.attackState === 'idle') {
+                    this.fireLapisJudgment();
+                } else if (this.heroName === 'Tonia' && this.attackState === 'idle') {
+                    this.fireToniaGrenades();
                 }
             }
             if (mirrorCopiedSwitch) {
@@ -1597,8 +1658,57 @@ class Fighter extends Entity {
         this.applySolaForceFallDamage();
     }
 
+    getLapisOrbitPosition(index) {
+        const angle = Date.now() * .0014 + index * Math.PI * 2 / 5;
+        const radius = 48 + (index % 2) * 10;
+        return { x: this.x + this.w/2 + Math.cos(angle)*radius, y: this.y + this.h/2 + Math.sin(angle)*30 };
+    }
+
+    releaseDogelCharge() {
+        if (this.heroName !== 'Dogel' || this.attackState !== 'dogel_charging') return;
+        const ratio = Math.min(1, this.dogelCharge / this.dogelChargeMax);
+        this.dogelChargedDamage = 20 + ratio * 30;
+        this.attackState = 'windup'; this.stateTimer = this.dogelReaperTimer > 0 ? 45 : 80; this.maxStateTimer = this.stateTimer;
+        this.hasHit = false;
+    }
+
+    fireDogelChain() {
+        if (this.dogelChainCooldown > 0) return false;
+        const target = this.aiCombatTarget && !this.aiCombatTarget.dead ? this.aiCombatTarget : game.getEnemyOf(this);
+        this.dogelChainCooldown = 7000; game.projectiles.push(new DogelChainHook(this,target));
+        return true;
+    }
+
+    fireLapisJudgment() {
+        if (this.lapisJudgmentCooldown > 0) return false;
+        const target = this.aiCombatTarget && !this.aiCombatTarget.dead ? this.aiCombatTarget : game.getEnemyOf(this);
+        if (!target) return false;
+        this.lapisJudgmentCooldown = 8000;
+        for(let index=0;index<5;index++)game.projectiles.push(new LapisStone(this,index,target,true));
+        return true;
+    }
+
+    fireToniaBullet() {
+        if (this.toniaOverheated || this.toniaHeat >= 100) return false;
+        const target=this.aiCombatTarget&&!this.aiCombatTarget.dead?this.aiCombatTarget:game.getEnemyOf(this);
+        const px=this.facing>0?this.x+this.w:this.x-8,py=this.y+27;
+        const tx=target?target.x+target.w/2:px+this.facing*500,ty=target?target.y+target.h/2:py;
+        const spread=(Math.random()-.5)*(.05+this.toniaHeat*.0007),angle=Math.atan2(ty-py,tx-px)+spread;
+        game.projectiles.push(new Projectile(px,py,9,3,Math.cos(angle)*22,Math.sin(angle)*22,2.5,this,'#ffe8a3','bullet'));
+        this.toniaHeat=Math.min(100,this.toniaHeat+3.2);this.toniaFireTimer=75;this.facing=Math.cos(angle)>=0?1:-1;
+        if(this.toniaHeat>=100){this.toniaHeat=100;this.toniaOverheated=true;}
+        window.audioManager?.playAttack(this);return true;
+    }
+
+    fireToniaGrenades() {
+        if(this.toniaGrenadeCooldown>0)return false;this.toniaGrenadeCooldown=7000;
+        for(let i=0;i<6;i++){const direction=this.facing;game.projectiles.push(new ToniaGrenade(this,direction*(7.2+i*.85),-11.5-i*.65));}
+        return true;
+    }
+
     isMeleeAttack() {
-        if (this.heroName === 'Hason' || this.heroName === 'Willi' || this.heroName === 'Ugo' || this.heroName === 'Kila' || this.heroName === 'Volt' || this.heroName === 'Noae' || this.heroName === 'Kuro' || this.heroName === 'Nyra' || this.heroName === 'Archor' || this.heroName === 'D2F1' || this.heroName === 'Veyra' || this.heroName === 'Brom' || this.heroName === 'Mori' || this.heroName === 'Roka') return false;
+        if (this.heroName === 'Lapis') return this.lapisWhipTimer > 0;
+        if (this.heroName === 'Hason' || this.heroName === 'Willi' || this.heroName === 'Ugo' || this.heroName === 'Kila' || this.heroName === 'Volt' || this.heroName === 'Noae' || this.heroName === 'Kuro' || this.heroName === 'Nyra' || this.heroName === 'Archor' || this.heroName === 'D2F1' || this.heroName === 'Veyra' || this.heroName === 'Brom' || this.heroName === 'Mori' || this.heroName === 'Roka' || this.heroName === 'Tonia') return false;
         if (this.heroName === 'Voss') return this.vossCopyTimer > 0 && this.vossCopiedMelee;
         if (this.heroName === 'Laegon') return this.thunderGodTimer > 0;
         if (this.heroName === 'Euclid' && this.euclidWeapon === 'magic') return false;
@@ -1625,6 +1735,8 @@ class Fighter extends Entity {
         if (this.heroName === 'Voss') { range = 78; yOffset = 2; h = 58; }
         if (this.heroName === 'Raigo') { range = 92; yOffset = -3; h = 68; }
         if (this.heroName === 'Gelann') { range = 74; yOffset = 3; h = 58; }
+        if (this.heroName === 'Dogel') { const charge=Math.min(1,(this.dogelCharge||0)/this.dogelChargeMax); range=105+charge*75+(this.dogelReaperTimer>0?22:0); yOffset=-42-charge*22; h=145+charge*44; }
+        if (this.heroName === 'Lapis' && this.lapisWhipTimer > 0) { range=165; yOffset=-35; h=135; }
 
         if (this.heroName === 'Macu') {
             range = 110;
@@ -1661,6 +1773,8 @@ class Fighter extends Entity {
             return this.raigoArmorTimer > 0 ? damage * 1.5 : damage;
         }
         if (this.heroName === 'Gelann') return 20;
+        if (this.heroName === 'Dogel') return this.dogelChargedDamage || 20;
+        if (this.heroName === 'Lapis' && this.lapisWhipTimer > 0) return 24;
         return 13;
     }
 
@@ -1692,6 +1806,11 @@ class Fighter extends Entity {
             this.startUkonRodCharge();
             return;
         }
+        if (this.heroName === 'Dogel') {
+            this.attackState='dogel_charging';this.dogelCharge=0;this.stateTimer=0;this.maxStateTimer=this.dogelChargeMax;this.hasHit=false;
+            return;
+        }
+        if (this.heroName === 'Tonia') { this.fireToniaBullet(); return; }
         if (this.heroName === 'Raigo') {
             this.raigoEmpoweredAttack = this.raigoEnergy >= this.raigoMaxEnergy;
             if (this.raigoEmpoweredAttack) this.raigoEnergy = 0;
@@ -1727,6 +1846,7 @@ class Fighter extends Entity {
         if (this.heroName === 'Voss') this.stateTimer = this.vossCopyTimer > 0 ? 90 : 120;
         if (this.heroName === 'Raigo') this.stateTimer = 70;
         if (this.heroName === 'Gelann') this.stateTimer = 70;
+        if (this.heroName === 'Lapis') this.stateTimer = this.lapisWhipTimer > 0 ? 45 : 180;
         if (this.heroName === 'Wolf') {
             this.stateTimer = 50;
             this.wolfPassiveReady = this.wolfAttackTimer >= 1500;
@@ -1772,6 +1892,12 @@ class Fighter extends Entity {
             return;
         }
 
+        if (this.heroName === 'Lapis' && this.lapisWhipTimer <= 0) {
+            const available=this.lapisStoneAvailable.map((ready,index)=>ready?index:-1).filter(index=>index>=0);
+            if(available.length){const index=available[Math.floor(Math.random()*available.length)];game.projectiles.push(new LapisStone(this,index,target));}
+            return;
+        }
+
         if (this.heroName === 'Hason') {
             this.hasonAmmo--;
             this.timeSinceLastDamage = 0;
@@ -1781,7 +1907,7 @@ class Fighter extends Entity {
         }
         else if (this.heroName === 'Willi') {
             if (this.williHealBuffTimer > 0) {
-                this.hp = Math.min(this.maxHp, this.hp + 10);
+                this.heal(10);
                 for(let i=0; i<5; i++) game.particles.push(new Particle(this.x + Math.random()*this.w, this.y + Math.random()*this.h, "#32CD32", 0, -2, 300, 4));
             }
 
@@ -2010,7 +2136,7 @@ class Fighter extends Entity {
 
     healRaigoFromDamage(actualDamage) {
         if(this.heroName!=='Raigo'||this.raigoArmorTimer<=0||actualDamage<=0)return;
-        const healing=actualDamage*.25;this.hp=Math.min(this.maxHp,this.hp+healing);
+        const healing=actualDamage*.25;this.heal(healing);
         for(let i=0;i<5;i++)game.particles.push(new Particle(this.x+Math.random()*this.w,this.y+Math.random()*this.h,'#fff3a6',0,-2-Math.random()*3,300,3));
     }
 
@@ -2496,7 +2622,7 @@ class Fighter extends Entity {
         const historicalHp = old?.hp ?? this.hp;
         this.x = Math.max(0, Math.min(CANVAS_W - this.w, destination.x - (recentAnchor ? this.w/2 : 0)));
         this.y = Math.max(0, Math.min(GROUND_Y - this.h, destination.y - (recentAnchor ? this.h/2 : 0)));
-        this.hp = Math.min(this.maxHp, this.hp + Math.max(0, historicalHp - this.hp) * 0.5);
+        this.heal(Math.max(0, historicalHp - this.hp) * 0.5);
         this.vx = 0; this.vy = 0; this.attackState = 'idle';
         for (let i=0; i<28; i++) game.particles.push(new Particle(this.x+this.w/2, this.y+this.h/2, '#b78aff', (Math.random()-0.5)*15, (Math.random()-0.5)*15, 500, 5));
     }
@@ -2504,7 +2630,7 @@ class Fighter extends Entity {
     onLaegonHit(target, damage, hammer = false) {
         if (!target) return;
         if (hammer && this.thunderGodTimer > 0) {
-            this.hp = Math.min(this.maxHp, this.hp + damage * 0.2 * (target.heroName ? 1 : 0.5));
+            this.heal(damage * 0.2 * (target.heroName ? 1 : 0.5));
         }
         if (!hammer && target !== this.laegonLastHitTarget) {
             this.laegonLastHitTarget = target;
@@ -2569,7 +2695,7 @@ class Fighter extends Entity {
             this.archorHitChain = 0;
             this.archorHitChainTimer = 0;
         }
-        this.hp = Math.min(this.maxHp, this.hp + 10);
+        this.heal(10);
         this.archorDamageBonus = Math.min(this.archorDamageBonusMax, this.archorDamageBonus + 2);
         for (let i = 0; i < 7; i++) {
             game.particles.push(new Particle(this.x + Math.random()*this.w, this.y + Math.random()*this.h, '#7df0aa', 0, -2-Math.random()*2, 320, 3));
@@ -2609,6 +2735,18 @@ class Fighter extends Entity {
 
     performSuper() {
         window.audioManager?.playSkill(this, 'super');
+        if (this.heroName === 'Dogel') {
+            if(this.superCooldown<=0){this.superCooldown=this.superCooldownMax;this.dogelReaperTimer=10000;for(let i=0;i<32;i++)game.particles.push(new Particle(this.x+this.w/2,this.y+this.h/2,i%2?'#ff405d':'#7c2538',(Math.random()-.5)*15,(Math.random()-.5)*15,520,5));}
+            return;
+        }
+        if (this.heroName === 'Lapis') {
+            if(this.superCooldown<=0){this.superCooldown=this.superCooldownMax;this.lapisWhipTimer=9000;for(const stone of game.projectiles.filter(item=>item?.owner===this&&item.type==='lapis_stone')){if(typeof stone.finish==='function')stone.finish();else stone.dead=true;}this.lapisStoneInFlight.fill(0);this.lapisStoneAvailable.fill(true);for(let i=0;i<30;i++)game.particles.push(new Particle(this.x+this.w/2,this.y+this.h/2,i%2?'#d9e5ff':'#537dcc',(Math.random()-.5)*14,(Math.random()-.5)*14,500,5));}
+            return;
+        }
+        if (this.heroName === 'Tonia') {
+            if(this.superCooldown<=0){this.superCooldown=this.superCooldownMax;this.toniaHeat=0;this.toniaOverheated=false;const target=game.getEnemyOf(this);[-18,0,18].forEach(offset=>game.projectiles.push(new ToniaMissile(this,target,offset)));}
+            return;
+        }
         if (this.heroName === 'Gelann') {
             if (this.superCooldown <= 0) {
                 const target = game.getEnemyOf(this);
@@ -3558,6 +3696,16 @@ class Fighter extends Entity {
             ctx.save();ctx.translate(hw-4,31);let angle=.65;
             if(this.attackState==='windup')angle=.65-1.25*phaseProg;else if(this.attackState==='active')angle=-.6+2.8*phaseProg;else if(this.attackState==='recovery')angle=2.2-1.55*phaseProg;
             ctx.rotate(angle);ctx.fillStyle='#5b646a';ctx.fillRect(-3,-14,6,24);ctx.fillStyle='#ffd166';ctx.beginPath();ctx.moveTo(0,-12);ctx.arc(0,-12,34,-2.7,-.44);ctx.closePath();ctx.fill();ctx.strokeStyle='#31383c';ctx.lineWidth=2;for(let rib=-2.5;rib<-.55;rib+=.38){ctx.beginPath();ctx.moveTo(0,-12);ctx.lineTo(Math.cos(rib)*32,Math.sin(rib)*32-12);ctx.stroke();}ctx.restore();
+        }
+        else if (this.heroName === 'Dogel') {
+            ctx.save();ctx.translate(0,30);const charging=this.attackState==='dogel_charging';const charge=Math.min(1,(this.dogelCharge||0)/this.dogelChargeMax);const angle=charging?Date.now()*(.01+charge*.018):(this.attackState==='active'?-1.5+phaseProg*3.8:.55);const radius=58+charge*45+(this.dogelReaperTimer>0?16:0);ctx.rotate(angle);ctx.strokeStyle=this.dogelReaperTimer>0?'#ff4b68':'#a99375';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(radius,0);ctx.stroke();ctx.fillStyle='#d9d6ca';ctx.beginPath();ctx.arc(radius,0,14,0,Math.PI*1.45);ctx.lineTo(radius,0);ctx.fill();if(charging){ctx.strokeStyle=`rgba(255,74,96,${.25+charge*.5})`;ctx.lineWidth=9;ctx.beginPath();ctx.arc(0,0,radius,0,Math.PI*2);ctx.stroke();}ctx.restore();
+        }
+        else if (this.heroName === 'Lapis') {
+            for(let i=0;i<5;i++){if(!this.lapisStoneAvailable[i])continue;const angle=Date.now()*.0014+i*Math.PI*2/5,radius=48+(i%2)*10,size=[7,9,12,15,19][i];ctx.save();ctx.translate(Math.cos(angle)*radius,35+Math.sin(angle)*30);ctx.rotate(Date.now()*.002+i);ctx.fillStyle=['#c5dbff','#9dbde9','#7193ce','#4e70ad','#354c86'][i];ctx.shadowBlur=8;ctx.shadowColor='#7ca6ff';ctx.fillRect(-size/2,-size/2,size,size);ctx.restore();}
+            if(this.lapisWhipTimer>0){ctx.save();ctx.translate(hw-2,31);const swing=this.attackState==='active'?-1.7+phaseProg*3.5:Math.sin(Date.now()*.008)*.3;ctx.rotate(swing);ctx.strokeStyle='#91b6ff';ctx.shadowBlur=12;ctx.shadowColor='#5f86dd';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(0,0);for(let i=1;i<=5;i++)ctx.lineTo(i*30,Math.sin(i*.9)*12);ctx.stroke();for(let i=1;i<=5;i++){ctx.fillStyle=['#c5dbff','#9dbde9','#7193ce','#4e70ad','#354c86'][i-1];ctx.fillRect(i*30-7,Math.sin(i*.9)*12-7,14,14);}ctx.restore();}
+        }
+        else if (this.heroName === 'Tonia') {
+            ctx.save();ctx.translate(-hw+6,26);const recoil=keys[this.controls.attack]&&!this.toniaOverheated?Math.sin(Date.now()*.08)*3:0;ctx.fillStyle='#303938';ctx.fillRect(recoil,-10,70,20);ctx.fillStyle='#747f7d';ctx.fillRect(10+recoil,-15,48,10);ctx.fillRect(10+recoil,5,48,10);ctx.save();ctx.translate(63+recoil,0);ctx.rotate(this.toniaBarrelRotation);ctx.fillStyle=this.toniaHeat>70?'#e87948':'#a8b1ad';for(let i=0;i<6;i++){ctx.rotate(Math.PI/3);ctx.fillRect(0,-2,19,4);}ctx.restore();if(this.toniaOverheated||this.toniaHeat>60){ctx.fillStyle=`rgba(210,220,220,${.2+this.toniaHeat*.004})`;for(let i=0;i<3;i++){ctx.beginPath();ctx.arc(35+i*9,-22-i*6,5+i*2,0,Math.PI*2);ctx.fill();}}ctx.restore();
         }
         else if (this.heroName === 'Gelann') {
             ctx.save();ctx.translate(hw-2,29);

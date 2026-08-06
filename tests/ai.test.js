@@ -57,7 +57,7 @@ function loadProjectileContext() {
     };
     vm.createContext(context);
     const source = fs.readFileSync(path.join(__dirname, '..', 'entities.js'), 'utf8');
-    vm.runInContext(`${source}\nwindow.Projectile = Projectile; window.KuroDecoy = KuroDecoy; window.UkonShadow = UkonShadow; window.PeachTree = PeachTree; window.GiantSword = GiantSword; window.GravityWell = GravityWell; window.ChiqPath = ChiqPath; window.D2FDrone = D2FDrone; window.D2FTargetBeacon = D2FTargetBeacon; window.D2FGiantRobot = D2FGiantRobot; window.TimeAnchor = TimeAnchor; window.TemporalEcho = TemporalEcho; window.LaegonLightning = LaegonLightning; window.LaegonHammer = LaegonHammer; window.LaegonHammerStrike = LaegonHammerStrike; window.BromBlastCharge = BromBlastCharge; window.BromStickyBomb = BromStickyBomb; window.DemolitionZone = DemolitionZone; window.TitanAxe = TitanAxe; window.MechanismNode = MechanismNode; window.MoriEnergyWire = MoriEnergyWire; window.MechanicFanBlade = MechanicFanBlade; window.MoriTrap = MoriTrap; window.ThousandMechanisms = ThousandMechanisms; window.GelannFlameCone = GelannFlameCone; window.GelannArrowRain = GelannArrowRain; window.RokaCannonball = RokaCannonball; window.RokaMortarShell = RokaMortarShell; window.TemporalBolt = TemporalBolt; window.VossTemporalDouble = VossTemporalDouble;`, context, { filename: 'entities.js' });
+    vm.runInContext(`${source}\nwindow.Projectile = Projectile; window.KuroDecoy = KuroDecoy; window.UkonShadow = UkonShadow; window.PeachTree = PeachTree; window.GiantSword = GiantSword; window.GravityWell = GravityWell; window.ChiqPath = ChiqPath; window.D2FDrone = D2FDrone; window.D2FTargetBeacon = D2FTargetBeacon; window.D2FGiantRobot = D2FGiantRobot; window.TimeAnchor = TimeAnchor; window.TemporalEcho = TemporalEcho; window.LaegonLightning = LaegonLightning; window.LaegonHammer = LaegonHammer; window.LaegonHammerStrike = LaegonHammerStrike; window.BromBlastCharge = BromBlastCharge; window.BromStickyBomb = BromStickyBomb; window.DemolitionZone = DemolitionZone; window.TitanAxe = TitanAxe; window.MechanismNode = MechanismNode; window.MoriEnergyWire = MoriEnergyWire; window.MechanicFanBlade = MechanicFanBlade; window.MoriTrap = MoriTrap; window.ThousandMechanisms = ThousandMechanisms; window.GelannFlameCone = GelannFlameCone; window.GelannArrowRain = GelannArrowRain; window.RokaCannonball = RokaCannonball; window.RokaMortarShell = RokaMortarShell; window.TemporalBolt = TemporalBolt; window.VossTemporalDouble = VossTemporalDouble; window.DogelChainHook = DogelChainHook; window.LapisStone = LapisStone; window.ToniaGrenade = ToniaGrenade; window.ToniaMissile = ToniaMissile;`, context, { filename: 'entities.js' });
     return context;
 }
 
@@ -159,10 +159,17 @@ function makeFighter(heroName, id = 'cpu') {
         raigoEnergy: 100,
         raigoArmorTimer: 0,
         gelannBreathCooldown: 0,
+        dogelChainCooldown: 0,
+        lapisJudgmentCooldown: 0,
+        lapisWhipTimer: 0,
+        toniaHeat: 0,
+        toniaGrenadeCooldown: 0,
+        toniaOverheated: false,
         isMeleeAttack() {
             if (this.heroName === 'Laegon') return this.thunderGodTimer > 0;
             if (this.heroName === 'Voss') return this.vossCopyTimer > 0 && this.vossCopiedMelee;
-            return !['Hason', 'Willi', 'Ugo', 'Kila', 'Volt', 'Noae', 'Kuro', 'Nyra', 'Archor', 'D2F1', 'Veyra', 'Brom', 'Mori', 'Roka'].includes(this.heroName)
+            if (this.heroName === 'Lapis') return this.lapisWhipTimer > 0;
+            return !['Hason', 'Willi', 'Ugo', 'Kila', 'Volt', 'Noae', 'Kuro', 'Nyra', 'Archor', 'D2F1', 'Veyra', 'Brom', 'Mori', 'Roka', 'Tonia'].includes(this.heroName)
                 && !(this.heroName === 'Hunter' && this.hunterWeapon === 'musket')
                 && !(this.heroName === 'Euclid' && this.euclidWeapon === 'magic');
         }
@@ -297,6 +304,10 @@ function loadPhysicsGame(heroName = 'Hunter') {
     class ThousandMechanisms extends Entity { constructor(owner){super(0,0,1280,660);Object.assign(this,{owner,type:'thousand_mechanisms',life:8000});} }
     class GelannFlameCone extends Entity { constructor(owner){super(owner.x,owner.y,190,120);Object.assign(this,{owner,type:'gelann_flame_cone',life:1200});} }
     class GelannArrowRain extends Entity { constructor(owner,targetX){super(targetX-280,0,560,660);Object.assign(this,{owner,type:'gelann_arrow_rain',warning:750,duration:2500});} }
+    class DogelChainHook extends Entity { constructor(owner,target){super(owner.x,owner.y,18,18);Object.assign(this,{owner,target,type:'dogel_chain_hook'});} }
+    class LapisStone extends Entity { constructor(owner,index,target,judgment=false){super(owner.x,owner.y,20,20);Object.assign(this,{owner,index,target,judgment,type:'lapis_stone'});owner.lapisStoneInFlight[index]++;owner.lapisStoneAvailable[index]=false;} finish(){this.owner.lapisStoneInFlight[this.index]=Math.max(0,this.owner.lapisStoneInFlight[this.index]-1);this.owner.lapisStoneAvailable[this.index]=this.owner.lapisStoneInFlight[this.index]===0;this.dead=true;} }
+    class ToniaGrenade extends Entity { constructor(owner,vx,vy){super(owner.x,owner.y,14,14);Object.assign(this,{owner,vx,vy,type:'tonia_grenade'});} }
+    class ToniaMissile extends Entity { constructor(owner,target,offset){super(owner.x,owner.y,30,12);Object.assign(this,{owner,target,offset,type:'tonia_missile'});} }
     class RokaCannonball extends Entity { constructor(owner,x,y,vx,vy,artillery){super(x,y,28,28);Object.assign(this,{owner,vx,vy,artillery,type:'roka_cannonball',damage:artillery?50:40,radius:artillery?165:110});} }
     class RokaMortarShell extends Entity { constructor(owner,x,y){super(x,y,20,26);Object.assign(this,{owner,targetX:x,targetY:y,type:'roka_mortar'});} }
     class TemporalBolt extends Entity { constructor(owner,x,y,vx,vy,damage,kind){super(x,y,18,14);Object.assign(this,{owner,vx,vy,damage,kind,type:kind==='copy'?'voss_copy_bolt':'temporal_shard'});} }
@@ -328,6 +339,10 @@ function loadPhysicsGame(heroName = 'Hunter') {
         ThousandMechanisms,
         GelannFlameCone,
         GelannArrowRain,
+        DogelChainHook,
+        LapisStone,
+        ToniaGrenade,
+        ToniaMissile,
         RokaCannonball,
         RokaMortarShell,
         TemporalBolt,
@@ -358,7 +373,10 @@ function loadPhysicsGame(heroName = 'Hunter') {
             Roka: { maxHp: 600, speed: 4.6, jump: 14, width: 42, height: 70, color: '#496d7b', superCD: 24000 },
             Voss: { maxHp: 750, speed: 5.6, jump: 15, width: 40, height: 70, color: '#5660a8', superCD: 22000 },
             Raigo: { maxHp: 800, speed: 6.4, jump: 16, width: 42, height: 72, color: '#287b8f', superCD: 22000 },
-            Gelann: { maxHp: 750, speed: 6.1, jump: 15.5, width: 40, height: 70, color: '#b6422b', superCD: 24000 }
+            Gelann: { maxHp: 750, speed: 6.1, jump: 15.5, width: 40, height: 70, color: '#b6422b', superCD: 24000 },
+            Dogel: { maxHp: 800, speed: 5.8, jump: 15, width: 42, height: 72, color: '#7c2538', superCD: 26000 },
+            Lapis: { maxHp: 650, speed: 5.2, jump: 14.5, width: 40, height: 68, color: '#4066b1', superCD: 24000 },
+            Tonia: { maxHp: 700, speed: 4.9, jump: 14, width: 44, height: 70, color: '#61706e', superCD: 25000 }
         },
         keys: {},
         keysPressed: {},
@@ -606,7 +624,7 @@ test('every hero with a direct super can decide to use it', () => {
     const context = loadAI();
     const directSuperHeroes = [
         'Hason', 'Willi', 'Hunter', 'Macu', 'Artu', 'Duke', 'Kadaxi', 'Euclid',
-        'Lique', 'Kae', 'Kila', 'Volt', 'Gensan', 'Noae', 'Wolf', 'Kuro', 'Sola', 'Nyra', 'Orion', 'Archor', 'Itan', 'D2F1', 'Laegon', 'Veyra', 'Brom', 'Axeron', 'Ukon', 'Mori', 'Roka', 'Voss', 'Raigo', 'Gelann'
+        'Lique', 'Kae', 'Kila', 'Volt', 'Gensan', 'Noae', 'Wolf', 'Kuro', 'Sola', 'Nyra', 'Orion', 'Archor', 'Itan', 'D2F1', 'Laegon', 'Veyra', 'Brom', 'Axeron', 'Ukon', 'Mori', 'Roka', 'Voss', 'Raigo', 'Gelann', 'Dogel', 'Lapis', 'Tonia'
     ];
 
     for (const heroName of directSuperHeroes) {
@@ -2625,4 +2643,67 @@ test('Gelann Rain of Arrows telegraphs then deals 6 WRD with an exact 45% slow',
 
     assert.equal(target.hp, 40);
     assert.equal(target.buffs.gelannArrowSlow, 2000);
+});
+
+test('Dogel charges while mobile, throws Chain Pull, and enters Blood Reaper', () => {
+    const simulation = loadPhysicsGame('Dogel');
+    const { ai, context } = simulation;
+    ai.attackState = 'idle';
+    context.keys[ai.controls.attack] = true;
+    ai.performAttack();
+    ai.update(900);
+    assert.equal(ai.attackState, 'dogel_charging');
+    assert.ok(ai.dogelCharge >= 900);
+
+    context.keys[ai.controls.attack] = false;
+    ai.update(16);
+    assert.equal(ai.attackState, 'windup');
+    assert.ok(ai.dogelChargedDamage > 35 && ai.dogelChargedDamage <= 50);
+
+    ai.attackState = 'idle';
+    assert.equal(ai.fireDogelChain(), true);
+    assert.equal(context.game.projectiles.at(-1).type, 'dogel_chain_hook');
+
+    ai.superCooldown = 0;
+    ai.performSuper();
+    assert.equal(ai.dogelReaperTimer, 10000);
+});
+
+test('Lapis launches available stones, converges all five, and forms Stone Whip', () => {
+    const simulation = loadPhysicsGame('Lapis');
+    const { ai, context } = simulation;
+    ai.attackState = 'idle';
+    ai.executeActiveAttack();
+    assert.equal(context.game.projectiles.filter(entity => entity.type === 'lapis_stone').length, 1);
+    assert.equal(ai.lapisStoneAvailable.filter(Boolean).length, 4);
+
+    ai.lapisStoneAvailable.fill(true);
+    assert.equal(ai.fireLapisJudgment(), true);
+    assert.equal(context.game.projectiles.filter(entity => entity.type === 'lapis_stone' && entity.judgment).length, 5);
+
+    ai.superCooldown = 0;
+    ai.performSuper();
+    assert.equal(ai.lapisWhipTimer, 9000);
+    assert.equal(ai.isMeleeAttack(), true);
+    assert.equal(ai.getMeleeDamage(), 24);
+});
+
+test('Tonia builds Heat with held fire, launches six grenades, and resets with missiles', () => {
+    const simulation = loadPhysicsGame('Tonia');
+    const { ai, context } = simulation;
+    ai.attackState = 'idle';
+    for (let shot = 0; shot < 5; shot++) { ai.toniaFireTimer = 0; ai.fireToniaBullet(); }
+    assert.equal(context.game.projectiles.filter(entity => entity.type === 'bullet').length, 5);
+    assert.ok(ai.toniaHeat > 0);
+
+    assert.equal(ai.fireToniaGrenades(), true);
+    assert.equal(context.game.projectiles.filter(entity => entity.type === 'tonia_grenade').length, 6);
+
+    ai.toniaHeat = 95;
+    ai.toniaOverheated = true;
+    ai.superCooldown = 0;
+    ai.performSuper();
+    assert.equal(ai.toniaHeat, 0);
+    assert.equal(ai.toniaOverheated, false);
+    assert.equal(context.game.projectiles.filter(entity => entity.type === 'tonia_missile').length, 3);
 });

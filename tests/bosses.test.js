@@ -19,7 +19,10 @@ function loadBossHarness() {
         BOSSES: {
             tyrannt: { name: 'TYRANNT', color: '#35d5e8', maxHp: 9000 },
             dragon: { name: 'DRAGON', color: '#ff5a36', maxHp: 7500 },
-            libertus: { name: 'LIBERTUS', color: '#e8d39c', maxHp: 8500 }
+            libertus: { name: 'LIBERTUS', color: '#e8d39c', maxHp: 8500 },
+            abyss: { name: 'ABYSS', color: '#2aa8b8', maxHp: 8800 },
+            chronos: { name: 'CHRONOS', color: '#d2b35c', maxHp: 8200 },
+            mortem: { name: 'MORTEM', color: '#9a5ec4', maxHp: 8400 }
         },
         checkAABB(a, b) {
             return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
@@ -37,7 +40,7 @@ function loadBossHarness() {
     };
     vm.createContext(context);
     const source = fs.readFileSync(path.join(__dirname, '..', 'entities.js'), 'utf8');
-    vm.runInContext(`${source}\nthis.__bossExports = { BossLaserStrike, TyranntBoss, BossFireDemon, DragonBoss, BossKnight, LibertusBoss, createBoss };`, context, { filename: 'entities.js' });
+    vm.runInContext(`${source}\nthis.__bossExports = { BossLaserStrike, TyranntBoss, BossFireDemon, DragonBoss, BossKnight, LibertusBoss, AbyssTentacle, AbyssWave, AbyssBoss, ChronosShockwave, TimeFragment, ChronosBoss, MortemSkeleton, SoulHarvest, MortemBoss, createBoss };`, context, { filename: 'entities.js' });
     return { context, players, ...context.__bossExports };
 }
 
@@ -150,6 +153,58 @@ test('LIBERTUS summons five knights and releases a telegraphed colossal swing', 
     boss.update(1000);
     assert.equal(boss.swingState, 'active');
     assert.ok(player.hp <= 875);
+});
+
+test('ABYSS summons tentacles, warns its bite, and enters Drowning at half HP', () => {
+    const harness = loadBossHarness();
+    harness.players.push(makePlayer('p1', 500));
+    const boss = new harness.AbyssBoss(1800, harness.context.GROUND_Y);
+    harness.context.game.minions = [boss];
+
+    boss.update(10000);
+    assert.equal(harness.context.game.minions.filter(entity => entity.type === 'abyss_tentacle').length, 4);
+    assert.ok(boss.biteWarning > 0);
+
+    boss.hp = boss.maxHp / 2;
+    boss.update(16);
+    assert.equal(boss.drowningTimer, 15000);
+    assert.equal(harness.context.game.hazards.filter(entity => entity.type === 'abyss_wave').length, 4);
+});
+
+test('CHRONOS creates destructible fragments and freezes time on schedule', () => {
+    const harness = loadBossHarness();
+    harness.players.push(makePlayer('p1', 650));
+    const boss = new harness.ChronosBoss(1300, harness.context.GROUND_Y);
+    harness.context.game.minions = [boss];
+
+    boss.update(10000);
+    assert.equal(harness.context.game.minions.filter(entity => entity.type === 'time_fragment').length, 4);
+    assert.ok(boss.hammerWarning > 0);
+
+    boss.update(5000);
+    assert.equal(boss.timeStopTimer, 2000);
+});
+
+test('MORTEM builds a mixed army and marks players for Soul Harvest', () => {
+    const harness = loadBossHarness();
+    harness.players.push(makePlayer('p1', 600), makePlayer('p2', 900));
+    const boss = new harness.MortemBoss(1500, harness.context.GROUND_Y);
+    harness.context.game.minions = [boss];
+
+    boss.update(8000);
+    const army = harness.context.game.minions.filter(entity => entity.type === 'mortem_skeleton');
+    assert.ok(army.length >= 6 && army.length <= 10);
+    assert.ok(boss.cleaveWarning > 0);
+
+    boss.update(7000);
+    assert.equal(harness.context.game.hazards.filter(entity => entity.type === 'soul_harvest').length, 2);
+});
+
+test('boss factory maps every selectable boss to its encounter class', () => {
+    const harness = loadBossHarness();
+    assert.ok(harness.createBoss('abyss', 1000, harness.context.GROUND_Y) instanceof harness.AbyssBoss);
+    assert.ok(harness.createBoss('chronos', 1000, harness.context.GROUND_Y) instanceof harness.ChronosBoss);
+    assert.ok(harness.createBoss('mortem', 1000, harness.context.GROUND_Y) instanceof harness.MortemBoss);
 });
 
 test('boss death delegates the match result exactly once', () => {

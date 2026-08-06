@@ -65,7 +65,10 @@ const HERO_TACTICS = {
     Roka:    { role: 'recoil_artillery', aggression: 0.62, caution: 1.35, burst: 1.65, kite: 1.55, setup: 0.85, highGround: 1.42, retreatHp: 0.42, retreatFireChance: 0.72 },
     Voss:    { role: 'copycat', aggression: 0.72, caution: 1.05, burst: 1.38, kite: 0.92, setup: 1.45, highGround: 0.85, retreatHp: 0.36, retreatFireChance: 0.48 },
     Raigo:   { role: 'thunder_bruiser', aggression: 1.28, caution: 0.58, burst: 1.55, kite: 0.18, setup: 0.32, highGround: 0.65, retreatHp: 0.27, retreatFireChance: 0.10 },
-    Gelann:  { role: 'flame_zoner', aggression: 1.08, caution: 0.72, burst: 1.24, kite: 0.52, setup: 1.18, highGround: 0.78, retreatHp: 0.32, retreatFireChance: 0.18 }
+    Gelann:  { role: 'flame_zoner', aggression: 1.08, caution: 0.72, burst: 1.24, kite: 0.52, setup: 1.18, highGround: 0.78, retreatHp: 0.32, retreatFireChance: 0.18 },
+    Dogel:   { role: 'chain_bruiser', aggression: 1.28, caution: 0.52, burst: 1.55, kite: 0.12, setup: 1.05, highGround: 0.48, retreatHp: 0.24, retreatFireChance: 0.08 },
+    Lapis:   { role: 'stone_mage', aggression: 0.68, caution: 1.08, burst: 1.45, kite: 1.25, setup: 1.32, highGround: 1.08, retreatHp: 0.38, retreatFireChance: 0.42 },
+    Tonia:   { role: 'suppressor', aggression: 0.78, caution: 1.02, burst: 1.35, kite: 1.28, setup: 0.78, highGround: 1.02, retreatHp: 0.36, retreatFireChance: 0.68 }
 };
 
 function getHeroTactic(ai) {
@@ -480,6 +483,9 @@ function getCombatProfile(ai, source = ai) {
         case 'Voss': range = ai.vossCopyTimer > 0 && ai.vossCopiedMelee ? 92 : 430; preferred = ai.vossCopyTimer > 0 && ai.vossCopiedMelee ? 62 : 275; break;
         case 'Raigo': range = 112; preferred = 72; break;
         case 'Gelann': range = 96; preferred = 66; break;
+        case 'Dogel': range = 205; preferred = 105; break;
+        case 'Lapis': range = ai.lapisWhipTimer > 0 ? 185 : 520; preferred = ai.lapisWhipTimer > 0 ? 105 : 330; break;
+        case 'Tonia': range = 560; preferred = 350; break;
     }
     return { range, preferred, ranged: !ai.isMeleeAttack(), tactics };
 }
@@ -904,6 +910,18 @@ function chooseHeroAction(game, ai, target, targetEntity, dist, verticalDistance
             if(superReady&&dist<700&&(combatState==='setup'||combatState==='pressure'||combatState==='burst'||isVulnerableTarget(target)))return 'super';
             if(ai.gelannBreathCooldown<=0&&dist<220&&Math.abs(verticalDistance)<105)return 'switch';
             break;
+        case 'Dogel':
+            if(superReady&&dist<260)return 'super';
+            if(ai.dogelChainCooldown<=0&&dist>90&&dist<620)return 'switch';
+            break;
+        case 'Lapis':
+            if(superReady&&dist<260)return 'super';
+            if(ai.lapisJudgmentCooldown<=0&&dist<700)return 'switch';
+            break;
+        case 'Tonia':
+            if(superReady&&dist<700)return 'super';
+            if(ai.toniaGrenadeCooldown<=0&&dist<520)return 'switch';
+            break;
     }
     return null;
 }
@@ -1095,7 +1113,11 @@ function runFighterAI(game, ai, dt, diff) {
     brain.strafeTimer = Math.max(0, (brain.strafeTimer || 0) - dt);
     brain.combatStateTimer = Math.max(0, (brain.combatStateTimer || 0) - dt);
     brain.kuroChargeTimer = Math.max(0, (brain.kuroChargeTimer || 0) - dt);
-    brain.intent.holdAttack = ai.heroName === 'Kuro' && brain.kuroChargeTimer > 0;
+    brain.dogelChargeTimer = Math.max(0, (brain.dogelChargeTimer || 0) - dt);
+    brain.toniaBurstTimer = Math.max(0, (brain.toniaBurstTimer || 0) - dt);
+    brain.intent.holdAttack = (ai.heroName === 'Kuro' && brain.kuroChargeTimer > 0)
+        || (ai.heroName === 'Dogel' && brain.dogelChargeTimer > 0)
+        || (ai.heroName === 'Tonia' && brain.toniaBurstTimer > 0 && !ai.toniaOverheated);
     if (ai.heroName !== 'Volt') brain.intent.holdJump = brain.jumpHoldTimer > 0;
     brain.actionLock = Math.max(0, brain.actionLock - dt);
     if (brain.navGoal && brain.navTimer <= 0) {
@@ -1194,6 +1216,12 @@ function runFighterAI(game, ai, dt, diff) {
             brain.kuroChargeTimer = desiredCharge;
             brain.intent.holdAttack = true;
             keys[ai.controls.attack] = true;
+        } else if (ai.heroName === 'Dogel') {
+            brain.dogelChargeTimer = combatState === 'burst' ? 1450 : 760;
+            brain.intent.holdAttack = true; keys[ai.controls.attack] = true;
+        } else if (ai.heroName === 'Tonia') {
+            brain.toniaBurstTimer = ai.toniaHeat > 75 ? 260 : 850;
+            brain.intent.holdAttack = true; keys[ai.controls.attack] = true;
         }
         press(ai, 'attack');
         if (combatState === 'burst') brain.actionLock = 20;

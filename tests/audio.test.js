@@ -55,7 +55,8 @@ test('every roster hero has a distinct T and Super sound profile', () => {
         'Hason', 'Hunter', 'Macu', 'Willi', 'Artu', 'Duke', 'Kadaxi', 'Euclid',
         'Lique', 'Kae', 'Ugo', 'Kila', 'Volt', 'Gensan', 'Noae', 'Wolf',
         'Kuro', 'Sola', 'Nyra', 'Orion', 'Archor', 'Itan', 'D2F1', 'Laegon',
-        'Veyra', 'Brom', 'Axeron', 'Ukon', 'Mori', 'Roka', 'Voss', 'Raigo', 'Gelann'
+        'Veyra', 'Brom', 'Axeron', 'Ukon', 'Mori', 'Roka', 'Voss', 'Raigo', 'Gelann',
+        'Dogel', 'Lapis', 'Tonia'
     ];
     assert.deepEqual(Object.keys(audio.heroProfiles).sort(), heroes.slice().sort());
     assert.equal(new Set(heroes.map(hero => audio.heroProfiles[hero].root)).size, heroes.length);
