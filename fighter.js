@@ -4078,9 +4078,11 @@ class Fighter extends Entity {
             ctx.strokeStyle='#c59658';ctx.lineWidth=2;
             for(let wrap=-4;wrap>-142;wrap-=12){ctx.beginPath();ctx.moveTo(-5,wrap);ctx.lineTo(5,wrap+5);ctx.stroke();}
             ctx.fillStyle='#c59658';ctx.fillRect(-18,-22,36,7);ctx.fillRect(-8,8,16,18);
+            // Ge's head is a straight, thin ge blade set perpendicular to the pole.
+            // The long lower edge and pointed outer tip keep it distinct from a rod cap.
             ctx.shadowBlur=this.geGodTimer>0?12:4;ctx.shadowColor='#ffd27a';ctx.fillStyle=this.geGodTimer>0?'#fff1c8':'#edf3f5';ctx.strokeStyle='#667985';ctx.lineWidth=2;
-            ctx.beginPath();ctx.moveTo(-3,-154);ctx.lineTo(23,-154);ctx.lineTo(31,-150);ctx.lineTo(23,-146);ctx.lineTo(-3,-146);ctx.closePath();ctx.fill();ctx.stroke();
-            ctx.fillStyle=this.geGodTimer>0?'#ffd27a':'#a9bac4';ctx.fillRect(-3,-153,5,6);ctx.shadowBlur=0;ctx.restore();
+            ctx.beginPath();ctx.moveTo(-7,-151);ctx.lineTo(25,-151);ctx.lineTo(35,-148);ctx.lineTo(25,-145);ctx.lineTo(-7,-145);ctx.closePath();ctx.fill();ctx.stroke();
+            ctx.fillStyle=this.geGodTimer>0?'#ffd27a':'#a9bac4';ctx.fillRect(-4,-152,5,8);ctx.fillRect(25,-149,7,2);ctx.shadowBlur=0;ctx.restore();
         }
         else if (this.heroName === 'Lak') {
             ctx.save();ctx.translate(hw-2,32);let angle=.55;if(this.attackState==='windup')angle=.55-1.55*phaseProg;else if(this.attackState==='active')angle=-1+3.25*phaseProg;else if(this.attackState==='recovery')angle=2.25-1.7*phaseProg;
