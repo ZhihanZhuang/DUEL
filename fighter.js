@@ -4072,8 +4072,15 @@ class Fighter extends Entity {
         }
         else if (this.heroName === 'Ge') {
             ctx.save();ctx.translate(hw-3,31);let angle=.42;if(this.attackState==='windup')angle=.42-1.4*phaseProg;else if(this.attackState==='active')angle=-.98+2.8*phaseProg;else if(this.geThrustTimer>0)angle=-Math.PI/2;
-            ctx.rotate(angle);ctx.fillStyle='#4a2e1b';ctx.fillRect(-4,-104,8,126);ctx.fillStyle='#ad7b39';ctx.strokeStyle='#e0bc71';ctx.lineWidth=2;
-            ctx.beginPath();ctx.moveTo(-3,-101);ctx.lineTo(35,-91);ctx.lineTo(12,-77);ctx.lineTo(2,-48);ctx.lineTo(-8,-72);ctx.lineTo(-31,-86);ctx.closePath();ctx.fill();ctx.stroke();ctx.fillStyle='#6f4825';ctx.fillRect(-7,5,14,22);ctx.restore();
+            ctx.rotate(angle);
+            // A Dogel-style narrow kama blade mounted on a deliberately long bronze pole.
+            ctx.fillStyle='#4a2818';ctx.fillRect(-4,-154,8,176);
+            ctx.strokeStyle='#c59658';ctx.lineWidth=2;
+            for(let wrap=-4;wrap>-142;wrap-=12){ctx.beginPath();ctx.moveTo(-5,wrap);ctx.lineTo(5,wrap+5);ctx.stroke();}
+            ctx.fillStyle='#c59658';ctx.fillRect(-18,-22,36,7);ctx.fillRect(-8,8,16,18);
+            ctx.shadowBlur=this.geGodTimer>0?12:4;ctx.shadowColor='#ffd27a';ctx.fillStyle=this.geGodTimer>0?'#fff1c8':'#edf3f5';ctx.strokeStyle='#667985';ctx.lineWidth=2;
+            ctx.beginPath();ctx.moveTo(-3,-154);ctx.lineTo(23,-154);ctx.lineTo(31,-150);ctx.lineTo(23,-146);ctx.lineTo(-3,-146);ctx.closePath();ctx.fill();ctx.stroke();
+            ctx.fillStyle=this.geGodTimer>0?'#ffd27a':'#a9bac4';ctx.fillRect(-3,-153,5,6);ctx.shadowBlur=0;ctx.restore();
         }
         else if (this.heroName === 'Lak') {
             ctx.save();ctx.translate(hw-2,32);let angle=.55;if(this.attackState==='windup')angle=.55-1.55*phaseProg;else if(this.attackState==='active')angle=-1+3.25*phaseProg;else if(this.attackState==='recovery')angle=2.25-1.7*phaseProg;
