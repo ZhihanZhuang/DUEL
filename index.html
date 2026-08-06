@@ -913,53 +913,24 @@
         }
 
     </style>
+    <link rel="stylesheet" href="frontend/hero-select.css?v=3">
 </head>
 <body>
 
 <canvas id="gameCanvas"></canvas>
 
 <!-- Title & Main Menu -->
-<div id="menu-screen" class="overlay">
-    <h1>Otokojuku: Legends Duel</h1>
-
-    <div class="roster-container">
-        <div class="roster-col">
-            <h2>Player 1</h2>
-            <div id="p1-roster" class="hero-grid"></div>
-        </div>
-        <div class="roster-col">
-            <h2>Player 2 / CPU</h2>
-            <div id="p2-roster" class="hero-grid"></div>
-        </div>
+<div id="menu-screen" class="overlay arcade-main">
+    <div class="main-brand">
+        <h1>Otokojuku: Legends Duel</h1>
+        <p>Choose a battle mode</p>
     </div>
-
-    <div class="info-panel">
-        <div id="info-name">Hover a Hero</div>
-        <div id="info-desc">Hero description will appear here.</div>
-        <div id="info-details"></div>
-    </div>
-
-    <div class="ai-difficulty-row">
-        <label for="ai-difficulty">CPU Difficulty</label>
-        <select id="ai-difficulty">
-            <option value="easy">Easy</option>
-            <option value="normal" selected>Normal</option>
-            <option value="hard">Hard</option>
-            <option value="expert">Expert</option>
-        </select>
-    </div>
-
-    <div class="arena-select" aria-labelledby="arena-select-label">
-        <div id="arena-select-label" class="arena-select-label">Duel Arena</div>
-        <div id="arena-options" class="arena-options"></div>
-    </div>
-
-    <div class="menu-btns">
-        <button id="btn-sp" aria-expanded="false" style="background:#8b0000; border-color:#ff5252">Play with Computer</button>
-        <button id="btn-mp">Local Multiplayer (1 Keyboard)</button>
-        <button id="btn-boss-mode" style="background:#3b2415; border-color:#ffd93d">Boss Mode</button>
-        <button id="btn-online" style="background:#004080; border-color:#00bfff">Online Play</button>
-        <button id="btn-open-settings" style="background:#333; border-color:#888">Settings</button>
+    <div class="main-mode-list">
+        <button id="btn-sp" aria-expanded="false">Play with Computer</button>
+        <button id="btn-mp">Local Multiplayer</button>
+        <button id="btn-boss-mode">Boss Mode</button>
+        <button id="btn-online">Online Play</button>
+        <button id="btn-open-settings">Settings</button>
     </div>
 </div>
 
@@ -973,6 +944,36 @@
     <button id="btn-sp-back">Back</button>
 </div>
 
+<!-- Visual Hero Showcase -->
+<div id="hero-select-screen" class="overlay hidden">
+    <div class="select-header">
+        <div><span class="select-kicker">Visual Fighter Archive</span><h1 id="hero-select-title">Choose Your Fighter</h1></div>
+        <span id="hero-select-step" class="select-step">Fighter Showcase</span>
+    </div>
+    <div id="hero-select-stage" class="hero-select-stage"></div>
+    <div class="select-footer">
+        <div class="select-options">
+            <div id="select-difficulty" class="ai-difficulty-row hidden">
+                <label for="ai-difficulty">CPU Difficulty</label>
+                <select id="ai-difficulty">
+                    <option value="easy">Easy</option>
+                    <option value="normal" selected>Normal</option>
+                    <option value="hard">Hard</option>
+                    <option value="expert">Expert</option>
+                </select>
+            </div>
+            <div id="arena-select" class="arena-select" aria-labelledby="arena-select-label">
+                <div id="arena-select-label" class="arena-select-label">Duel Arena</div>
+                <div id="arena-options" class="arena-options"></div>
+            </div>
+        </div>
+        <div class="select-actions">
+            <button id="btn-hero-back" type="button">Back</button>
+            <button id="btn-hero-confirm" type="button">Fight!</button>
+        </div>
+    </div>
+</div>
+
 <!-- Boss Mode Select -->
 <div id="boss-mode-screen" class="overlay hidden">
     <h1>Boss Mode</h1>
@@ -981,7 +982,22 @@
             <button type="button" data-boss-players="1" class="selected" aria-pressed="true">Solo</button>
             <button type="button" data-boss-players="2" aria-pressed="false">Two Players</button>
         </div>
-        <div class="boss-grid" aria-label="Boss selection">
+        <div class="boss-showcase" aria-label="Boss selection">
+            <button id="boss-prev" class="boss-nav" type="button" aria-label="Previous boss">&#9664;</button>
+            <div id="boss-visual" class="boss-visual" title="Preview boss attack">
+                <canvas id="boss-preview" width="620" height="500"></canvas>
+            </div>
+            <div class="boss-copy">
+                <span class="select-kicker">Select Your Boss</span>
+                <h2 id="boss-name">TYRANNT</h2>
+                <h3 id="boss-title">Drone Overlord</h3>
+                <div id="boss-hp-label" class="boss-threat">900 WRD // EXTREME</div>
+                <div class="boss-threat">Difficulty: ★★★★★</div>
+                <p id="boss-summary">Laser Matrix. Drone Swarm. Giant Units.</p>
+            </div>
+            <button id="boss-next" class="boss-nav" type="button" aria-label="Next boss">&#9654;</button>
+        </div>
+        <div class="boss-hidden-options" aria-hidden="true">
             <button type="button" class="boss-option selected" data-boss-id="tyrannt" aria-pressed="true"><strong>TYRANNT</strong><span>Drone Overlord<br>900 WRD</span></button>
             <button type="button" class="boss-option" data-boss-id="dragon" aria-pressed="false"><strong>DRAGON</strong><span>Infernal Sky Tyrant<br>750 WRD</span></button>
             <button type="button" class="boss-option" data-boss-id="libertus" aria-pressed="false"><strong>LIBERTUS</strong><span>Titan Knight<br>850 WRD</span></button>
@@ -990,7 +1006,7 @@
             <button type="button" class="boss-option" data-boss-id="mortem" aria-pressed="false"><strong>MORTEM</strong><span>Necromancer King<br>840 WRD</span></button>
         </div>
         <div class="boss-mode-actions">
-            <button id="btn-boss-start" type="button" style="background:#6b1010; border-color:#ffd93d">Start Fight</button>
+            <button id="btn-boss-start" type="button" style="background:#6b1010; border-color:#ffd93d">Choose Challengers</button>
             <button id="btn-boss-back" type="button">Back</button>
         </div>
     </div>
@@ -1191,9 +1207,10 @@
 <script src="entities.js"></script>
 <script src="fighter.js"></script>
 <script src="frontend/ai.js"></script>
+<script src="frontend/hero-select.js?v=3"></script>
 <script src="game.js"></script>
 <script src="frontend/multiplayer-client.js"></script>
-<script src="network.js"></script>
+<script src="network.js?v=2"></script>
 <script>
     document.getElementById('ai-difficulty').value = localStorage.getItem('otokojuku_ai_difficulty') || 'normal';
     document.getElementById('ai-difficulty').onchange = (e) => {

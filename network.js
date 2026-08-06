@@ -187,6 +187,10 @@ if (window.Game && !window.Game.prototype.socketSyncPatched) {
 }
 
 document.getElementById('btn-online').onclick = () => {
+    if (window.game?.heroSelectUI) {
+        window.game.heroSelectUI.open('online');
+        return;
+    }
     document.getElementById('menu-screen').classList.add('hidden');
     document.getElementById('login-screen').classList.remove('hidden');
     window.mySelectedHero = window.game?.p1Choice || window.mySelectedHero || 'Noae';

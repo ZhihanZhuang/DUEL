@@ -32,70 +32,24 @@ class Game {
         this.screenShakeTimer = 0;
         this.screenShakeMagnitude = 0;
         this.audio = window.audioManager || null;
+        this.heroSelectUI = new HeroSelectUI(this);
 
         this.setupMenu();
         updateControlsDisplay();
     }
 
     setupMenu() {
-        const p1Roster = document.getElementById('p1-roster');
-        const p2Roster = document.getElementById('p2-roster');
-
-        p1Roster.innerHTML = '';
-        p2Roster.innerHTML = '';
-
-        const attachHover = (btn, key) => {
-            btn.onmouseover = () => {
-                const info = HEROES[key];
-                document.getElementById('info-name').innerText = info.name;
-                document.getElementById('info-desc').innerText = info.desc;
-                document.getElementById('info-details').innerHTML = `
-                    <div class="info-stat">HP: <span style="color:#4caf50">${info.ui.hp}</span></div>
-                    <div class="info-stat">ATK: <span style="color:#ff5252">${info.ui.atk}</span></div><br>
-                    <div class="info-stat">Passive:</div> <div class="info-desc">${info.ui.passive}</div>
-                    <div class="info-stat">Super Skill:</div> <div class="info-desc">${info.ui.super}</div>
-                `;
-            };
-        };
-
-        Object.keys(HEROES).forEach(key => {
-            let b1 = document.createElement('button');
-            b1.className = `hero-btn ${key === this.p1Choice ? 'selected' : ''}`;
-            b1.innerText = `${HEROES[key].name}`;
-            b1.onclick = () => {
-                this.p1Choice = key;
-                Array.from(p1Roster.children).forEach(c => c.classList.remove('selected'));
-                b1.classList.add('selected');
-            };
-            attachHover(b1, key);
-            p1Roster.appendChild(b1);
-
-            let b2 = document.createElement('button');
-            b2.className = `hero-btn ${key === this.p2Choice ? 'selected' : ''}`;
-            b2.innerText = `${HEROES[key].name}`;
-            b2.onclick = () => {
-                this.p2Choice = key;
-                Array.from(p2Roster.children).forEach(c => c.classList.remove('selected'));
-                b2.classList.add('selected');
-            };
-            attachHover(b2, key);
-            p2Roster.appendChild(b2);
-        });
-
-        if (p1Roster.children.length > 0) {
-            p1Roster.children[Object.keys(HEROES).indexOf(this.p1Choice)].onmouseover();
-        }
-
         this.setupArenaMenu();
+        this.heroSelectUI.mount();
 
         document.getElementById('btn-sp').onclick = () => this.showComputerModes(true);
-        document.getElementById('btn-sp-duel').onclick = () => this.startGame(true, 'duel');
-        document.getElementById('btn-sp-survival').onclick = () => this.startGame(true, 'survival');
+        document.getElementById('btn-sp-duel').onclick = () => this.heroSelectUI.open('computer', 'duel');
+        document.getElementById('btn-sp-survival').onclick = () => this.heroSelectUI.open('computer', 'survival');
         document.getElementById('btn-sp-back').onclick = () => this.showComputerModes(false);
-        document.getElementById('btn-mp').onclick = () => this.startGame(false);
+        document.getElementById('btn-mp').onclick = () => this.heroSelectUI.open('local');
         document.getElementById('btn-boss-mode').onclick = () => this.showBossMenu(true);
         document.getElementById('btn-boss-back').onclick = () => this.showBossMenu(false);
-        document.getElementById('btn-boss-start').onclick = () => this.startBossGame();
+        document.getElementById('btn-boss-start').onclick = () => this.heroSelectUI.open('boss');
         document.querySelectorAll('[data-boss-players]').forEach(button => {
             button.onclick = () => {
                 this.bossPlayerCount = Number(button.dataset.bossPlayers) === 2 ? 2 : 1;
@@ -205,6 +159,7 @@ class Game {
     showBossMenu(show) {
         document.getElementById('menu-screen').classList.toggle('hidden', show);
         document.getElementById('boss-mode-screen').classList.toggle('hidden', !show);
+        document.getElementById('hero-select-screen')?.classList.add('hidden');
     }
 
     configureArena(arenaId, preserveFighters = true) {
@@ -366,6 +321,7 @@ class Game {
         document.getElementById('game-ui').classList.add('hidden');
         document.getElementById('computer-mode-screen')?.classList.add('hidden');
         document.getElementById('boss-mode-screen')?.classList.add('hidden');
+        document.getElementById('hero-select-screen')?.classList.add('hidden');
         document.getElementById('menu-screen').classList.remove('hidden');
         document.getElementById('spectator-banner')?.classList.add('hidden');
         document.getElementById('ping-display')?.classList.add('hidden');
