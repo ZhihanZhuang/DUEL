@@ -3778,28 +3778,28 @@ class Fighter extends Entity {
             const charge = Math.min(1, (this.dogelCharge || 0) / this.dogelChargeMax);
             const handX = hw - 5;
             const handY = 31;
-            let weightAngle = .7;
+            let bladeAngle = .7;
             let chainRadius = 50;
             let chainDrop = 42;
 
             if (charging) {
-                weightAngle = Date.now() * (.011 + charge * .018);
+                bladeAngle = Date.now() * (.011 + charge * .018);
                 chainRadius = 62 + charge * 48 + (reaperActive ? 14 : 0);
                 chainDrop = 12;
             } else if (active) {
-                weightAngle = -1.75 + phaseProg * 4.55;
+                bladeAngle = -1.75 + phaseProg * 4.55;
                 chainRadius = 104 + charge * 54 + (reaperActive ? 18 : 0);
                 chainDrop = 4;
             } else if (this.attackState === 'recovery') {
-                weightAngle = 2.8 - phaseProg * 2.1;
+                bladeAngle = 2.8 - phaseProg * 2.1;
                 chainRadius = 72 - phaseProg * 22;
                 chainDrop = 24 + phaseProg * 18;
             }
 
-            const weightX = handX + Math.cos(weightAngle) * chainRadius;
-            const weightY = handY + Math.sin(weightAngle) * chainRadius * .72 + chainDrop;
-            const controlX = (handX + weightX) / 2;
-            const controlY = (handY + weightY) / 2 + (charging || active ? 0 : 20);
+            const bladeX = handX + Math.cos(bladeAngle) * chainRadius;
+            const bladeY = handY + Math.sin(bladeAngle) * chainRadius * .72 + chainDrop;
+            const controlX = (handX + bladeX) / 2;
+            const controlY = (handY + bladeY) / 2 + (charging || active ? 0 : 20);
             const chainColor = reaperActive ? '#ff6578' : '#aaa49a';
 
             if (charging || active) {
@@ -3808,8 +3808,8 @@ class Fighter extends Entity {
                     : `rgba(210, 220, 215, ${.16 + charge * .28})`;
                 ctx.lineWidth = active ? 15 : 8 + charge * 5;
                 ctx.beginPath();
-                const trailEnd = active ? weightAngle - 1.2 : weightAngle - .8;
-                ctx.arc(handX, handY, chainRadius, trailEnd, weightAngle);
+                const trailEnd = active ? bladeAngle - 1.2 : bladeAngle - .8;
+                ctx.arc(handX, handY, chainRadius, trailEnd, bladeAngle);
                 ctx.stroke();
             }
 
@@ -3822,10 +3822,10 @@ class Fighter extends Entity {
             for (let link = 0; link <= linkCount; link++) {
                 const t = link / linkCount;
                 const inv = 1 - t;
-                const x = inv * inv * handX + 2 * inv * t * controlX + t * t * weightX;
-                const y = inv * inv * handY + 2 * inv * t * controlY + t * t * weightY;
-                const dx = 2 * inv * (controlX - handX) + 2 * t * (weightX - controlX);
-                const dy = 2 * inv * (controlY - handY) + 2 * t * (weightY - controlY);
+                const x = inv * inv * handX + 2 * inv * t * controlX + t * t * bladeX;
+                const y = inv * inv * handY + 2 * inv * t * controlY + t * t * bladeY;
+                const dx = 2 * inv * (controlX - handX) + 2 * t * (bladeX - controlX);
+                const dy = 2 * inv * (controlY - handY) + 2 * t * (bladeY - controlY);
                 ctx.save();
                 ctx.translate(x, y);
                 ctx.rotate(Math.atan2(dy, dx) + (link % 2 ? Math.PI / 2 : 0));
@@ -3835,18 +3835,33 @@ class Fighter extends Entity {
                 ctx.restore();
             }
 
-            ctx.shadowBlur = reaperActive ? 13 : 4;
-            ctx.shadowColor = reaperActive ? '#ff304f' : '#77736d';
-            ctx.fillStyle = reaperActive ? '#7d1728' : '#3e4142';
-            ctx.strokeStyle = reaperActive ? '#ff9aa8' : '#c7c2b8';
-            ctx.lineWidth = 2;
+            // The chain carries the attacking kama blade, aligned to the swing tangent.
+            ctx.save();
+            ctx.translate(bladeX, bladeY);
+            ctx.rotate(bladeAngle + Math.PI / 2 + (charging ? charge * .18 : 0));
+            ctx.shadowBlur = reaperActive ? 16 : 7;
+            ctx.shadowColor = reaperActive ? '#ff304f' : '#8fa7bd';
+            ctx.fillStyle = '#4a2818';
+            ctx.fillRect(-18, -4, 29, 8);
+            ctx.fillStyle = '#c59658';
+            ctx.fillRect(-16, -5, 5, 10);
+            ctx.fillStyle = reaperActive ? '#ffe3e6' : '#edf3f5';
+            ctx.strokeStyle = reaperActive ? '#ff6077' : '#667985';
+            ctx.lineWidth = 2.5;
             ctx.beginPath();
-            ctx.arc(weightX, weightY, 9 + charge * 2, 0, Math.PI * 2);
+            ctx.moveTo(7, -5);
+            ctx.quadraticCurveTo(33, -14, 47, -43);
+            ctx.quadraticCurveTo(50, -13, 27, 10);
+            ctx.quadraticCurveTo(17, 17, 7, 6);
+            ctx.closePath();
             ctx.fill();
             ctx.stroke();
+            ctx.fillStyle = reaperActive ? '#ff8294' : '#a9bac4';
+            ctx.beginPath();ctx.arc(8,0,4,0,Math.PI*2);ctx.fill();
+            ctx.restore();
             ctx.shadowBlur = 0;
 
-            // Kama: wrapped wooden handle with a broad, hooked steel blade.
+            // Wrapped grip and chain guard at Dogel's hand.
             ctx.save();
             ctx.translate(handX, handY);
             let kamaAngle = -.35;
@@ -3863,17 +3878,9 @@ class Fighter extends Entity {
             }
             ctx.fillStyle = '#8c6239';
             ctx.fillRect(-7, -9, 14, 8);
-            ctx.fillStyle = reaperActive ? '#ffe3e6' : '#e7e9e6';
-            ctx.strokeStyle = reaperActive ? '#ff6077' : '#747b7b';
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.moveTo(-2, -7);
-            ctx.quadraticCurveTo(28, -15, 38, -45);
-            ctx.quadraticCurveTo(42, -18, 18, -2);
-            ctx.quadraticCurveTo(8, 4, -2, -1);
-            ctx.closePath();
-            ctx.fill();
-            ctx.stroke();
+            ctx.strokeStyle = reaperActive ? '#ff6077' : '#aeb9bd';
+            ctx.lineWidth = 3;
+            ctx.beginPath();ctx.arc(0,-7,8,0,Math.PI*2);ctx.stroke();
             ctx.restore();
             ctx.restore();
         }
