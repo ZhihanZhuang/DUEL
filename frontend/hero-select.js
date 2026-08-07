@@ -12,6 +12,7 @@ class HeroSelectUI {
         this.attackPulse = { p1: 0, p2: 0 };
         this.bossKeys = Object.keys(BOSSES);
         this.bossIndex = Math.max(0, this.bossKeys.indexOf(game.bossChoice));
+        this.previewFighters = new Map();
         this.frame = 0;
     }
 
@@ -256,7 +257,7 @@ class HeroSelectUI {
     animate(time) {
         for (const slot of ['p1','p2']) {
             const canvas = this.panels?.[slot]?.querySelector('.hero-preview');
-            if (canvas) this.drawHero(canvas, this.keys[this.indices[slot]], time, time - this.attackPulse[slot] < 520);
+            if (canvas) this.drawHero(canvas, this.keys[this.indices[slot]], time, time - this.attackPulse[slot] < 520, false, this.attackPulse[slot]);
         }
         const bossCanvas = document.getElementById('boss-preview');
         if (bossCanvas) this.drawBoss(bossCanvas, this.bossKeys[this.bossIndex], time, time - (this.bossAttackPulse || 0) < 600);
@@ -265,45 +266,76 @@ class HeroSelectUI {
 
     drawMiniHero(canvas, key) { this.drawHero(canvas, key, 0, false, true); }
 
-    drawHero(canvas, key, time, attacking, mini = false) {
+    drawHero(canvas, key, time, attacking, mini = false, attackStarted = 0) {
         const ctx = canvas.getContext('2d');
+        if (!mini) {
+            const displayWidth = Math.max(1, Math.round(canvas.clientWidth));
+            const displayHeight = Math.max(1, Math.round(canvas.clientHeight));
+            if (canvas.width !== displayWidth || canvas.height !== displayHeight) {
+                canvas.width = displayWidth;
+                canvas.height = displayHeight;
+            }
+        }
         const w = canvas.width, h = canvas.height;
         ctx.clearRect(0,0,w,h);
-        const hero = HEROES[key];
-        const scale = mini ? .5 : Math.min(w/260,h/330);
-        const bob = mini ? 0 : Math.round(Math.sin(time*.004)*4);
-        const cx = w/2, ground = h*(mini?.92:.86) + bob;
-        const bodyW=66*scale, bodyH=128*scale, head=48*scale;
-        ctx.save();ctx.translate(cx,ground);
-        ctx.fillStyle='rgba(0,0,0,.45)';ctx.fillRect(-58*scale,-5*scale,116*scale,10*scale);
-        ctx.fillStyle='#151a24';ctx.fillRect(-bodyW*.58,-bodyH-5*scale,bodyW*1.16,bodyH+5*scale);
-        ctx.fillStyle=hero.color;ctx.fillRect(-bodyW/2,-bodyH,bodyW,bodyH);
-        ctx.fillStyle=this.mix(hero.color,'#ffffff',.38);ctx.fillRect(-head/2,-bodyH-head*.72,head,head*.72);
-        ctx.fillStyle='#0a0d12';ctx.fillRect(-head/2,-bodyH-head*.25,head,9*scale);
-        ctx.fillStyle='#f2cf55';ctx.fillRect(head*.1,-bodyH-head*.08,8*scale,5*scale);
-        ctx.fillStyle=this.mix(hero.color,'#000000',.45);ctx.fillRect(-bodyW/2,-bodyH*.48,bodyW,12*scale);
-        ctx.fillRect(-bodyW*.42,0,20*scale,22*scale);ctx.fillRect(bodyW*.12,0,20*scale,22*scale);
-        this.drawWeapon(ctx,key,hero,scale,attacking,time);
-        if(!mini){ctx.strokeStyle=this.mix(hero.color,'#ffffff',.35);ctx.lineWidth=3*scale;ctx.strokeRect(-bodyW*.58,-bodyH-5*scale,bodyW*1.16,bodyH+5*scale);}
+        ctx.imageSmoothingEnabled = false;
+        const scale = mini ? .22 : Math.max(.72, Math.min(w / 250, h / 300));
+        const logicalW = w / scale;
+        const logicalH = h / scale;
+        const fighter = this.getPreviewFighter(key);
+        const ground = mini ? logicalH - 22 : logicalH * .78;
+        fighter.x = logicalW * (mini ? .36 : .38) - fighter.w / 2;
+        fighter.y = ground - fighter.h;
+        fighter.facing = 1;
+        fighter.dead = false;
+        fighter.flipActive = 0;
+        this.setPreviewAttackState(fighter, attacking, time, attackStarted);
+
+        ctx.fillStyle = mini ? 'rgba(0,0,0,.24)' : 'rgba(0,0,0,.42)';
+        ctx.fillRect(w * .12, ground * scale, w * .76, mini ? 2 : 7);
+        ctx.save();
+        ctx.scale(scale, scale);
+        fighter.draw(ctx, {
+            revealOwnedKuro: true,
+            previewTarget: { x: logicalW * .82, y: ground - fighter.h * .55, w: 1, h: 1 }
+        });
         ctx.restore();
     }
 
-    drawWeapon(ctx,key,hero,scale,attacking,time) {
-        const text=`${hero.desc} ${hero.ui?.atk||''}`.toLowerCase();
-        const ranged=/gun|cannon|musket|rifle|archer|arrow|laser|gatling|projectile/.test(text);
-        const pole=/spear|naginata|lance|rod| ge\b/.test(text);
-        const chain=/chain|kusarigama|whip|thread/.test(text);
-        const hammer=/hammer|axe|hatchet|pickaxe|labrys/.test(text);
-        const blade=/sword|blade|scimitar|knife|saber/.test(text);
-        const swing=attacking?Math.sin(time*.025)*1.25:Math.sin(time*.002)*.05;
-        ctx.save();ctx.translate(28*scale,-86*scale);ctx.rotate((attacking?-1.05:.32)+swing);
-        if(chain){ctx.strokeStyle='#aab4c0';ctx.lineWidth=4*scale;ctx.beginPath();ctx.moveTo(0,0);ctx.quadraticCurveTo(48*scale,-45*scale,94*scale,-8*scale);ctx.stroke();ctx.fillStyle='#d7dde5';ctx.beginPath();ctx.moveTo(90*scale,-17*scale);ctx.lineTo(120*scale,-7*scale);ctx.lineTo(91*scale,2*scale);ctx.fill();}
-        else if(ranged){ctx.fillStyle='#303945';ctx.fillRect(0,-10*scale,92*scale,22*scale);ctx.fillStyle='#9ba9b6';ctx.fillRect(58*scale,-6*scale,50*scale,9*scale);}
-        else if(pole){ctx.fillStyle='#54341f';ctx.fillRect(-4*scale,-118*scale,8*scale,145*scale);ctx.fillStyle='#d5b15d';ctx.beginPath();ctx.moveTo(0,-150*scale);ctx.lineTo(20*scale,-116*scale);ctx.lineTo(0,-102*scale);ctx.lineTo(-20*scale,-116*scale);ctx.fill();}
-        else if(hammer){ctx.fillStyle='#5d432d';ctx.fillRect(-5*scale,-90*scale,10*scale,112*scale);ctx.fillStyle='#8f9496';ctx.fillRect(-35*scale,-110*scale,70*scale,32*scale);}
-        else if(blade){ctx.fillStyle='#cbd4db';ctx.beginPath();ctx.moveTo(-5*scale,-105*scale);ctx.lineTo(7*scale,-105*scale);ctx.lineTo(4*scale,10*scale);ctx.lineTo(-4*scale,10*scale);ctx.fill();ctx.fillStyle='#f2cf55';ctx.fillRect(-15*scale,5*scale,30*scale,7*scale);}
-        else {ctx.strokeStyle='#d9a8ee';ctx.lineWidth=7*scale;ctx.beginPath();ctx.arc(22*scale,-30*scale,36*scale,0,Math.PI*1.5);ctx.stroke();}
-        ctx.restore();
+    getPreviewFighter(key) {
+        if (!this.previewFighters.has(key)) {
+            const controls = currentBinds?.p1 || DEFAULT_BINDS.p1;
+            this.previewFighters.set(key, new Fighter(`preview-${key}`, key, 0, controls, true));
+        }
+        return this.previewFighters.get(key);
+    }
+
+    setPreviewAttackState(fighter, attacking, time, attackStarted) {
+        if (!attacking) {
+            fighter.attackState = 'idle';
+            fighter.stateTimer = 0;
+            fighter.maxStateTimer = 0;
+            return;
+        }
+        const elapsed = Math.max(0, time - attackStarted);
+        const phases = [
+            ['windup', 150],
+            ['active', 220],
+            ['recovery', 150]
+        ];
+        let remaining = elapsed;
+        for (const [state, duration] of phases) {
+            if (remaining <= duration) {
+                fighter.attackState = state;
+                fighter.maxStateTimer = duration;
+                fighter.stateTimer = duration - remaining;
+                return;
+            }
+            remaining -= duration;
+        }
+        fighter.attackState = 'idle';
+        fighter.stateTimer = 0;
+        fighter.maxStateTimer = 0;
     }
 
     drawBoss(canvas,key,time,attacking) {

@@ -4236,7 +4236,7 @@ class Fighter extends Entity {
         }
         else if (this.heroName === 'Macu') {
             ctx.save(); ctx.translate(0, 20);
-            let enemy = game.getEnemyOf(this);
+            let enemy = view.previewTarget || game.getEnemyOf(this);
             if (enemy) {
                 let mx = this.x + this.w/2; let my = this.y + 20; let ex = enemy.x + enemy.w/2; let ey = enemy.y + enemy.h/2;
                 let rDx = (ex - mx) * this.facing; let rDy = ey - my; let baseAimAngle = Math.atan2(rDy, rDx);

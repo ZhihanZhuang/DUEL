@@ -26,6 +26,9 @@ test('hero selection is data-driven and supports staged mode flows', () => {
     assert.match(source, /this\.mode === 'online'/);
     assert.match(source, /this\.mode === 'boss'/);
     assert.match(source, /skillCards\(hero\)/);
+    assert.match(source, /new Fighter\(`preview-\$\{key\}`/);
+    assert.match(source, /fighter\.draw\(ctx/);
+    assert.doesNotMatch(source, /drawWeapon\(ctx/);
     assert.match(networkSource, /heroSelectUI\.open\('online'\)/);
 });
 
