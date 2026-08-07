@@ -1074,6 +1074,25 @@ test('Itan Chiq applies heavy slow and bleed but can be deflected', () => {
     assert.equal(sola.solaFocus, 1);
 });
 
+test('Hoin regular arrows deal damage without knockback', () => {
+    const context = loadProjectileContext();
+    const owner = { id: 'archor', heroName: 'Archor' };
+    const hit = [];
+    const target = {
+        x: 100, y: 100, w: 40, h: 70, dead: false, invincible: 0,
+        buffs: {}, attackState: 'idle',
+        takeDamage(amount, attacker, isDoT, noKnockback) { hit.push({ amount, attacker, isDoT, noKnockback }); }
+    };
+    context.game.opponents = [target];
+
+    new context.window.Projectile(100, 100, 36, 4, 0, 0, 6, owner, '#ffffa8', 'archor_arrow').update(16);
+
+    assert.equal(hit.length, 1);
+    assert.equal(hit[0].amount, 6);
+    assert.equal(hit[0].attacker, owner);
+    assert.equal(hit[0].noKnockback, true);
+});
+
 test('Chiq paths last five seconds, control enemies, and heal Itan with Nu doubling', () => {
     const context = loadProjectileContext();
     const owner = { id: 'itan', heroName: 'Itan', hp: 100, maxHp: 200, dead: false };
