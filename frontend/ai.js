@@ -58,6 +58,7 @@ const HERO_TACTICS = {
     D2F1:    { role: 'drone_commander', aggression: 0.68, caution: 1.22, burst: 1.28, kite: 1.42, setup: 1.55, highGround: 1.24, retreatHp: 0.40, retreatFireChance: 0.56 },
     Laegon:  { role: 'thunder_mage', aggression: 0.86, caution: 0.90, burst: 1.42, kite: 1.20, setup: 0.72, highGround: 1.18, retreatHp: 0.34, retreatFireChance: 0.55 },
     Veyra:   { role: 'chronomancer', aggression: 0.48, caution: 1.42, burst: 0.72, kite: 1.38, setup: 1.75, highGround: 1.30, retreatHp: 0.45, retreatFireChance: 0.35 },
+    Vaeilash:{ role: 'blood_assassin', aggression: 1.38, caution: 0.42, burst: 1.55, kite: 0.15, setup: 0.55, highGround: 0.35, retreatHp: 0.24, retreatFireChance: 0.08 },
     Brom:    { role: 'demolitionist', aggression: 0.52, caution: 1.08, burst: 1.55, kite: 1.18, setup: 1.85, highGround: 0.92, retreatHp: 0.36, retreatFireChance: 0.30 },
     Axeron:  { role: 'power_assassin', aggression: 1.32, caution: 0.62, burst: 1.75, kite: 0.32, setup: 0.85, highGround: 0.48, retreatHp: 0.30, retreatFireChance: 0.08 },
     Ukon:    { role: 'dash_assassin', aggression: 1.38, caution: 0.58, burst: 1.82, kite: 0.36, setup: 1.05, highGround: 0.84, retreatHp: 0.27, retreatFireChance: 0.06 },
