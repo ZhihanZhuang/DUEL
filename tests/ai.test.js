@@ -2488,6 +2488,7 @@ test('Roka charges cannon fire, recoils opposite the shot, and empowers artiller
     assert.equal(normal.type, 'roka_cannonball');
     assert.equal(normal.damage, 40);
     assert.equal(normal.radius, 110);
+    assert.equal(Math.hypot(normal.vx, normal.vy), 21);
     assert.ok(normal.vx * ai.vx <= 0, 'Roka did not recoil opposite the cannonball');
 
     ai.superCooldown = 0;

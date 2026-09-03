@@ -2216,8 +2216,11 @@ class Fighter extends Entity {
             game.projectiles.push(new MechanicFanBlade(this, px, py - 4, Math.cos(aimAngle)*17, Math.sin(aimAngle)*17));
         }
         else if (this.heroName === 'Roka') {
-            const direction = this.getRokaAimVector();
-            const speed = 15;
+            // Fire along the smoothed weapon angle so quick target movement does not
+            // introduce a last-frame aim snap.
+            const aimAngle = this.rokaWeaponAngle || 0;
+            const direction = { x: this.facing * Math.cos(aimAngle), y: Math.sin(aimAngle) };
+            const speed = 21;
             const muzzleX = this.x + this.w/2 + direction.x*32, muzzleY = this.y + this.h*.42 + direction.y*24;
             game.projectiles.push(new RokaCannonball(this,muzzleX,muzzleY,direction.x*speed,direction.y*speed,this.rokaArtilleryTimer>0));
             const recoil = (this.rokaArtilleryTimer>0?18.75:15);
