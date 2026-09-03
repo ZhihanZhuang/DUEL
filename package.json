@@ -4,6 +4,7 @@
   "description": "Otokojuku: Legends Duel — fighting game with AI, online play, and retro UI",
   "main": "game.js",
   "scripts": {
+    "start": "node backend/server.js",
     "server": "node backend/server.js",
     "start:backend": "node backend/server.js",
     "install:backend": "npm install --prefix backend",

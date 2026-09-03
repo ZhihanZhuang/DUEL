@@ -11,14 +11,18 @@ const { Server } = require('socket.io');
 const { v4: uuidv4 } = require('uuid');
 
 const PORT = process.env.PORT || 3001;
+const allowedOrigins = (process.env.CORS_ORIGIN || '*')
+    .split(',')
+    .map(origin => origin.trim())
+    .filter(Boolean);
 const app = express();
-app.use(cors());
+app.use(cors({ origin: allowedOrigins.includes('*') ? '*' : allowedOrigins }));
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '..')));
 
 const server = http.createServer(app);
 const io = new Server(server, {
-    cors: { origin: '*', methods: ['GET', 'POST'] }
+    cors: { origin: allowedOrigins.includes('*') ? '*' : allowedOrigins, methods: ['GET', 'POST'] }
 });
 
 // --- In-memory stores (swap for Redis/DB in production) ---

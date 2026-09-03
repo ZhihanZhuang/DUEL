@@ -5,7 +5,10 @@
 
 const backendProtocol = window.location.protocol === 'https:' ? 'https:' : 'http:';
 const backendHost = window.location.hostname || 'localhost';
-const BACKEND_URL = window.DUEL_BACKEND_URL || `${backendProtocol}//${backendHost}:3001`;
+const isLocalBackendHost = ['localhost', '127.0.0.1', ''].includes(backendHost);
+const BACKEND_URL = window.DUEL_BACKEND_URL || (
+    isLocalBackendHost ? `${backendProtocol}//${backendHost || 'localhost'}:3001` : window.location.origin
+);
 
 let mpSocket = null;
 let mpConnected = false;
