@@ -384,6 +384,7 @@ function loadPhysicsGame(heroName = 'Hunter') {
             Voss: { maxHp: 750, speed: 5.6, jump: 15, width: 40, height: 70, color: '#5660a8', superCD: 22000 },
             Raigo: { maxHp: 800, speed: 6.4, jump: 16, width: 42, height: 72, color: '#287b8f', superCD: 22000 },
             Gelann: { maxHp: 750, speed: 6.1, jump: 15.5, width: 40, height: 70, color: '#b6422b', superCD: 24000 },
+            Vaeilash: { maxHp: 700, speed: 7.2, jump: 16, width: 36, height: 67, color: '#a71930', superCD: 24000 },
             Dogel: { maxHp: 800, speed: 5.8, jump: 15, width: 42, height: 72, color: '#7c2538', superCD: 26000 },
             Lapis: { maxHp: 650, speed: 5.2, jump: 14.5, width: 40, height: 68, color: '#4066b1', superCD: 24000 },
             Tonia: { maxHp: 700, speed: 4.9, jump: 14, width: 44, height: 70, color: '#61706e', superCD: 25000 },
@@ -2645,6 +2646,34 @@ test('Gelann uses a fast 2 WRD scimitar and deploys both zone-control skills', (
     ai.performSuper();
     assert.equal(ai.superCooldown, ai.superCooldownMax);
     assert.equal(context.game.hazards.at(-1).type, 'gelann_arrow_rain');
+});
+
+test('Vaeilash can move without auto-triggering Blood Moon', () => {
+    const simulation = loadPhysicsGame('Vaeilash');
+    const { ai, context } = simulation;
+    ai.attackState = 'idle';
+    ai.superCooldown = 0;
+    context.keys[ai.controls.right] = true;
+
+    ai.update(16);
+
+    assert.ok(ai.vx > 0, 'Vaeilash did not enter the shared movement path');
+    assert.equal(ai.vaeilashBloodMoon, 0, 'Blood Moon should not start without Super input');
+});
+
+test('Vaeilash Blood Moon starts from Super and boosts movement speed', () => {
+    const simulation = loadPhysicsGame('Vaeilash');
+    const { ai, context } = simulation;
+    ai.attackState = 'idle';
+    ai.superCooldown = 0;
+
+    ai.performSuper();
+    context.keys[ai.controls.right] = true;
+    ai.update(16);
+
+    assert.ok(ai.vaeilashBloodMoon > 0);
+    assert.equal(ai.superCooldown > 0, true);
+    assert.ok(ai.vx > ai.baseSpeed * 0.25, 'Blood Moon movement boost was not applied');
 });
 
 test('Gelann Flame Breath is a capped cone that burns and slows targets', () => {

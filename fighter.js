@@ -256,6 +256,10 @@ class Fighter extends Entity {
     }
 
     takeDamage(amt, attacker, isDoT = false, noKnockback = false, noHitReaction = false) {
+        if (!isDoT && this.heroName === 'Vaeilash' && this.vaeilashCounterTimer > 0 && attacker && attacker !== this && !attacker.dead) {
+            this.triggerVaeilashReversal(attacker);
+            return;
+        }
         if (this.dead || this.invincible > 0 || (this.heroName === 'Sola' && this.solaChargeTimer > 0)) return;
         const itanSuperDebuffImmune = this.heroName === 'Itan' && this.itanSuperWindupTimer > 0;
         const geDanceUninterruptible = this.heroName === 'Ge' && this.geDanceTimer > 0;
@@ -816,15 +820,6 @@ class Fighter extends Entity {
             this.vy = 0;
             return;
         }
-        if (this.heroName === 'Vaeilash') {
-            if (this.superCooldown <= 0 && this.vaeilashBloodMoon <= 0) {
-                this.superCooldown = this.superCooldownMax;
-                this.vaeilashBloodMoon = 8000;
-                for (let i = 0; i < 20; i++) game.particles.push(new Particle(this.x + this.w/2, this.y + this.h/2, '#ff304f', (Math.random()-0.5)*12, (Math.random()-0.5)*12, 420, 4));
-            }
-            return;
-        }
-
         if (this.solaForceFallPending && !this.solaForceHeld) {
             this.solaForceFallPeakY = Math.min(this.solaForceFallPeakY ?? this.y, this.y);
         }
@@ -1002,6 +997,7 @@ class Fighter extends Entity {
         if (this.heroName === 'Kuro' && this.attackState === 'charging') currentSpeed *= 0.55;
 
         if (this.buffs.msBoost > 0) currentSpeed *= (this.heroName === 'Wolf' ? 1.3 : 1.2);
+        if (this.heroName === 'Vaeilash' && this.vaeilashBloodMoon > 0) currentSpeed *= 1.35;
         if (this.heroName === 'Itan' && this.buffs.nuMode > 0) currentSpeed *= 1.35;
         if (this.heroName === 'Gelann' && this.gelannBreathTimer > 0) currentSpeed *= 0.35;
         if (this.heroName === 'Dogel' && this.dogelReaperTimer > 0) currentSpeed *= 1.2;
@@ -2279,28 +2275,85 @@ class Fighter extends Entity {
         this.vaeilashCombo++;
         const mark = this.vaeilashMarks.get(target) || { count: 0, life: 0 };
         mark.count++; mark.life = this.vaeilashBloodMoon > 0 ? 8000 : 5000;
-        if (mark.count >= 3) { mark.count = 0; target.buffs = target.buffs || {}; target.buffs.bleed = Math.max(target.buffs.bleed || 0, 2000); this.heal(15); }
+        if (mark.count >= 3) {
+            this.triggerVaeilashBloodMark(target, mark);
+        }
         this.vaeilashMarks.set(target, mark);
         if (this.vaeilashCombo >= 3) { this.vaeilashCombo = 0; this.heal(10); }
         if (this.vaeilashBloodMoon > 0) this.heal(5);
     }
 
+    triggerVaeilashBloodMark(target, mark = this.vaeilashMarks?.get(target)) {
+        if (!target || target.dead) return false;
+        const activeMark = mark || { count: 0, life: 0 };
+        activeMark.count = 0;
+        activeMark.life = 0;
+        target.buffs = target.buffs || {};
+        target.buffs.bleed = Math.max(target.buffs.bleed || 0, 2000);
+        this.heal(15);
+        if (this.vaeilashBloodMoon > 0) {
+            const direction = target.x + target.w/2 >= this.x + this.w/2 ? 1 : -1;
+            this.facing = direction;
+            this.x = Math.max(0, Math.min(CANVAS_W - this.w, target.x - direction * (this.w + 10)));
+            this.vx = direction * 5;
+            this.invincible = Math.max(this.invincible || 0, 120);
+        }
+        for (let i = 0; i < 14; i++) game.particles.push(new Particle(target.x + target.w/2, target.y + target.h/2, i % 2 ? '#ff304f' : '#ffd1d8', (Math.random()-0.5)*9, (Math.random()-0.5)*9, 360, 4));
+        return true;
+    }
+
     executeVaeilashFinisher() {
         const target = game.getEnemyOf(this); if (!target || target.dead) return;
         const before = target.hp; target.takeDamage(60, this, false, true); this.heal(Math.max(0, before - target.hp) * .5); target.vx = this.facing * 10;
+        for (let i = 0; i < 28; i++) {
+            const angle = (i % 2 ? -0.7 : 0.7) + (Math.random() - 0.5) * 0.35;
+            game.particles.push(new Particle(target.x + target.w/2, target.y + target.h/2, i % 2 ? '#ff304f' : '#ffffff', Math.cos(angle) * 12 * this.facing, Math.sin(angle) * 10, 430, 5));
+        }
     }
 
     startVaeilashBloodstep() {
         if (this.heroName !== 'Vaeilash' || this.vaeilashBloodstepCooldown > 0) return false;
+        const startX = this.x;
         const direction = keys[this.controls.left] && !keys[this.controls.right] ? -1 : (keys[this.controls.right] ? 1 : this.facing);
         this.facing = direction; this.x = Math.max(0, Math.min(CANVAS_W - this.w, this.x + direction * 150)); this.vx = direction * 8; this.invincible = 180; this.vaeilashBloodstepCooldown = this.vaeilashBloodMoon > 0 ? 2500 : 5000;
-        for (const target of game.getOpponentsOf(this)) if (checkAABB({x: Math.min(this.x, this.x - direction*150), y: this.y, w: this.w+150, h: this.h}, target)) target.takeDamage(10, this, false, true);
+        const trailX = direction > 0 ? startX : this.x;
+        const sweptBox = { x: trailX, y: this.y - 8, w: Math.abs(this.x - startX) + this.w, h: this.h + 16 };
+        for (let i = 0; i < 12; i++) game.particles.push(new Particle(startX + this.w/2 + direction * i * 12, this.y + 18 + Math.random()*34, '#ff304f', -direction * (1 + Math.random()*3), (Math.random()-0.5)*3, 300, 3));
+        for (const target of game.getOpponentsOf(this)) {
+            if (!checkAABB(sweptBox, target)) continue;
+            target.takeDamage(10, this, false, true);
+            const mark = this.vaeilashMarks?.get(target);
+            if (mark && mark.count >= 3) this.triggerVaeilashBloodMark(target, mark);
+        }
         return true;
     }
 
     startVaeilashReversal() {
         if (this.heroName !== 'Vaeilash' || this.vaeilashReversalCooldown > 0) return false;
-        this.vaeilashReversalCooldown = 9000; this.vaeilashCounterTimer = 600; this.invincible = 600; return true;
+        this.vaeilashReversalCooldown = 9000; this.vaeilashCounterTimer = 600; this.invincible = 600;
+        for (let i = 0; i < 10; i++) game.particles.push(new Particle(this.x + this.w/2, this.y + this.h/2, '#ff7890', (Math.random()-0.5)*6, (Math.random()-0.5)*6, 260, 3));
+        return true;
+    }
+
+    triggerVaeilashReversal(attacker) {
+        if (!attacker || attacker.dead) return false;
+        this.vaeilashCounterTimer = 0;
+        this.invincible = 260;
+        const direction = attacker.facing || (attacker.x + attacker.w/2 < this.x + this.w/2 ? 1 : -1);
+        this.facing = -direction;
+        this.x = Math.max(0, Math.min(CANVAS_W - this.w, attacker.x + attacker.w/2 + direction * (attacker.w/2 + 10)));
+        this.y = Math.min(this.y, attacker.y);
+        this.vx = -direction * 5;
+        const before = Number.isFinite(attacker.hp) ? attacker.hp : null;
+        attacker.takeDamage(25, this, false, true);
+        const actual = before === null ? 25 : Math.max(0, before - Math.max(0, attacker.hp));
+        this.heal(Math.max(actual, 0) ? 15 : 0);
+        const mark = this.vaeilashMarks.get(attacker) || { count: 0, life: 0 };
+        mark.count = Math.min(3, mark.count + 1);
+        mark.life = this.vaeilashBloodMoon > 0 ? 8000 : 5000;
+        this.vaeilashMarks.set(attacker, mark);
+        for (let i = 0; i < 18; i++) game.particles.push(new Particle(attacker.x + attacker.w/2, attacker.y + attacker.h/2, i % 2 ? '#ff304f' : '#260d16', (Math.random()-0.5)*12, (Math.random()-0.5)*10, 360, 4));
+        return true;
     }
 
     getRokaAimVector() {
@@ -3120,6 +3173,21 @@ class Fighter extends Entity {
             return;
         }
 
+        if (this.heroName === 'Vaeilash') {
+            if (this.superCooldown <= 0 && this.vaeilashBloodMoon <= 0) {
+                this.superCooldown = this.superCooldownMax;
+                this.vaeilashBloodMoon = 8000;
+                this.vaeilashBloodMoonWasActive = true;
+                this.attackState = 'idle';
+                this.stateTimer = 0;
+                for (let i = 0; i < 30; i++) {
+                    const angle = Math.random() * Math.PI * 2;
+                    game.particles.push(new Particle(this.x + this.w/2, this.y + this.h/2, i % 2 ? '#ff304f' : '#ffd1d8', Math.cos(angle)*11, Math.sin(angle)*11, 520, 5));
+                }
+            }
+            return;
+        }
+
         if (this.heroName === 'Itan') {
             if (this.superCooldown <= 0 && this.itanSuperWindupTimer <= 0) {
                 this.superCooldown = this.superCooldownMax;
@@ -3700,9 +3768,16 @@ class Fighter extends Entity {
             ctx.fillStyle='#d9c0ff';ctx.fillRect(-hw+5,8,this.w-10,14);ctx.fillStyle='#3d2360';ctx.fillRect(-hw,31,this.w,8);
             ctx.strokeStyle='#e0c8ff';ctx.lineWidth=2;ctx.beginPath();ctx.arc(0,48,10,0,Math.PI*2);ctx.stroke();
         } else if (this.heroName === 'Vaeilash') {
-            ctx.fillStyle='#260d16';ctx.fillRect(-hw-3,-3,this.w+6,h+6);ctx.fillStyle=this.color;ctx.fillRect(-hw,0,this.w,h);
-            ctx.fillStyle='#f0c0b0';ctx.fillRect(-hw+5,8,this.w-10,13);ctx.fillStyle='#180d16';ctx.fillRect(-hw,29,this.w,10);
-            if (this.vaeilashBloodMoon > 0) { ctx.strokeStyle='rgba(255,48,79,.8)';ctx.shadowBlur=16;ctx.shadowColor='#ff304f';ctx.lineWidth=3;ctx.strokeRect(-hw-6,-6,this.w+12,h+12);ctx.shadowBlur=0; }
+            ctx.fillStyle='#12070d';ctx.fillRect(-hw-4,-3,this.w+8,h+6);
+            ctx.fillStyle=this.color;ctx.fillRect(-hw,0,this.w,h);
+            ctx.fillStyle='#f0c0b0';ctx.fillRect(-hw+5,8,this.w-10,13);
+            ctx.fillStyle='#180d16';ctx.fillRect(-hw,27,this.w,12);
+            ctx.fillStyle='#3d101c';ctx.fillRect(-hw+4,43,7,h-43);ctx.fillRect(hw-11,43,7,h-43);
+            ctx.fillStyle='#ff4964';ctx.fillRect(-hw+4,25,this.w-8,3);
+            if (this.vaeilashCounterTimer > 0) {
+                ctx.strokeStyle='rgba(255,120,144,.8)';ctx.lineWidth=2;ctx.beginPath();ctx.arc(0,31,32,0,Math.PI*2);ctx.stroke();
+            }
+            if (this.vaeilashBloodMoon > 0) { ctx.strokeStyle='rgba(255,48,79,.8)';ctx.shadowBlur=18;ctx.shadowColor='#ff304f';ctx.lineWidth=3;ctx.strokeRect(-hw-7,-7,this.w+14,h+14);ctx.shadowBlur=0; }
         } else if (this.heroName === 'Brom') {
             ctx.fillStyle='#382116';ctx.fillRect(-hw-3,-3,this.w+6,h+6);ctx.fillStyle=this.color;ctx.fillRect(-hw,0,this.w,h);
             ctx.fillStyle='#f5d29b';ctx.fillRect(-hw+5,8,this.w-10,14);ctx.fillStyle='#30251f';ctx.fillRect(-hw,30,this.w,10);
@@ -3953,8 +4028,27 @@ class Fighter extends Entity {
         }
         else if (this.heroName === 'Vaeilash') {
             ctx.save(); ctx.translate(hw - 2, 29);
-            let swing = this.attackState === 'active' ? -1.2 + phaseProg * 2.8 : .35;
-            for (const side of [-1, 1]) { ctx.save(); ctx.scale(side, 1); ctx.rotate(swing + side * .16); ctx.fillStyle='#30151b';ctx.fillRect(-3,-6,7,29);ctx.fillStyle='#c7d5dc';ctx.strokeStyle='#ff4964';ctx.lineWidth=2;ctx.shadowBlur=this.vaeilashBloodMoon>0?12:5;ctx.shadowColor='#ff304f';ctx.beginPath();ctx.moveTo(2,-42);ctx.lineTo(11,-35);ctx.lineTo(5,-3);ctx.lineTo(-2,-9);ctx.closePath();ctx.fill();ctx.stroke();ctx.restore(); }
+            let swing = .55;
+            if (this.attackState === 'windup') swing = .55 - .95 * phaseProg;
+            else if (this.attackState === 'active') swing = -1.25 + phaseProg * 3.2;
+            else if (this.attackState === 'recovery') swing = 1.95 - phaseProg * 1.4;
+            if (this.attackState === 'active') {
+                ctx.strokeStyle = 'rgba(255,48,79,.45)';
+                ctx.lineWidth = 15;
+                ctx.beginPath(); ctx.arc(0, 0, 64, -1.55, 1.35); ctx.stroke();
+            }
+            for (const side of [-1, 1]) {
+                ctx.save();
+                ctx.scale(side, 1);
+                ctx.rotate(swing + side * .34);
+                ctx.fillStyle='#2a1218';ctx.fillRect(-5,-7,10,36);
+                ctx.fillStyle='#ff4964';ctx.fillRect(-9,-9,18,5);
+                ctx.fillStyle='#dfe9ee';ctx.strokeStyle='#ff4964';ctx.lineWidth=2;ctx.shadowBlur=this.vaeilashBloodMoon>0?16:7;ctx.shadowColor='#ff304f';
+                ctx.beginPath();ctx.moveTo(0,-76);ctx.lineTo(14,-62);ctx.lineTo(7,-5);ctx.lineTo(-7,-5);ctx.lineTo(-14,-62);ctx.closePath();ctx.fill();ctx.stroke();
+                ctx.fillStyle='#ffffff';ctx.fillRect(-2,-66,4,50);
+                ctx.shadowBlur=0;
+                ctx.restore();
+            }
             ctx.restore();
         }
         else if (this.heroName === 'Brom') {
@@ -4489,13 +4583,18 @@ class Fighter extends Entity {
             ctx.shadowBlur = 0;
         }
 
-        if (this.vaeilashMarks) {
-            const mark = [...this.vaeilashMarks.values()][0];
-            if (mark && mark.count > 0) {
-                ctx.save();ctx.translate(this.x + this.w/2, this.y - 24);ctx.fillStyle='#ff304f';ctx.shadowBlur=9;ctx.shadowColor='#ff304f';
-                for (let i=0;i<mark.count;i++) { ctx.rotate(Math.PI*2/mark.count);ctx.beginPath();ctx.moveTo(0,-9);ctx.lineTo(4,-2);ctx.lineTo(0,5);ctx.lineTo(-4,-2);ctx.closePath();ctx.fill(); }
-                ctx.restore();
+        const vaeilashMarkCount = typeof game !== 'undefined' && typeof game.getFighters === 'function'
+            ? game.getFighters().reduce((count, fighter) => {
+                const mark = fighter?.heroName === 'Vaeilash' && fighter.vaeilashMarks ? fighter.vaeilashMarks.get(this) : null;
+                return Math.max(count, mark?.count || 0);
+            }, 0)
+            : 0;
+        if (vaeilashMarkCount > 0) {
+            ctx.save();ctx.translate(this.x + this.w/2, this.y - 24);ctx.fillStyle='#ff304f';ctx.shadowBlur=10;ctx.shadowColor='#ff304f';
+            for (let i=0;i<vaeilashMarkCount;i++) {
+                ctx.save();ctx.rotate(i * Math.PI*2 / 3);ctx.translate(0,-10);ctx.beginPath();ctx.moveTo(0,-7);ctx.lineTo(5,0);ctx.lineTo(0,7);ctx.lineTo(-5,0);ctx.closePath();ctx.fill();ctx.restore();
             }
+            ctx.restore();
         }
 
         if (revealOwnedKuro) {
