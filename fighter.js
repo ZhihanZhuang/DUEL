@@ -33,6 +33,12 @@ class Fighter extends Entity {
         this.flightDisabled = false;
         this.lastAttacker = null;
         this.lastAttackerTimer = 0;
+        if (this.heroName === 'Vaeilash') {
+            this.vaeilashBloodMoon = 0;
+            this.vaeilashComboTarget = null;
+            this.vaeilashCombo = 0;
+            this.vaeilashMarks = new Map();
+        }
 
         this.hasonAmmo = 6; this.hasonReloadTimer = 0; this.hasonSuperCharges = 0; this.hasonSuperWindow = 0;
         this.williSuperCharges = 0; this.williSuperWindow = 0; this.williDashCooldown = 0;
@@ -650,6 +656,7 @@ class Fighter extends Entity {
             }
         }
         if (this.heroName === 'Veyra') this.updateVeyraTime(dt);
+        if (this.heroName === 'Vaeilash' && this.vaeilashBloodMoon > 0) this.vaeilashBloodMoon = Math.max(0, this.vaeilashBloodMoon - dt);
         if (this.heroName === 'Brom' && this.bromStickyBomb?.dead) this.bromStickyBomb = null;
         if (this.heroName === 'Axeron') {
             this.axeronMarks.forEach(mark => mark.life -= dt);
@@ -796,6 +803,14 @@ class Fighter extends Entity {
             this.y = this.grappledBy.y;
             this.vx = 0;
             this.vy = 0;
+            return;
+        }
+        if (this.heroName === 'Vaeilash') {
+            if (this.superCooldown <= 0 && this.vaeilashBloodMoon <= 0) {
+                this.superCooldown = this.superCooldownMax;
+                this.vaeilashBloodMoon = 8000;
+                for (let i = 0; i < 20; i++) game.particles.push(new Particle(this.x + this.w/2, this.y + this.h/2, '#ff304f', (Math.random()-0.5)*12, (Math.random()-0.5)*12, 420, 4));
+            }
             return;
         }
 
@@ -1955,6 +1970,7 @@ class Fighter extends Entity {
             return this.raigoArmorTimer > 0 ? damage * 1.5 : damage;
         }
         if (this.heroName === 'Gelann') return 20;
+        if (this.heroName === 'Vaeilash') return 15;
         if (this.heroName === 'Dogel') return this.dogelChargedDamage || 20;
         if (this.heroName === 'Lapis' && this.lapisWhipTimer > 0) return 24;
         if (this.heroName === 'Ge') return this.geGodTimer > 0 ? 60 : 30;
@@ -2030,6 +2046,7 @@ class Fighter extends Entity {
         if (this.heroName === 'Voss') this.stateTimer = this.vossCopyTimer > 0 ? 90 : 120;
         if (this.heroName === 'Raigo') this.stateTimer = 70;
         if (this.heroName === 'Gelann') this.stateTimer = 70;
+        if (this.heroName === 'Vaeilash') this.stateTimer = this.vaeilashBloodMoon > 0 ? 25 : 50;
         if (this.heroName === 'Lapis') this.stateTimer = this.lapisWhipTimer > 0 ? 45 : 180;
         if (this.heroName === 'Ge') this.stateTimer = 120;
         if (this.heroName === 'Lak') this.stateTimer = 220;

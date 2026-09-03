@@ -357,6 +357,11 @@ var HEROES = {
         color: "#9d5cff", maxHp: 700, speed: 6.2, jump: 14.5, width: 39, height: 69, superCD: 18000,
         ui: { hp: "70 WRD", atk: "3 WRD (Chrono Bolt)", passive: "Movement leaves up to 3 temporal echoes that slow enemies on contact. Press [Switch] to place a visible 12s Time Anchor (max 2; oldest is replaced).", super: "<span class='skill-tag'>Time Reversal</span> After a 1s charge, returns Veyra to his position about 3s ago or a recent valid anchor, and restores half the HP lost during those 3s. Only Veyra's position and HP are reversed." }
     },
+    Vaeilash: {
+        name: "Vaeilash", desc: "Twin-Blade Blood Assassin",
+        color: "#a71930", maxHp: 700, speed: 7.2, jump: 16, width: 36, height: 67, superCD: 24000,
+        ui: { hp: "70 WRD", atk: "1.5 WRD (Twin Blades)", passive: "Rapid close-range attacks build Blood Marks. Every third consecutive hit on one target restores 1 WRD and three marks trigger Bleeding.", super: "Blood Moon empowers Vaeilash for 8s: +35% movement, +50% attack speed, 0.5 WRD lifesteal per hit, longer marks, and a 6 WRD finishing cross-slash." }
+    },
     Brom: {
         name: "Brom", desc: "Demolitionist and Area Controller",
         color: "#e67e22", maxHp: 800, speed: 5.8, jump: 14, width: 43, height: 71, superCD: 24000,
