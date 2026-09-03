@@ -1336,6 +1336,7 @@ class Fighter extends Entity {
                         if (this.heroName === 'Veyra') activeTime = 90;
                         if (this.heroName === 'Brom') activeTime = 130;
                         if (this.heroName === 'Axeron') activeTime = 120;
+                        if (this.heroName === 'Vaeilash') activeTime = this.vaeilashBloodMoon > 0 ? 45 : 70;
                         if (this.heroName === 'Dogel') activeTime = this.dogelReaperTimer > 0 ? 90 : 130;
                         if (this.heroName === 'Lapis') activeTime = this.lapisWhipTimer > 0 ? 95 : 80;
 
@@ -1488,6 +1489,7 @@ class Fighter extends Entity {
                     if (this.heroName === 'Voss') recTime = 210;
                     if (this.heroName === 'Raigo') recTime = 115;
                     if (this.heroName === 'Gelann') recTime = 130;
+                    if (this.heroName === 'Vaeilash') recTime = this.vaeilashBloodMoon > 0 ? 55 : 85;
                     if (this.heroName === 'Dogel') recTime = this.dogelReaperTimer > 0 ? 150 : 330;
                     if (this.heroName === 'Lapis') recTime = this.lapisWhipTimer > 0 ? 115 : 260;
 
@@ -2058,7 +2060,7 @@ class Fighter extends Entity {
         if (this.heroName === 'Voss') this.stateTimer = this.vossCopyTimer > 0 ? 90 : 120;
         if (this.heroName === 'Raigo') this.stateTimer = 70;
         if (this.heroName === 'Gelann') this.stateTimer = 70;
-        if (this.heroName === 'Vaeilash') this.stateTimer = this.vaeilashBloodMoon > 0 ? 25 : 50;
+        if (this.heroName === 'Vaeilash') this.stateTimer = this.vaeilashBloodMoon > 0 ? 18 : 35;
         if (this.heroName === 'Lapis') this.stateTimer = this.lapisWhipTimer > 0 ? 45 : 180;
         if (this.heroName === 'Ge') this.stateTimer = 120;
         if (this.heroName === 'Lak') this.stateTimer = 220;

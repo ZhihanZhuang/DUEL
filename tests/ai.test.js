@@ -2676,6 +2676,34 @@ test('Vaeilash Blood Moon starts from Super and boosts movement speed', () => {
     assert.ok(ai.vx > ai.baseSpeed * 0.25, 'Blood Moon movement boost was not applied');
 });
 
+test('Vaeilash uses assassin-speed attack timings', () => {
+    const simulation = loadPhysicsGame('Vaeilash');
+    const { ai } = simulation;
+    ai.attackState = 'idle';
+
+    ai.performAttack();
+    assert.equal(ai.stateTimer, 35);
+    ai.stateTimer = 0;
+    ai.update(16);
+    assert.equal(ai.attackState, 'active');
+    assert.equal(ai.stateTimer, 70);
+    ai.stateTimer = 0;
+    ai.update(16);
+    assert.equal(ai.attackState, 'recovery');
+    assert.equal(ai.stateTimer, 85);
+
+    ai.attackState = 'idle';
+    ai.vaeilashBloodMoon = 8000;
+    ai.performAttack();
+    assert.equal(ai.stateTimer, 18);
+    ai.stateTimer = 0;
+    ai.update(16);
+    assert.equal(ai.stateTimer, 45);
+    ai.stateTimer = 0;
+    ai.update(16);
+    assert.equal(ai.stateTimer, 55);
+});
+
 test('Gelann Flame Breath is a capped cone that burns and slows targets', () => {
     const context = loadProjectileContext();
     const owner = { id: 'gelann', heroName: 'Gelann', x: 100, y: 500, w: 40, h: 70, facing: 1, dead: false };
