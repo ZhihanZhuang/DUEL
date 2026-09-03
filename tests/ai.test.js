@@ -2667,7 +2667,8 @@ test('Gelann Rain of Arrows telegraphs then deals 6 WRD with an exact 45% slow',
     const context = loadProjectileContext();
     const owner = { id: 'gelann', heroName: 'Gelann', x: 100, y: 500, w: 40, h: 70, facing: 1, dead: false };
     const target = { id: 'target', heroName: 'Hunter', x: 350, y: 500, w: 40, h: 70, hp: 100, buffs: {}, dead: false, invincible: 0, takeDamage(amount) { this.hp -= amount; } };
-    context.game.opponents = [target];
+    const farTarget = { id: 'far-target', heroName: 'Hunter', x: 1080, y: 500, w: 40, h: 70, hp: 100, buffs: {}, dead: false, invincible: 0, takeDamage(amount) { this.hp -= amount; } };
+    context.game.opponents = [target, farTarget];
     const rain = new context.window.GelannArrowRain(owner, target.x + target.w/2);
 
     rain.update(750);
@@ -2675,6 +2676,7 @@ test('Gelann Rain of Arrows telegraphs then deals 6 WRD with an exact 45% slow',
     for (let hit = 0; hit < 5; hit++) rain.update(500);
 
     assert.equal(target.hp, 40);
+    assert.equal(farTarget.hp, 40, 'full-arena rain missed a distant target');
     assert.equal(target.buffs.gelannArrowSlow, 2000);
 });
 

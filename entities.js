@@ -1372,8 +1372,8 @@ class GelannFlameCone extends Entity {
 
 class GelannArrowRain extends Entity {
     constructor(owner, targetX) {
-        const width = Math.min(560, Math.max(360, CANVAS_W * 0.44));
-        super(Math.max(0, Math.min(CANVAS_W - width, targetX - width/2)), 0, width, GROUND_Y);
+        const width = CANVAS_W;
+        super(0, 0, width, GROUND_Y);
         this.owner = owner;
         this.type = 'gelann_arrow_rain';
         this.warning = 750;
