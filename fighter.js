@@ -38,6 +38,9 @@ class Fighter extends Entity {
             this.vaeilashComboTarget = null;
             this.vaeilashCombo = 0;
             this.vaeilashMarks = new Map();
+            this.vaeilashBloodstepCooldown = 0;
+            this.vaeilashReversalCooldown = 0;
+            this.vaeilashCounterTimer = 0;
         }
 
         this.hasonAmmo = 6; this.hasonReloadTimer = 0; this.hasonSuperCharges = 0; this.hasonSuperWindow = 0;
@@ -657,6 +660,14 @@ class Fighter extends Entity {
         }
         if (this.heroName === 'Veyra') this.updateVeyraTime(dt);
         if (this.heroName === 'Vaeilash' && this.vaeilashBloodMoon > 0) this.vaeilashBloodMoon = Math.max(0, this.vaeilashBloodMoon - dt);
+        if (this.heroName === 'Vaeilash') {
+            this.vaeilashBloodstepCooldown = Math.max(0, this.vaeilashBloodstepCooldown - dt);
+            this.vaeilashReversalCooldown = Math.max(0, this.vaeilashReversalCooldown - dt);
+            if (this.vaeilashCounterTimer > 0 && (this.vaeilashCounterTimer = Math.max(0, this.vaeilashCounterTimer - dt)) <= 0) this.invincible = 0;
+            for (const [target, mark] of this.vaeilashMarks) { mark.life -= dt; if (mark.life <= 0 || target.dead) this.vaeilashMarks.delete(target); }
+            if (this.vaeilashBloodMoon <= 0 && this.vaeilashBloodMoonWasActive) { this.vaeilashBloodMoonWasActive = false; this.executeVaeilashFinisher(); }
+            if (this.vaeilashBloodMoon > 0) this.vaeilashBloodMoonWasActive = true;
+        }
         if (this.heroName === 'Brom' && this.bromStickyBomb?.dead) this.bromStickyBomb = null;
         if (this.heroName === 'Axeron') {
             this.axeronMarks.forEach(mark => mark.life -= dt);
@@ -1354,7 +1365,8 @@ class Fighter extends Entity {
                             enemy.takeDamage(this.getMeleeDamage(), this);
                             const actualDamage = hpBefore === null ? this.getMeleeDamage() : Math.max(0, hpBefore - Math.max(0, enemy.hp));
                             if ((this.heroName === 'Dogel' && this.dogelReaperTimer > 0) || (this.heroName === 'Lapis' && this.lapisWhipTimer > 0) || (this.heroName === 'Ge' && this.geGodTimer > 0)) this.heal(actualDamage * (this.heroName === 'Lapis' ? .2 : .25));
-                            if (this.heroName === 'Raigo') this.onRaigoBasicHit(enemy, hpBefore === null ? this.getMeleeDamage() : Math.max(0, hpBefore - Math.max(0, enemy.hp)));
+                        if (this.heroName === 'Raigo') this.onRaigoBasicHit(enemy, hpBefore === null ? this.getMeleeDamage() : Math.max(0, hpBefore - Math.max(0, enemy.hp)));
+                            if (this.heroName === 'Vaeilash') this.onVaeilashBasicHit(enemy, actualDamage);
                             targetsHit.push(enemy);
                         }
                     }
@@ -1606,6 +1618,8 @@ class Fighter extends Entity {
                     }
                 } else if (this.heroName === 'Archor' && this.archorSpeedCooldown <= 0) {
                     this.cleanseHoinDebuffs();
+                } else if (this.heroName === 'Vaeilash' && this.attackState === 'idle') {
+                    this.startVaeilashBloodstep();
                 } else if (this.heroName === 'Itan' && this.buffs.nuMode <= 0) {
                     this.buffs.nuMode = 8000;
                     for (let i = 0; i < 18; i++) game.particles.push(new Particle(this.x + this.w/2, this.y + this.h/2, '#ff3030', (Math.random()-0.5)*13, (Math.random()-0.5)*13, 420, 4));
@@ -2255,6 +2269,36 @@ class Fighter extends Entity {
             game.projectiles.push(new PatThread(this,target,false));
         }
         if (this.vossCopyActive) this.queueVossMirror(this.getVossCopiedDamage(), 'copy', tx, ty);
+    }
+
+    onVaeilashBasicHit(target, actualDamage) {
+        if (!target || actualDamage <= 0) return;
+        if (this.vaeilashComboTarget !== target) { this.vaeilashComboTarget = target; this.vaeilashCombo = 0; }
+        this.vaeilashCombo++;
+        const mark = this.vaeilashMarks.get(target) || { count: 0, life: 0 };
+        mark.count++; mark.life = this.vaeilashBloodMoon > 0 ? 8000 : 5000;
+        if (mark.count >= 3) { mark.count = 0; target.buffs = target.buffs || {}; target.buffs.bleed = Math.max(target.buffs.bleed || 0, 2000); this.heal(15); }
+        this.vaeilashMarks.set(target, mark);
+        if (this.vaeilashCombo >= 3) { this.vaeilashCombo = 0; this.heal(10); }
+        if (this.vaeilashBloodMoon > 0) this.heal(5);
+    }
+
+    executeVaeilashFinisher() {
+        const target = game.getEnemyOf(this); if (!target || target.dead) return;
+        const before = target.hp; target.takeDamage(60, this, false, true); this.heal(Math.max(0, before - target.hp) * .5); target.vx = this.facing * 10;
+    }
+
+    startVaeilashBloodstep() {
+        if (this.heroName !== 'Vaeilash' || this.vaeilashBloodstepCooldown > 0) return false;
+        const direction = keys[this.controls.left] && !keys[this.controls.right] ? -1 : (keys[this.controls.right] ? 1 : this.facing);
+        this.facing = direction; this.x = Math.max(0, Math.min(CANVAS_W - this.w, this.x + direction * 150)); this.vx = direction * 8; this.invincible = 180; this.vaeilashBloodstepCooldown = this.vaeilashBloodMoon > 0 ? 2500 : 5000;
+        for (const target of game.getOpponentsOf(this)) if (checkAABB({x: Math.min(this.x, this.x - direction*150), y: this.y, w: this.w+150, h: this.h}, target)) target.takeDamage(10, this, false, true);
+        return true;
+    }
+
+    startVaeilashReversal() {
+        if (this.heroName !== 'Vaeilash' || this.vaeilashReversalCooldown > 0) return false;
+        this.vaeilashReversalCooldown = 9000; this.vaeilashCounterTimer = 600; this.invincible = 600; return true;
     }
 
     getRokaAimVector() {
