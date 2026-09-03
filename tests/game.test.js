@@ -226,6 +226,64 @@ test('local viewing perspective follows online role and excludes spectators', ()
     assert.equal(game.getLocalControlledFighter(), null);
 });
 
+test('online snapshots preserve host camera position', () => {
+    const networkSource = fs.readFileSync(path.join(__dirname, '..', 'network.js'), 'utf8');
+
+    const p1 = { id: 'p1', heroName: 'Noae', x: 310, y: 500, w: 40, h: 70, buffs: {}, controls: {} };
+    const p2 = { id: 'p2', heroName: 'Wolf', x: 620, y: 500, w: 40, h: 70, buffs: {}, controls: {} };
+    const game = {
+        p1,
+        p2,
+        fighters: [p1, p2],
+        projectiles: [],
+        minions: [],
+        particles: [],
+        hazards: [],
+        hurricane: null,
+        hitstop: 0,
+        screenShakeTimer: 0,
+        screenShakeMagnitude: 0,
+        camera: { x: 240 },
+        update() {},
+        updateUI() {},
+        endGame() {}
+    };
+    const context = {
+        window: { Game: function Game() {}, game },
+        Particle: function Particle() {},
+        SwordShadow: function SwordShadow() {},
+        KuroDecoy: function KuroDecoy() {},
+        UkonShadow: function UkonShadow() {},
+        PeachTree: function PeachTree() {},
+        GiantSword: function GiantSword() {},
+        LandMine: function LandMine() {},
+        Minecart: function Minecart() {},
+        Hazard: function Hazard() {},
+        FireDragon: function FireDragon() {},
+        Projectile: function Projectile() {},
+        GravityWell: function GravityWell() {},
+        ChiqPath: function ChiqPath() {},
+        D2FDrone: function D2FDrone() {},
+        D2FTargetBeacon: function D2FTargetBeacon() {},
+        D2FGiantRobot: function D2FGiantRobot() {},
+        Minion: function Minion() {},
+        Skeleton: function Skeleton() {},
+        Puppet: function Puppet() {},
+        Hurricane: function Hurricane() {},
+        document: { getElementById: () => ({ onclick: null }) },
+        localStorage: { getItem: () => '' }
+    };
+    context.window.Game.prototype = game;
+    vm.createContext(context);
+    vm.runInContext(networkSource.slice(0, networkSource.indexOf("document.getElementById('btn-online')")), context, { filename: 'network.js' });
+
+    const snapshot = context.window.Game.prototype.exportState.call(game);
+    game.camera.x = 0;
+    context.window.Game.prototype.importState.call(game, snapshot);
+
+    assert.equal(game.camera.x, 240);
+});
+
 test('match start exposes the Menu button only in single-player modes', () => {
     const harness = loadGameClass();
     const { context } = harness;

@@ -1962,6 +1962,18 @@ test('online input synchronization preserves held and pressed Super states', () 
 
     context.window.applyRemoteOnlineInputs({ super: false });
     assert.equal(context.window.keys[p2.super], false);
+
+    context.window.game = {
+        getLocalControlledFighter: () => ({ controls: p2 })
+    };
+    context.window.keys[p1.super] = false;
+    context.window.keys[p2.right] = true;
+    context.window.keys[p2.super] = true;
+    context.window.keysPressed[p2.super] = true;
+    const challengerInputs = context.window.collectLocalOnlineInputs();
+    assert.equal(challengerInputs.right, true);
+    assert.equal(challengerInputs.super, true);
+    assert.equal(challengerInputs.pSuper, true);
 });
 
 test('Laegon lightning branches without duplicate hits and gains anti-summon damage', () => {

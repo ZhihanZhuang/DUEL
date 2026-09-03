@@ -37,7 +37,8 @@ window.updateLoginStatus = updateLoginStatus;
 window.updateOnlineHeroLabel = updateOnlineHeroLabel;
 
 function collectLocalOnlineInputs() {
-    const binds = window.currentBinds.p1;
+    const localFighter = window.game?.getLocalControlledFighter?.();
+    const binds = localFighter?.controls || window.currentBinds.p1;
     return {
         left: !!window.keys[binds.left],
         right: !!window.keys[binds.right],
@@ -119,7 +120,8 @@ if (window.Game && !window.Game.prototype.socketSyncPatched) {
             hurricane: cloneEntity(this.hurricane),
             hitstop: this.hitstop,
             screenShakeTimer: this.screenShakeTimer,
-            screenShakeMagnitude: this.screenShakeMagnitude
+            screenShakeMagnitude: this.screenShakeMagnitude,
+            camera: { ...(this.camera || { x: 0 }) }
         };
     };
 
@@ -154,6 +156,7 @@ if (window.Game && !window.Game.prototype.socketSyncPatched) {
         this.hitstop = state.hitstop || 0;
         this.screenShakeTimer = state.screenShakeTimer || 0;
         this.screenShakeMagnitude = state.screenShakeMagnitude || 0;
+        if (state.camera) this.camera = { ...this.camera, ...state.camera };
     };
 
     const originalUpdate = window.Game.prototype.update;
