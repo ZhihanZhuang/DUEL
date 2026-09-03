@@ -3699,6 +3699,10 @@ class Fighter extends Entity {
             ctx.fillStyle='#25143d';ctx.fillRect(-hw-3,-3,this.w+6,h+6);ctx.fillStyle=this.color;ctx.fillRect(-hw,0,this.w,h);
             ctx.fillStyle='#d9c0ff';ctx.fillRect(-hw+5,8,this.w-10,14);ctx.fillStyle='#3d2360';ctx.fillRect(-hw,31,this.w,8);
             ctx.strokeStyle='#e0c8ff';ctx.lineWidth=2;ctx.beginPath();ctx.arc(0,48,10,0,Math.PI*2);ctx.stroke();
+        } else if (this.heroName === 'Vaeilash') {
+            ctx.fillStyle='#260d16';ctx.fillRect(-hw-3,-3,this.w+6,h+6);ctx.fillStyle=this.color;ctx.fillRect(-hw,0,this.w,h);
+            ctx.fillStyle='#f0c0b0';ctx.fillRect(-hw+5,8,this.w-10,13);ctx.fillStyle='#180d16';ctx.fillRect(-hw,29,this.w,10);
+            if (this.vaeilashBloodMoon > 0) { ctx.strokeStyle='rgba(255,48,79,.8)';ctx.shadowBlur=16;ctx.shadowColor='#ff304f';ctx.lineWidth=3;ctx.strokeRect(-hw-6,-6,this.w+12,h+12);ctx.shadowBlur=0; }
         } else if (this.heroName === 'Brom') {
             ctx.fillStyle='#382116';ctx.fillRect(-hw-3,-3,this.w+6,h+6);ctx.fillStyle=this.color;ctx.fillRect(-hw,0,this.w,h);
             ctx.fillStyle='#f5d29b';ctx.fillRect(-hw+5,8,this.w-10,14);ctx.fillStyle='#30251f';ctx.fillRect(-hw,30,this.w,10);
@@ -3946,6 +3950,12 @@ class Fighter extends Entity {
         }
         else if (this.heroName === 'Veyra') {
             ctx.save();ctx.translate(hw-2,28);ctx.strokeStyle='#d8c0ff';ctx.lineWidth=4;ctx.beginPath();ctx.arc(16,0,12,0,Math.PI*1.7);ctx.stroke();ctx.fillStyle='#9d5cff';ctx.beginPath();ctx.arc(16,0,4,0,Math.PI*2);ctx.fill();ctx.restore();
+        }
+        else if (this.heroName === 'Vaeilash') {
+            ctx.save(); ctx.translate(hw - 2, 29);
+            let swing = this.attackState === 'active' ? -1.2 + phaseProg * 2.8 : .35;
+            for (const side of [-1, 1]) { ctx.save(); ctx.scale(side, 1); ctx.rotate(swing + side * .16); ctx.fillStyle='#30151b';ctx.fillRect(-3,-6,7,29);ctx.fillStyle='#c7d5dc';ctx.strokeStyle='#ff4964';ctx.lineWidth=2;ctx.shadowBlur=this.vaeilashBloodMoon>0?12:5;ctx.shadowColor='#ff304f';ctx.beginPath();ctx.moveTo(2,-42);ctx.lineTo(11,-35);ctx.lineTo(5,-3);ctx.lineTo(-2,-9);ctx.closePath();ctx.fill();ctx.stroke();ctx.restore(); }
+            ctx.restore();
         }
         else if (this.heroName === 'Brom') {
             ctx.save();ctx.translate(hw-2,28);const recoil=this.attackState==='active'?-6*Math.sin(phaseProg*Math.PI):0;ctx.fillStyle='#4b3426';ctx.fillRect(recoil,-8,38,16);ctx.fillStyle='#ff9f1c';ctx.fillRect(28+recoil,-6,15,12);ctx.restore();
@@ -4477,6 +4487,15 @@ class Fighter extends Entity {
             ctx.shadowColor = "#ff3030";
             ctx.strokeRect(this.x - 5, this.y - 5, this.w + 10, this.h + 10);
             ctx.shadowBlur = 0;
+        }
+
+        if (this.vaeilashMarks) {
+            const mark = [...this.vaeilashMarks.values()][0];
+            if (mark && mark.count > 0) {
+                ctx.save();ctx.translate(this.x + this.w/2, this.y - 24);ctx.fillStyle='#ff304f';ctx.shadowBlur=9;ctx.shadowColor='#ff304f';
+                for (let i=0;i<mark.count;i++) { ctx.rotate(Math.PI*2/mark.count);ctx.beginPath();ctx.moveTo(0,-9);ctx.lineTo(4,-2);ctx.lineTo(0,5);ctx.lineTo(-4,-2);ctx.closePath();ctx.fill(); }
+                ctx.restore();
+            }
         }
 
         if (revealOwnedKuro) {
