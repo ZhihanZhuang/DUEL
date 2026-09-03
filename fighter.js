@@ -904,6 +904,8 @@ class Fighter extends Entity {
         let canAct = (this.stunTimer <= 0 && this.buffs.dizzy <= 0 && this.grapplePhase !== 1 && this.superWindupTimer <= 0 && this.euclidSwitchTimer <= 0 && !(this.itanSuperWindupTimer > 0) && !(this.veyraReversalTimer > 0) && !(this.axeronRushTimer > 0) && !(this.gelannBreathWindup > 0) && !isKilaSwitching && !isSolaForceLocked && !isSolaCharging && !isUkonBursting && !isUkonUltimateLocked && !isMoriGrappling && !isRaigoCharging && !isDogelCharging && !isGeLocked);
         let canMoveAndAttack = (canAct || isDogelCharging) && !hasPuppet;
 
+        if (this.heroName === 'Vaeilash' && canAct && keysPressed[this.controls.extra]) this.startVaeilashReversal();
+
         if (this.heroName === 'Gensan') {
             if (this.gensanSwitchCD > 0) this.gensanSwitchCD -= dt;
             if (this.gensanShadowCD > 0) this.gensanShadowCD -= dt;
