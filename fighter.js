@@ -132,6 +132,7 @@ class Fighter extends Entity {
         if (this.heroName === 'Itan') {
             this.itanSuperWindupTimer = 0;
             this.itanSuperWindupMax = 2000;
+            this.itanSuperChiq = false;
         }
 
         if (this.heroName === 'D2F1') {
@@ -2907,9 +2908,11 @@ class Fighter extends Entity {
 
     releaseItanChiq() {
         if (this.heroName !== 'Itan' || this.dead) return;
+        const superChiq = this.itanSuperChiq;
+        this.itanSuperChiq = false;
         const nuMode = this.buffs.nuMode > 0;
-        const chiqColor = nuMode ? '#ff3030' : '#4db8ff';
-        const bladeDamage = nuMode ? 100 : 50;
+        const chiqColor = superChiq ? '#4db8ff' : (nuMode ? '#ff3030' : '#4db8ff');
+        const bladeDamage = superChiq ? 60 : (nuMode ? 100 : 50);
         const combatTarget = this.isCPU && this.aiCombatTarget && !this.aiCombatTarget.dead && !this.aiCombatTarget.untargetable
             ? this.aiCombatTarget
             : null;
@@ -2921,14 +2924,17 @@ class Fighter extends Entity {
         const baseAngle = Math.atan2(ty - py, tx - px);
         [-0.09, 0, 0.09].forEach((offset, index) => {
             const angle = baseAngle + offset;
-            const blade = new Projectile(px, py + (index - 1) * 13, 42, 12, Math.cos(angle)*32, Math.sin(angle)*32, bladeDamage, this, chiqColor, 'chiq_blade');
+            const blade = new Projectile(px, py + (index - 1) * 13, 42, 12, Math.cos(angle)*(superChiq ? 8 : 32), Math.sin(angle)*(superChiq ? 8 : 32), bladeDamage, this, chiqColor, superChiq ? 'chiq_super_blade' : 'chiq_blade');
             blade.chiqNu = nuMode;
+            blade.chiqSuper = superChiq;
             game.projectiles.push(blade);
 
-            const pathLength = Math.min(900, Math.max(420, Math.abs(tx - px)));
-            const endX = px + this.facing * pathLength;
-            const pathY = GROUND_Y - 8 - (index - 1) * 18;
-            game.minions.push(new ChiqPath(this, px, pathY, endX, pathY, nuMode));
+            if (!superChiq) {
+                const pathLength = Math.min(900, Math.max(420, Math.abs(tx - px)));
+                const endX = px + this.facing * pathLength;
+                const pathY = GROUND_Y - 8 - (index - 1) * 18;
+                game.minions.push(new ChiqPath(this, px, pathY, endX, pathY, nuMode));
+            }
         });
         for (let i = 0; i < 24; i++) game.particles.push(new Particle(px, py, chiqColor, (Math.random()-0.5)*16, (Math.random()-0.5)*16, 420, 4));
         this.attackState = 'recovery';
@@ -3054,6 +3060,7 @@ class Fighter extends Entity {
         if (this.heroName === 'Itan') {
             if (this.superCooldown <= 0 && this.itanSuperWindupTimer <= 0) {
                 this.superCooldown = this.superCooldownMax;
+                this.itanSuperChiq = true;
                 this.itanSuperWindupTimer = this.itanSuperWindupMax;
                 this.attackState = 'windup';
                 this.stateTimer = this.itanSuperWindupMax;

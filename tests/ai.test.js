@@ -1015,11 +1015,11 @@ test('Itan has a wide Naginata swing and a damageable, debuff-immune 2s Chiq cas
     assert.equal(ai.stunTimer, 0);
     assert.equal(ai.itanSuperWindupTimer, 984);
     ai.update(984);
-    const blades = context.game.projectiles.filter(projectile => projectile.type === 'chiq_blade');
+    const blades = context.game.projectiles.filter(projectile => projectile.type === 'chiq_super_blade');
     assert.equal(blades.length, 3);
-    assert.ok(blades.every(blade => blade.damage === 50));
-    assert.ok(blades.every(blade => Math.hypot(blade.vx, blade.vy) > 31));
-    assert.equal(context.game.minions.filter(minion => minion.type === 'chiq_path').length, 3);
+    assert.ok(blades.every(blade => blade.damage === 60));
+    assert.ok(blades.every(blade => Math.abs(Math.hypot(blade.vx, blade.vy) - 8) < 1e-9));
+    assert.equal(context.game.minions.filter(minion => minion.type === 'chiq_path').length, 0);
 });
 
 test('Itan Nu mode doubles attack cadence and empowers red Chiq', () => {

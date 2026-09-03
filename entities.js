@@ -832,8 +832,10 @@ class Projectile extends Entity {
                             game.createExplosion(this.x + this.w/2, this.y + this.h/2, 180, 70, this.owner, false, 2500);
                             return;
                         }
-                        let noKnockback = (this.type === "bullet" || this.type === "skeleton_arrow" || this.type === "archor_arrow" || this.type === "homing_bullet" || this.type === "ki_blast" || this.type === "magic_burst" || this.type === "paper_plane" || this.type === "blue_paper_plane" || this.type === "fire_bolt" || this.type === "water_bolt" || this.type === "tidal_wave" || this.type === "volt_laser" || this.type === "pickaxe" || this.type === "chiq_blade" || this.type === "em_ball" || this.type === "chrono_bolt");
+                        const healthBeforeHit = t.hp;
+                        let noKnockback = (this.type === "bullet" || this.type === "skeleton_arrow" || this.type === "archor_arrow" || this.type === "homing_bullet" || this.type === "ki_blast" || this.type === "magic_burst" || this.type === "paper_plane" || this.type === "blue_paper_plane" || this.type === "fire_bolt" || this.type === "water_bolt" || this.type === "tidal_wave" || this.type === "volt_laser" || this.type === "pickaxe" || this.type === "chiq_blade" || this.type === "chiq_super_blade" || this.type === "em_ball" || this.type === "chrono_bolt");
                         t.takeDamage(this.damage, this.owner, false, noKnockback);
+                        if (this.type === "chiq_super_blade" && this.owner?.heroName === 'Itan' && typeof this.owner.heal === 'function') this.owner.heal(Math.max(0, healthBeforeHit - t.hp));
                         if (this.damage > 0 && this.owner?.heroName === 'Archor' && typeof this.owner.onArchorHit === 'function') this.owner.onArchorHit(t);
 
                         if (t.buffs) {
