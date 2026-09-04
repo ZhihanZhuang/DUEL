@@ -10,6 +10,22 @@ window.onlineMatchRole = null;
 window.isHost = false;
 const ONLINE_STATE_INTERVAL_MS = 33;
 const ONLINE_PARTICLE_SNAPSHOT_LIMIT = 12;
+const ONLINE_REMOTE_BINDS = {
+    left: 'ONLINE_REMOTE_LEFT',
+    right: 'ONLINE_REMOTE_RIGHT',
+    jump: 'ONLINE_REMOTE_JUMP',
+    down: 'ONLINE_REMOTE_DOWN',
+    attack: 'ONLINE_REMOTE_ATTACK',
+    super: 'ONLINE_REMOTE_SUPER',
+    switch: 'ONLINE_REMOTE_SWITCH',
+    extra: 'ONLINE_REMOTE_EXTRA'
+};
+
+window.ONLINE_REMOTE_BINDS = ONLINE_REMOTE_BINDS;
+
+function getOnlineP1Binds() {
+    return window.currentBinds?.p1 || (typeof currentBinds !== 'undefined' ? currentBinds.p1 : null);
+}
 
 function updateLoginStatus(message, isError = false) {
     const status = document.getElementById('login-status');
@@ -39,8 +55,10 @@ window.updateLoginStatus = updateLoginStatus;
 window.updateOnlineHeroLabel = updateOnlineHeroLabel;
 
 function collectLocalOnlineInputs() {
-    const localFighter = window.game?.getLocalControlledFighter?.();
-    const binds = localFighter?.controls || window.currentBinds.p1;
+    // In online duels each player is alone on their own keyboard, so the local
+    // machine always reads the P1/WASD-style bindings regardless of host/client role.
+    const binds = getOnlineP1Binds();
+    if (!binds) return {};
     return {
         left: !!window.keys[binds.left],
         right: !!window.keys[binds.right],
@@ -58,7 +76,7 @@ function collectLocalOnlineInputs() {
 
 window.applyRemoteOnlineInputs = function(inputs) {
     if (!inputs) return;
-    const binds = window.currentBinds.p2;
+    const binds = ONLINE_REMOTE_BINDS;
     window.keys[binds.left] = !!inputs.left;
     window.keys[binds.right] = !!inputs.right;
     window.keys[binds.jump] = !!inputs.jump;
@@ -72,6 +90,81 @@ window.applyRemoteOnlineInputs = function(inputs) {
     if (inputs.pExtra) window.keysPressed[binds.extra] = true;
 };
 window.collectLocalOnlineInputs = collectLocalOnlineInputs;
+
+function clearOnlineRemoteInputs() {
+    Object.values(ONLINE_REMOTE_BINDS).forEach(key => {
+        window.keys[key] = false;
+        window.keysPressed[key] = false;
+    });
+}
+
+function setupOnlineControls(game) {
+    if (!game) return;
+    const p1Binds = getOnlineP1Binds();
+    if (!p1Binds) return;
+    if (game.p1) game.p1.controls = p1Binds;
+    if (!game.p2 || game.p2 === game.p1) return;
+    game.p2.controls = game.netRole === 'host' ? ONLINE_REMOTE_BINDS : p1Binds;
+}
+
+function predictOnlineLocalFighter(game, dt) {
+    const fighter = game?.p2;
+    if (!fighter || fighter.dead || fighter.stunTimer > 0 || fighter.buffs?.dizzy > 0) return;
+    const binds = getOnlineP1Binds();
+    if (!binds) return;
+    fighter.controls = binds;
+
+    let speed = fighter.baseSpeed || 5;
+    if (fighter.buffs?.msBoost > 0) speed *= fighter.heroName === 'Wolf' ? 1.3 : 1.2;
+    if (fighter.heroName === 'Vaeilash' && fighter.vaeilashBloodMoon > 0) speed *= 1.35;
+    if (fighter.heroName === 'Itan' && fighter.buffs?.nuMode > 0) speed *= 1.35;
+    if (fighter.buffs?.slow > 0) speed *= 0.5;
+    if (fighter.buffs?.gravitySlow > 0) speed *= 0.3;
+    if (fighter.buffs?.root > 0) speed = 0;
+
+    let targetVx = 0;
+    if (window.keys[binds.left] && !window.keys[binds.right]) {
+        targetVx = -speed;
+        fighter.facing = -1;
+    } else if (window.keys[binds.right] && !window.keys[binds.left]) {
+        targetVx = speed;
+        fighter.facing = 1;
+    }
+    fighter.vx = (fighter.vx || 0) + (targetVx - (fighter.vx || 0)) * 0.32;
+
+    if (window.keysPressed[binds.jump] && fighter.isGrounded) {
+        fighter.vy = -(fighter.baseJump || 13);
+        fighter.isGrounded = false;
+    }
+    const gravity = typeof GRAVITY === 'number' ? GRAVITY : 0.6;
+    fighter.vy = (fighter.vy || 0) + gravity;
+    if (!window.keys[binds.jump] && fighter.vy < 0) fighter.vy *= 0.86;
+
+    fighter.x += fighter.vx;
+    fighter.y += fighter.vy;
+    const canvasW = typeof CANVAS_W === 'number' ? CANVAS_W : 1280;
+    const groundY = typeof GROUND_Y === 'number' ? GROUND_Y : 660;
+    fighter.x = Math.max(0, Math.min(canvasW - fighter.w, fighter.x));
+    fighter.isGrounded = false;
+    if (fighter.y + fighter.h >= groundY) {
+        fighter.y = groundY - fighter.h;
+        fighter.vy = 0;
+        fighter.isGrounded = true;
+    } else if (Array.isArray(typeof PLATFORMS !== 'undefined' ? PLATFORMS : null) && fighter.vy >= 0) {
+        for (const plat of PLATFORMS) {
+            if (fighter.y + fighter.h - fighter.vy <= plat.y && fighter.y + fighter.h >= plat.y
+                && fighter.x + fighter.w > plat.x && fighter.x < plat.x + plat.w && !window.keys[binds.down]) {
+                fighter.y = plat.y - fighter.h;
+                fighter.vy = 0;
+                fighter.isGrounded = true;
+                break;
+            }
+        }
+    }
+}
+
+window.clearOnlineRemoteInputs = clearOnlineRemoteInputs;
+window.setupOnlineControls = setupOnlineControls;
 
 if (window.Game && !window.Game.prototype.socketSyncPatched) {
     const entityClasses = {
@@ -159,12 +252,15 @@ if (window.Game && !window.Game.prototype.socketSyncPatched) {
         this.screenShakeTimer = state.screenShakeTimer || 0;
         this.screenShakeMagnitude = state.screenShakeMagnitude || 0;
         if (state.camera) this.camera = { ...this.camera, ...state.camera };
+        setupOnlineControls(this);
     };
 
     const originalUpdate = window.Game.prototype.update;
     window.Game.prototype.update = function(dt) {
+        if (this.isOnline) setupOnlineControls(this);
         if (this.isOnline && this.netRole === 'client') {
             window.sendBackendInputs?.(collectLocalOnlineInputs());
+            predictOnlineLocalFighter(this, dt);
             this.updateUI();
             return;
         }

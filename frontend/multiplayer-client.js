@@ -35,6 +35,7 @@ function initMultiplayerClient() {
 
     mpSocket.on('disconnect', () => {
         mpConnected = false;
+        window.clearOnlineRemoteInputs?.();
         stopLatencyMonitor();
         updateMpStatus('Duel server offline', true);
         window.updateLoginStatus?.('Connection lost. Reconnecting...', true);
@@ -90,9 +91,11 @@ function initMultiplayerClient() {
     mpSocket.on('match:finished', data => {
         if (window.game?.isOnline && window.game.netRole === 'client') window.game.endGame(data.winnerText || 'Opponent');
         window.currentMatchId = null;
+        window.clearOnlineRemoteInputs?.();
     });
     mpSocket.on('match:opponent_left', () => {
         window.currentMatchId = null;
+        window.clearOnlineRemoteInputs?.();
         if (window.game?.state === 'PLAYING') window.game.endGame('Remaining Player');
         else leaveRoom(false);
     });
@@ -234,6 +237,7 @@ function startOnlineMatch(state) {
     window.game.startGame(false);
     window.game.isOnline = true;
     window.game.netRole = state.role;
+    window.setupOnlineControls?.(window.game);
     document.getElementById('p1-name').innerText = `[HOST] ${state.host.name}: ${HEROES[state.host.hero].name}`;
     document.getElementById('p2-name').innerText = `[CHALLENGER] ${state.client.name}: ${HEROES[state.client.hero].name}`;
 }
@@ -275,6 +279,7 @@ function leaveRoom(showLogin = true) {
     if (window.currentMatchId) mpSocket?.emit('room:leave', { matchId: window.currentMatchId });
     window.currentMatchId = null;
     window.onlineMatchRole = null;
+    window.clearOnlineRemoteInputs?.();
     document.getElementById('room-screen')?.classList.add('hidden');
     if (showLogin) document.getElementById('login-screen')?.classList.remove('hidden');
 }

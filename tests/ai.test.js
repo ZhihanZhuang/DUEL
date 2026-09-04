@@ -1957,23 +1957,33 @@ test('online input synchronization preserves held and pressed Super states', () 
     assert.equal(inputs.pSuper, true);
 
     context.window.applyRemoteOnlineInputs({ super: true, pSuper: true });
-    assert.equal(context.window.keys[p2.super], true);
-    assert.equal(context.window.keysPressed[p2.super], true);
+    assert.equal(context.window.keys[p2.super], undefined);
+    assert.equal(context.window.keys[context.window.ONLINE_REMOTE_BINDS.super], true);
+    assert.equal(context.window.keysPressed[context.window.ONLINE_REMOTE_BINDS.super], true);
 
     context.window.applyRemoteOnlineInputs({ super: false });
-    assert.equal(context.window.keys[p2.super], false);
+    assert.equal(context.window.keys[context.window.ONLINE_REMOTE_BINDS.super], false);
 
     context.window.game = {
         getLocalControlledFighter: () => ({ controls: p2 })
     };
     context.window.keys[p1.super] = false;
+    context.window.keysPressed[p1.super] = false;
     context.window.keys[p2.right] = true;
     context.window.keys[p2.super] = true;
     context.window.keysPressed[p2.super] = true;
     const challengerInputs = context.window.collectLocalOnlineInputs();
-    assert.equal(challengerInputs.right, true);
-    assert.equal(challengerInputs.super, true);
-    assert.equal(challengerInputs.pSuper, true);
+    assert.equal(challengerInputs.right, false);
+    assert.equal(challengerInputs.super, false);
+    assert.equal(challengerInputs.pSuper, false);
+
+    context.window.keys[p1.right] = true;
+    context.window.keys[p1.super] = true;
+    context.window.keysPressed[p1.super] = true;
+    const localWasdInputs = context.window.collectLocalOnlineInputs();
+    assert.equal(localWasdInputs.right, true);
+    assert.equal(localWasdInputs.super, true);
+    assert.equal(localWasdInputs.pSuper, true);
 });
 
 test('Laegon lightning branches without duplicate hits and gains anti-summon damage', () => {
