@@ -132,35 +132,9 @@ function predictOnlineLocalFighter(game, dt) {
     }
     fighter.vx = (fighter.vx || 0) + (targetVx - (fighter.vx || 0)) * 0.32;
 
-    if (window.keysPressed[binds.jump] && fighter.isGrounded) {
-        fighter.vy = -(fighter.baseJump || 13);
-        fighter.isGrounded = false;
-    }
-    const gravity = typeof GRAVITY === 'number' ? GRAVITY : 0.6;
-    fighter.vy = (fighter.vy || 0) + gravity;
-    if (!window.keys[binds.jump] && fighter.vy < 0) fighter.vy *= 0.86;
-
     fighter.x += fighter.vx;
-    fighter.y += fighter.vy;
     const canvasW = typeof CANVAS_W === 'number' ? CANVAS_W : 1280;
-    const groundY = typeof GROUND_Y === 'number' ? GROUND_Y : 660;
     fighter.x = Math.max(0, Math.min(canvasW - fighter.w, fighter.x));
-    fighter.isGrounded = false;
-    if (fighter.y + fighter.h >= groundY) {
-        fighter.y = groundY - fighter.h;
-        fighter.vy = 0;
-        fighter.isGrounded = true;
-    } else if (Array.isArray(typeof PLATFORMS !== 'undefined' ? PLATFORMS : null) && fighter.vy >= 0) {
-        for (const plat of PLATFORMS) {
-            if (fighter.y + fighter.h - fighter.vy <= plat.y && fighter.y + fighter.h >= plat.y
-                && fighter.x + fighter.w > plat.x && fighter.x < plat.x + plat.w && !window.keys[binds.down]) {
-                fighter.y = plat.y - fighter.h;
-                fighter.vy = 0;
-                fighter.isGrounded = true;
-                break;
-            }
-        }
-    }
 }
 
 window.clearOnlineRemoteInputs = clearOnlineRemoteInputs;

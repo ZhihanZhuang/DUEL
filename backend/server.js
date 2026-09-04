@@ -32,6 +32,8 @@ const friendships = new Map();     // userId -> Set<friendUserId>
 const matchQueue = [];             // { socketId, userId, name, hero, rating, joinedAt }
 const activeMatches = new Map();   // matchId -> { hostId, clientId, hostSocket, clientSocket, spectators: Set, status }
 const socketToUser = new Map();
+const disconnectTimers = new Map();
+const DISCONNECT_GRACE_MS = 8000;
 
 function getUser(socketId) {
     return users.get(socketId);
@@ -68,6 +70,11 @@ function buildFriendsList(socketId) {
 function removeFromQueue(socketId) {
     const idx = matchQueue.findIndex(q => q.socketId === socketId);
     if (idx >= 0) matchQueue.splice(idx, 1);
+}
+
+function replaceSocketInQueue(oldSocketId, newSocketId) {
+    const queued = matchQueue.find(q => q.socketId === oldSocketId);
+    if (queued) queued.socketId = newSocketId;
 }
 
 function tryMatchmake() {
@@ -140,6 +147,54 @@ function resetChallengerSlot(match) {
     match.status = 'lobby';
 }
 
+function cancelDisconnectCleanup(socketId) {
+    const timer = disconnectTimers.get(socketId);
+    if (timer) clearTimeout(timer);
+    disconnectTimers.delete(socketId);
+}
+
+function replaceSocketInMatches(oldSocketId, newSocketId) {
+    [...activeMatches.values()].forEach(match => {
+        let role = null;
+        if (match.hostSocket === oldSocketId) {
+            match.hostSocket = newSocketId;
+            role = 'host';
+            if (match.status === 'playing') match.status = 'lobby';
+        }
+        if (match.clientSocket === oldSocketId) {
+            match.clientSocket = newSocketId;
+            role = 'client';
+        }
+        if (match.spectators.has(oldSocketId)) {
+            match.spectators.delete(oldSocketId);
+            match.spectators.add(newSocketId);
+        }
+
+        if (!role) return;
+        if (match.status === 'playing' && role === 'client') {
+            io.to(newSocketId).emit('match:start', matchState(match, role));
+        } else {
+            emitMatchState(match);
+        }
+    });
+}
+
+function transferSocketIdentity(oldSocketId, newSocketId) {
+    if (oldSocketId === newSocketId) return null;
+    const oldUser = getUser(oldSocketId);
+    if (!oldUser) return null;
+
+    cancelDisconnectCleanup(oldSocketId);
+    replaceSocketInQueue(oldSocketId, newSocketId);
+    replaceSocketInMatches(oldSocketId, newSocketId);
+    users.delete(oldSocketId);
+    socketToUser.delete(oldSocketId);
+    users.set(newSocketId, oldUser);
+    socketToUser.set(newSocketId, oldUser.id);
+    usersByName.set(oldUser.name.toLowerCase(), newSocketId);
+    return oldUser;
+}
+
 function clearSocketFromMatches(socketId) {
     [...activeMatches.entries()].forEach(([mid, match]) => {
         if (match.hostSocket === socketId) {
@@ -169,6 +224,7 @@ function clearSocketFromMatches(socketId) {
 }
 
 function cleanupSocket(socketId) {
+    cancelDisconnectCleanup(socketId);
     removeFromQueue(socketId);
     clearSocketFromMatches(socketId);
     const user = getUser(socketId);
@@ -219,7 +275,7 @@ io.on('connection', (socket) => {
 
         if (usersByName.has(key) && usersByName.get(key) !== socket.id) {
             const oldSocketId = usersByName.get(key);
-            cleanupSocket(oldSocketId);
+            transferSocketIdentity(oldSocketId, socket.id);
             io.sockets.sockets.get(oldSocketId)?.disconnect(true);
         }
 
@@ -486,7 +542,8 @@ io.on('connection', (socket) => {
     });
 
     socket.on('disconnect', () => {
-        cleanupSocket(socket.id);
+        cancelDisconnectCleanup(socket.id);
+        disconnectTimers.set(socket.id, setTimeout(() => cleanupSocket(socket.id), DISCONNECT_GRACE_MS));
     });
 });
 
