@@ -580,8 +580,8 @@ class Game {
             document.getElementById('p1-horse-hp').style.width = `${Math.max(0, this.p1.laegonEnergy)}%`;
             document.getElementById('p1-horse-hp').style.background = '#9d5cff';
         } else if (this.p1.heroName === 'Raigo') {
-            document.getElementById('p1-horse-hp').style.width = `${Math.max(0, this.p1.raigoEnergy)}%`;
-            document.getElementById('p1-horse-hp').style.background = this.p1.raigoEnergy >= 100 ? '#ffd84d' : '#58e6ff';
+            document.getElementById('p1-horse-hp').style.width = `${Math.max(0, (this.p1.raigoEnergy / this.p1.raigoMaxEnergy) * 100)}%`;
+            document.getElementById('p1-horse-hp').style.background = this.p1.raigoEnergy >= this.p1.raigoMaxEnergy ? '#ffd84d' : '#58e6ff';
         } else if (this.p1.heroName === 'Tonia') {
             document.getElementById('p1-horse-hp').style.width = `${Math.max(0, this.p1.toniaHeat)}%`;
             document.getElementById('p1-horse-hp').style.background = this.p1.toniaOverheated ? '#ff3d35' : '#f0a34a';
@@ -710,7 +710,7 @@ class Game {
         }
         if (this.p1.heroName === 'Roka') p1Stat += `${this.p1.rokaArtilleryTimer>0?`[ARTILLERY ${(this.p1.rokaArtilleryTimer/1000).toFixed(1)}s] `:''}${this.p1.rokaMortarCooldown>0?`[MORTAR ${(this.p1.rokaMortarCooldown/1000).toFixed(1)}s]`:'[MORTAR READY]'}`;
         if (this.p1.heroName === 'Voss' || this.p1.vossCopyActive) p1Stat += `${this.p1.vossCopyActive?`[COPIED: ${this.p1.vossCopiedHero} ${(this.p1.vossCopyTimer/1000).toFixed(1)}s] `:''}${this.p1.vossCopyCooldown>0?`[COPY ${(this.p1.vossCopyCooldown/1000).toFixed(1)}s]`:'[COPY READY]'}${this.p1.vossDouble&&!this.p1.vossDouble.dead?' [DOUBLE]':''}`;
-        if (this.p1.heroName === 'Raigo') p1Stat += `[ENERGY: ${Math.floor(this.p1.raigoEnergy)}/100]${this.p1.raigoEnergy>=100?' [THUNDER STRIKE]':''}${this.p1.raigoArmorTimer>0?` [GOLDEN ARMOR ${(this.p1.raigoArmorTimer/1000).toFixed(1)}s]`:''}`;
+        if (this.p1.heroName === 'Raigo') p1Stat += `[ENERGY: ${Math.floor(this.p1.raigoEnergy)}/${this.p1.raigoMaxEnergy}]${this.p1.raigoEnergy>=this.p1.raigoMaxEnergy?' [THUNDER STRIKE]':''}${this.p1.raigoArmorTimer>0?` [GOLDEN SPEARS ${(this.p1.raigoArmorTimer/1000).toFixed(1)}s]`:''}`;
         if (this.p1.heroName === 'Gelann') p1Stat += this.p1.gelannBreathCooldown>0?`[FLAME ${(this.p1.gelannBreathCooldown/1000).toFixed(1)}s]`:'[FLAME READY]';
         if (this.p1.heroName === 'Dogel') p1Stat += `${this.p1.attackState==='dogel_charging'?`[SPIN ${Math.round(this.p1.dogelCharge/this.p1.dogelChargeMax*100)}%] `:''}${this.p1.dogelReaperTimer>0?`[BLOOD REAPER ${(this.p1.dogelReaperTimer/1000).toFixed(1)}s] `:''}${this.p1.dogelChainCooldown>0?`[CHAIN ${(this.p1.dogelChainCooldown/1000).toFixed(1)}s]`:'[CHAIN READY]'}`;
         if (this.p1.heroName === 'Lapis') p1Stat += `[STONES ${this.p1.lapisStoneAvailable.filter(Boolean).length}/5] ${this.p1.lapisWhipTimer>0?`[STONE WHIP ${(this.p1.lapisWhipTimer/1000).toFixed(1)}s]`:this.p1.lapisJudgmentCooldown>0?`[JUDGMENT ${(this.p1.lapisJudgmentCooldown/1000).toFixed(1)}s]`:'[JUDGMENT READY]'}`;
@@ -737,8 +737,8 @@ class Game {
             document.getElementById('p2-horse-hp').style.width = `${Math.max(0, this.p2.laegonEnergy)}%`;
             document.getElementById('p2-horse-hp').style.background = '#9d5cff';
         } else if (this.p2.heroName === 'Raigo') {
-            document.getElementById('p2-horse-hp').style.width = `${Math.max(0, this.p2.raigoEnergy)}%`;
-            document.getElementById('p2-horse-hp').style.background = this.p2.raigoEnergy >= 100 ? '#ffd84d' : '#58e6ff';
+            document.getElementById('p2-horse-hp').style.width = `${Math.max(0, (this.p2.raigoEnergy / this.p2.raigoMaxEnergy) * 100)}%`;
+            document.getElementById('p2-horse-hp').style.background = this.p2.raigoEnergy >= this.p2.raigoMaxEnergy ? '#ffd84d' : '#58e6ff';
         } else if (this.p2.heroName === 'Tonia') {
             document.getElementById('p2-horse-hp').style.width = `${Math.max(0, this.p2.toniaHeat)}%`;
             document.getElementById('p2-horse-hp').style.background = this.p2.toniaOverheated ? '#ff3d35' : '#f0a34a';
@@ -867,7 +867,7 @@ class Game {
         }
         if (this.p2.heroName === 'Roka') p2Stat += `${this.p2.rokaArtilleryTimer>0?`[ARTILLERY ${(this.p2.rokaArtilleryTimer/1000).toFixed(1)}s] `:''}${this.p2.rokaMortarCooldown>0?`[MORTAR ${(this.p2.rokaMortarCooldown/1000).toFixed(1)}s]`:'[MORTAR READY]'}`;
         if (this.p2.heroName === 'Voss' || this.p2.vossCopyActive) p2Stat += `${this.p2.vossCopyActive?`[COPIED: ${this.p2.vossCopiedHero} ${(this.p2.vossCopyTimer/1000).toFixed(1)}s] `:''}${this.p2.vossCopyCooldown>0?`[COPY ${(this.p2.vossCopyCooldown/1000).toFixed(1)}s]`:'[COPY READY]'}${this.p2.vossDouble&&!this.p2.vossDouble.dead?' [DOUBLE]':''}`;
-        if (this.p2.heroName === 'Raigo') p2Stat += `[ENERGY: ${Math.floor(this.p2.raigoEnergy)}/100]${this.p2.raigoEnergy>=100?' [THUNDER STRIKE]':''}${this.p2.raigoArmorTimer>0?` [GOLDEN ARMOR ${(this.p2.raigoArmorTimer/1000).toFixed(1)}s]`:''}`;
+        if (this.p2.heroName === 'Raigo') p2Stat += `[ENERGY: ${Math.floor(this.p2.raigoEnergy)}/${this.p2.raigoMaxEnergy}]${this.p2.raigoEnergy>=this.p2.raigoMaxEnergy?' [THUNDER STRIKE]':''}${this.p2.raigoArmorTimer>0?` [GOLDEN SPEARS ${(this.p2.raigoArmorTimer/1000).toFixed(1)}s]`:''}`;
         if (this.p2.heroName === 'Gelann') p2Stat += this.p2.gelannBreathCooldown>0?`[FLAME ${(this.p2.gelannBreathCooldown/1000).toFixed(1)}s]`:'[FLAME READY]';
         if (this.p2.heroName === 'Dogel') p2Stat += `${this.p2.attackState==='dogel_charging'?`[SPIN ${Math.round(this.p2.dogelCharge/this.p2.dogelChargeMax*100)}%] `:''}${this.p2.dogelReaperTimer>0?`[BLOOD REAPER ${(this.p2.dogelReaperTimer/1000).toFixed(1)}s] `:''}${this.p2.dogelChainCooldown>0?`[CHAIN ${(this.p2.dogelChainCooldown/1000).toFixed(1)}s]`:'[CHAIN READY]'}`;
         if (this.p2.heroName === 'Lapis') p2Stat += `[STONES ${this.p2.lapisStoneAvailable.filter(Boolean).length}/5] ${this.p2.lapisWhipTimer>0?`[STONE WHIP ${(this.p2.lapisWhipTimer/1000).toFixed(1)}s]`:this.p2.lapisJudgmentCooldown>0?`[JUDGMENT ${(this.p2.lapisJudgmentCooldown/1000).toFixed(1)}s]`:'[JUDGMENT READY]'}`;

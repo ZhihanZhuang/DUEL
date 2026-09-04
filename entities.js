@@ -833,9 +833,20 @@ class Projectile extends Entity {
                             return;
                         }
                         const healthBeforeHit = t.hp;
-                        let noKnockback = (this.type === "bullet" || this.type === "skeleton_arrow" || this.type === "archor_arrow" || this.type === "homing_bullet" || this.type === "ki_blast" || this.type === "magic_burst" || this.type === "paper_plane" || this.type === "blue_paper_plane" || this.type === "fire_bolt" || this.type === "water_bolt" || this.type === "tidal_wave" || this.type === "volt_laser" || this.type === "pickaxe" || this.type === "chiq_blade" || this.type === "chiq_super_blade" || this.type === "em_ball" || this.type === "chrono_bolt");
+                        let noKnockback = (this.type === "bullet" || this.type === "skeleton_arrow" || this.type === "archor_arrow" || this.type === "homing_bullet" || this.type === "ki_blast" || this.type === "magic_burst" || this.type === "paper_plane" || this.type === "blue_paper_plane" || this.type === "fire_bolt" || this.type === "water_bolt" || this.type === "tidal_wave" || this.type === "volt_laser" || this.type === "pickaxe" || this.type === "chiq_blade" || this.type === "chiq_super_blade" || this.type === "em_ball" || this.type === "chrono_bolt" || this.type === "raigo_golden_spear");
                         t.takeDamage(this.damage, this.owner, false, noKnockback);
                         if (this.type === "chiq_super_blade" && this.owner?.heroName === 'Itan' && typeof this.owner.heal === 'function') this.owner.heal(Math.max(0, healthBeforeHit - t.hp));
+                        if (this.type === "raigo_golden_spear" && this.owner?.heroName === 'Raigo') {
+                            const actual = Number.isFinite(healthBeforeHit) && Number.isFinite(t.hp) ? Math.max(0, healthBeforeHit - Math.max(0, t.hp)) : this.damage;
+                            this.owner.healRaigoFromDamage?.(actual);
+                            const pullX = (this.owner.x + this.owner.w/2) - (t.x + t.w/2);
+                            const pullY = (this.owner.y + this.owner.h/2) - (t.y + t.h/2);
+                            const pullDistance = Math.max(1, Math.hypot(pullX, pullY));
+                            t.vx = (t.vx || 0) + pullX / pullDistance * 8;
+                            t.vy = (t.vy || 0) + pullY / pullDistance * 4 - 1;
+                            this.owner.vx = (this.owner.vx || 0) - Math.sign(this.vx || this.owner.facing || 1) * 2.5;
+                            for(let i=0;i<10;i++)game.particles.push(new Particle(t.x+t.w/2,t.y+t.h/2,i%2?'#ffd84d':'#dffcff',(Math.random()-.5)*10,(Math.random()-.5)*10,320,4));
+                        }
                         if (this.damage > 0 && this.owner?.heroName === 'Archor' && typeof this.owner.onArchorHit === 'function') this.owner.onArchorHit(t);
 
                         if (t.buffs) {
@@ -987,6 +998,28 @@ class Projectile extends Entity {
             ctx.beginPath(); ctx.arc(0, 0, this.w/2 + 4 + Math.sin(Date.now()*0.02)*2, 0, Math.PI*2); ctx.stroke();
             ctx.restore();
             game.particles.push(new Particle(this.x + this.w/2, this.y + this.h/2, '#35d5e8', 0, 0, 120, 3));
+        } else if (this.type === "raigo_golden_spear") {
+            ctx.save();
+            ctx.translate(this.x + this.w/2, this.y + this.h/2);
+            ctx.rotate(Math.atan2(this.vy, this.vx));
+            ctx.strokeStyle = 'rgba(255,216,77,.45)';
+            ctx.lineWidth = 8;
+            ctx.shadowBlur = 16;
+            ctx.shadowColor = '#ffd84d';
+            ctx.beginPath(); ctx.moveTo(-26, 0); ctx.lineTo(18, 0); ctx.stroke();
+            ctx.fillStyle = '#fff7b0';
+            ctx.fillRect(-20, -2, 32, 4);
+            ctx.fillStyle = '#ffd84d';
+            ctx.beginPath();
+            ctx.moveTo(28, 0);
+            ctx.lineTo(10, -9);
+            ctx.lineTo(15, 0);
+            ctx.lineTo(10, 9);
+            ctx.closePath();
+            ctx.fill();
+            ctx.shadowBlur = 0;
+            ctx.restore();
+            game.particles.push(new Particle(this.x + this.w/2 - this.vx*.4, this.y + this.h/2 - this.vy*.4, '#ffd84d', 0, 0, 120, 3));
         } else if (this.type === "fire_bolt" || this.type === "water_bolt" || this.type === "boss_fire_orb") {
             ctx.fillStyle = this.color;
             if (this.type === "boss_fire_orb") {

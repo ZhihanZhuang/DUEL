@@ -530,7 +530,7 @@ function hasSetupOpportunity(game, ai) {
         case 'Mori': return owned('mori_node') < 3;
         case 'Roka': return ai.rokaMortarCooldown <= 0;
         case 'Voss': return ai.vossCopyTimer <= 0 && ai.vossCopyCooldown <= 0;
-        case 'Raigo': return ai.raigoEnergy >= 30;
+        case 'Raigo': return ai.raigoEnergy >= 25;
         case 'Gelann': return ai.gelannBreathCooldown <= 0;
         case 'Lak': return ai.lakWallCooldown <= 0;
         case 'Pat': return ai.patBindingCooldown <= 0;
@@ -723,7 +723,7 @@ function chooseDefensiveAction(game, ai, target, threat) {
             if (ai.rokaMortarCooldown <= 0) return 'switch';
             break;
         case 'Raigo':
-            if (ai.raigoEnergy >= 30) return 'switch';
+            if (ai.raigoEnergy >= 25) return 'switch';
             break;
     }
     return null;
@@ -913,7 +913,7 @@ function chooseHeroAction(game, ai, target, targetEntity, dist, verticalDistance
             break;
         case 'Raigo':
             if(superReady&&dist<520)return 'super';
-            if(ai.raigoEnergy>=30&&(dist>105||Math.abs(verticalDistance)>65||combatState==='pressure'))return 'switch';
+            if(ai.raigoEnergy>=25&&(dist>105||Math.abs(verticalDistance)>65||combatState==='pressure'))return 'switch';
             break;
         case 'Gelann':
             if(superReady&&dist<700&&(combatState==='setup'||combatState==='pressure'||combatState==='burst'||isVulnerableTarget(target)))return 'super';

@@ -212,7 +212,7 @@ class Fighter extends Entity {
         }
         if (this.heroName === 'Raigo') {
             this.raigoEnergy = 0;
-            this.raigoMaxEnergy = 100;
+            this.raigoMaxEnergy = 70;
             this.raigoEmpoweredAttack = false;
             this.raigoChargeTimer = 0;
             this.raigoChargeHitTargets = new Set();
@@ -1980,8 +1980,7 @@ class Fighter extends Entity {
         if (this.heroName === 'Axeron') return 30;
         if (this.heroName === 'Voss') return this.getVossCopiedDamage();
         if (this.heroName === 'Raigo') {
-            const damage = this.raigoEmpoweredAttack ? 50 : 22;
-            return this.raigoArmorTimer > 0 ? damage * 1.5 : damage;
+            return this.raigoEmpoweredAttack ? 60 : 28;
         }
         if (this.heroName === 'Gelann') return 20;
         if (this.heroName === 'Vaeilash') return 15;
@@ -2026,6 +2025,10 @@ class Fighter extends Entity {
         }
         if (this.heroName === 'Tonia') { this.fireToniaBullet(); return; }
         if (this.heroName === 'Raigo') {
+            if (this.raigoArmorTimer > 0) {
+                this.fireRaigoGoldenSpear();
+                return;
+            }
             this.raigoEmpoweredAttack = this.raigoEnergy >= this.raigoMaxEnergy;
             if (this.raigoEmpoweredAttack) this.raigoEnergy = 0;
         }
@@ -2389,7 +2392,7 @@ class Fighter extends Entity {
 
     getVossCopiedDamage() {
         if(!this.vossCopiedHero)return 15;
-        const values={Hason:28,Hunter:20,Macu:22,Willi:23,Artu:73,Duke:33,Kadaxi:33,Euclid:35,Lique:18,Kae:25,Ugo:17,Kila:35,Volt:12,Gensan:32,Noae:19,Wolf:20,Kuro:35,Sola:56,Nyra:22,Orion:30,Archor:24,Itan:32,D2F1:15,Laegon:30,Veyra:30,Brom:45,Axeron:30,Ukon:40,Mori:25,Roka:40,Raigo:22,Gelann:20,Dogel:35,Lapis:24,Tonia:15,Ge:30,Lak:25,Pat:12};
+        const values={Hason:28,Hunter:20,Macu:22,Willi:23,Artu:73,Duke:33,Kadaxi:33,Euclid:35,Lique:18,Kae:25,Ugo:17,Kila:35,Volt:12,Gensan:32,Noae:19,Wolf:20,Kuro:35,Sola:56,Nyra:22,Orion:30,Archor:24,Itan:32,D2F1:15,Laegon:30,Veyra:30,Brom:45,Axeron:30,Ukon:40,Mori:25,Roka:40,Raigo:28,Gelann:20,Dogel:35,Lapis:24,Tonia:15,Ge:30,Lak:25,Pat:12};
         return values[this.vossCopiedHero]||30;
     }
 
@@ -2458,21 +2461,42 @@ class Fighter extends Entity {
 
     healRaigoFromDamage(actualDamage) {
         if(this.heroName!=='Raigo'||this.raigoArmorTimer<=0||actualDamage<=0)return;
-        const healing=actualDamage*.25;this.heal(healing);
+        const healing=actualDamage*.35;this.heal(healing);
         for(let i=0;i<5;i++)game.particles.push(new Particle(this.x+Math.random()*this.w,this.y+Math.random()*this.h,'#fff3a6',0,-2-Math.random()*3,300,3));
     }
 
     onRaigoBasicHit(target,actualDamage) {
         if(actualDamage<=0)return;
         if(this.raigoEmpoweredAttack){target.buffs=target.buffs||{};target.buffs.dizzy=Math.max(target.buffs.dizzy||0,500);for(let i=0;i<18;i++)game.particles.push(new Particle(target.x+target.w/2,target.y+target.h/2,i%2?'#ffd84d':'#dffcff',(Math.random()-.5)*14,(Math.random()-.5)*14,380,4));}
-        else this.raigoEnergy=Math.min(this.raigoMaxEnergy,this.raigoEnergy+10);
+        else this.raigoEnergy=Math.min(this.raigoMaxEnergy,this.raigoEnergy+15);
         this.healRaigoFromDamage(actualDamage);
     }
 
+    fireRaigoGoldenSpear() {
+        if(this.heroName!=='Raigo'||this.raigoArmorTimer<=0||this.attackState!=='idle')return false;
+        let dx=(keys[this.controls.right]?1:0)-(keys[this.controls.left]?1:0);
+        let dy=(keys[this.controls.down]?1:0)-(keys[this.controls.jump]?1:0);
+        if(!dx&&!dy)dx=this.facing;
+        const length=Math.max(1,Math.hypot(dx,dy));
+        const nx=dx/length,ny=dy/length;
+        if(dx)this.facing=dx>0?1:-1;
+        const px=this.x+this.w/2+nx*26-14;
+        const py=this.y+this.h/2+ny*10-5;
+        game.projectiles.push(new Projectile(px,py,28,10,nx*27,ny*27,24,this,'#ffd84d','raigo_golden_spear'));
+        this.vx-=nx*4.5;
+        this.vy-=ny*2;
+        this.attackState='recovery';
+        this.stateTimer=150;
+        this.maxStateTimer=150;
+        this.hasHit=true;
+        for(let i=0;i<10;i++)game.particles.push(new Particle(this.x+this.w/2,this.y+this.h/2,i%2?'#ffd84d':'#fff7b0',-nx*(3+Math.random()*4)+(Math.random()-.5)*3,-ny*(3+Math.random()*4)+(Math.random()-.5)*3,260,3));
+        return true;
+    }
+
     startRaigoCharge() {
-        if(this.heroName!=='Raigo'||this.raigoEnergy<30||this.raigoChargeTimer>0)return false;
+        if(this.heroName!=='Raigo'||this.raigoEnergy<25||this.raigoChargeTimer>0)return false;
         let dx=(keys[this.controls.right]?1:0)-(keys[this.controls.left]?1:0),dy=(keys[this.controls.down]?1:0)-(keys[this.controls.jump]?1:0);
-        if(!dx&&!dy)dx=this.facing;const length=Math.max(1,Math.hypot(dx,dy));this.raigoEnergy-=30;this.raigoChargeTimer=240;this.raigoChargeHitTargets=new Set();this.vx=dx/length*24;this.vy=dy/length*24;if(dx)this.facing=dx>0?1:-1;return true;
+        if(!dx&&!dy)dx=this.facing;const length=Math.max(1,Math.hypot(dx,dy));this.raigoEnergy-=25;this.raigoChargeTimer=240;this.raigoChargeHitTargets=new Set();this.vx=dx/length*24;this.vy=dy/length*24;if(dx)this.facing=dx>0?1:-1;return true;
     }
 
     updateRaigoCharge(dt) {
@@ -3111,7 +3135,7 @@ class Fighter extends Entity {
             return;
         }
         if (this.heroName === 'Raigo') {
-            if(this.superCooldown<=0){this.superCooldown=this.superCooldownMax;this.raigoArmorTimer=8000;for(let i=0;i<42;i++)game.particles.push(new Particle(this.x+this.w/2,this.y+this.h/2,i%2?'#ffd84d':'#fff7b0',(Math.random()-.5)*18,(Math.random()-.5)*18,600,5));}
+            if(this.superCooldown<=0){this.superCooldown=this.superCooldownMax;this.raigoArmorTimer=8000;this.raigoEmpoweredAttack=false;for(let i=0;i<42;i++)game.particles.push(new Particle(this.x+this.w/2,this.y+this.h/2,i%2?'#ffd84d':'#fff7b0',(Math.random()-.5)*18,(Math.random()-.5)*18,600,5));}
             return;
         }
         if (this.heroName === 'Mori') {

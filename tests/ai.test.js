@@ -2617,27 +2617,27 @@ test('Raigo builds Energy, spends Thunder Strike, and lifesteals from actual arm
     const simulation = loadPhysicsGame('Raigo');
     const { ai, target, context } = simulation;
     ai.isCPU = false;
-    ai.raigoEnergy = 90;
+    ai.raigoEnergy = 55;
     ai.raigoEmpoweredAttack = false;
-    ai.onRaigoBasicHit(target, 22);
-    assert.equal(ai.raigoEnergy, 100);
+    ai.onRaigoBasicHit(target, 28);
+    assert.equal(ai.raigoEnergy, 70);
 
     ai.attackState = 'idle';
     ai.performAttack();
     assert.equal(ai.raigoEnergy, 0);
-    assert.equal(ai.getMeleeDamage(), 50);
-    ai.onRaigoBasicHit(target, 50);
+    assert.equal(ai.getMeleeDamage(), 60);
+    ai.onRaigoBasicHit(target, 60);
     assert.equal(target.buffs.dizzy, 500);
 
     ai.superCooldown = 0;
     ai.performSuper();
     assert.equal(ai.raigoArmorTimer, 8000);
-    assert.equal(ai.getMeleeDamage(), 75);
+    assert.equal(ai.getMeleeDamage(), 28);
     ai.hp = 700;
     ai.healRaigoFromDamage(40);
-    assert.equal(ai.hp, 710);
+    assert.equal(ai.hp, 714);
 
-    ai.raigoEnergy = 30;
+    ai.raigoEnergy = 25;
     assert.equal(ai.startRaigoCharge(), true);
     assert.equal(ai.raigoEnergy, 0);
     const hpBefore = target.hp;
@@ -2645,8 +2645,40 @@ test('Raigo builds Energy, spends Thunder Strike, and lifesteals from actual arm
     context.checkAABB = () => true;
     ai.updateRaigoCharge(16);
     assert.equal(target.hp, hpBefore - 45);
-    assert.equal(ai.hp, raigoHpBefore + 11.25);
+    assert.equal(ai.hp, raigoHpBefore + 15.75);
     assert.ok(target.vx < 0);
+
+    ai.attackState = 'idle';
+    const projectileCount = context.game.projectiles.length;
+    assert.equal(ai.fireRaigoGoldenSpear(), true);
+    assert.equal(context.game.projectiles.length, projectileCount + 1);
+    assert.equal(context.game.projectiles.at(-1).type, 'raigo_golden_spear');
+    assert.equal(context.game.projectiles.at(-1).damage, 24);
+});
+
+test('Raigo golden spears heal and pull enemies during Super', () => {
+    const context = loadProjectileContext();
+    let healed = 0;
+    const owner = {
+        id: 'raigo', heroName: 'Raigo', x: 500, y: 520, w: 42, h: 72, hp: 600, maxHp: 800, facing: 1,
+        healRaigoFromDamage(amount) { healed += amount * 0.35; }
+    };
+    const target = {
+        id: 'target', heroName: 'Hunter', x: 650, y: 520, w: 42, h: 70, hp: 100, maxHp: 100,
+        vx: 0, vy: 0, dead: false, invincible: 0, buffs: {},
+        takeDamage(amount) { this.hp -= amount; }
+    };
+    context.game.opponents = [target];
+    context.game.projectiles = [];
+    const spear = new context.window.Projectile(642, 548, 28, 10, 27, 0, 24, owner, '#ffd84d', 'raigo_golden_spear');
+    context.game.projectiles = [spear];
+
+    spear.update(16);
+
+    assert.equal(target.hp, 76);
+    assert.equal(healed, 8.399999999999999);
+    assert.ok(target.vx < 0, 'golden spear should pull the enemy toward Raigo');
+    assert.equal(spear.dead, true);
 });
 
 test('Gelann uses a fast 2 WRD scimitar and deploys both zone-control skills', () => {

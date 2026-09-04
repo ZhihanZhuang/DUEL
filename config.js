@@ -395,7 +395,7 @@ var HEROES = {
     Raigo: {
         name: "Raigo", desc: "Golden Thunder Rider",
         color: "#287b8f", maxHp: 800, speed: 6.4, jump: 16, width: 42, height: 72, superCD: 22000,
-        ui: { hp: "80 WRD", atk: "2.2 WRD (Lightning Spear)", passive: "<span class='skill-tag'>Static Energy</span> Basic hits generate 10 Energy. At 100, the next attack becomes a 5 WRD Thunder Strike with a brief stun and consumes all Energy. Press [Switch] to spend 30 Energy on a directional 3 WRD Thunder Charge.", super: "<span class='skill-tag'>Golden Thunder Armor</span> For 8s, all attacks deal 150% damage and heal Raigo for 25% of actual damage dealt. Golden lightning makes the empowered state unmistakable." }
+        ui: { hp: "80 WRD", atk: "2.8 WRD (Lightning Spear)", passive: "<span class='skill-tag'>Static Energy</span> Basic hits generate 15 Energy. At 70, the next attack becomes a 6 WRD Thunder Strike with a brief stun and consumes all Energy. Press [Switch] to spend 25 Energy on a directional 3 WRD Thunder Charge.", super: "<span class='skill-tag'>Golden Spear Arsenal</span> For 8s, Raigo switches into a marksman stance: Basic Attack throws golden spears that deal 2.4 WRD, heal for 35% of actual damage, and pull enemies toward Raigo while he kites backward." }
     },
     Gelann: {
         name: "Gelann", desc: "Flameblade Archer",
