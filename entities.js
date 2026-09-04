@@ -721,16 +721,31 @@ class Projectile extends Entity {
     update(dt) {
         if (this.type === "raigo_golden_spear" && !this.released) {
             this.timer += dt;
+            this.launchTimer = (this.launchTimer || 0) + dt;
             if (!this.owner || this.owner.dead) { this.dead = true; return; }
-            const ratio = Math.max(.05, Math.min(1, this.chargeRatio || 0));
-            const orbit = 42 + ratio * 28;
-            const bob = Math.sin(this.timer * .012 + (this.floatSeed || 0)) * (8 + ratio * 8);
+            const delay = Math.max(1, this.launchDelay || 150);
+            const progress = Math.max(0, Math.min(1, this.launchTimer / delay));
+            const lift = Math.sin(progress * Math.PI * .5);
+            const ratio = Math.max(.35, Math.min(1, this.chargeRatio || .55));
+            const orbit = 44 + ratio * 18;
+            const bob = Math.sin(this.timer * .02 + (this.floatSeed || 0)) * 4;
+            const offset = (this.floatOffsetIndex || 0) * 24;
             const side = this.owner.facing || 1;
             this.w = 28 + Math.round(16 * ratio);
             this.h = 10 + Math.round(4 * ratio);
-            this.x = this.owner.x + this.owner.w/2 + side * orbit - this.w/2;
-            this.y = this.owner.y + this.owner.h/2 - 34 - ratio * 34 + bob - this.h/2;
-            if (Math.random() < .45 + ratio * .35) {
+            this.x = this.owner.x + this.owner.w/2 + side * orbit - this.w/2 + offset;
+            this.y = this.owner.y + this.owner.h/2 - 16 - lift * 72 + bob - this.h/2 - Math.abs(offset) * .25;
+            if (this.launchTimer >= delay) {
+                const direction = this.launchDirection || { x: side, y: 0 };
+                const speed = this.launchSpeed || 34;
+                this.released = true;
+                this.vx = direction.x * speed;
+                this.vy = direction.y * speed;
+                this.timer = 0;
+                for(let i=0;i<14;i++)game.particles.push(new Particle(this.x+this.w/2,this.y+this.h/2,i%2?'#ffd84d':'#fff7b0',-direction.x*(4+Math.random()*8)+(Math.random()-.5)*4,-direction.y*(4+Math.random()*8)+(Math.random()-.5)*4,280,4));
+                return;
+            }
+            if (Math.random() < .38 + progress * .45) {
                 game.particles.push(new Particle(this.x + this.w/2, this.y + this.h/2, ratio > .7 ? '#fff7b0' : '#ffd84d', (Math.random()-.5)*3, -1-Math.random()*3, 180, 2+ratio*3));
             }
             return;
@@ -873,12 +888,14 @@ class Projectile extends Entity {
                             const actual = Number.isFinite(healthBeforeHit) && Number.isFinite(t.hp) ? Math.max(0, healthBeforeHit - Math.max(0, t.hp)) : this.damage;
                             this.owner.healRaigoFromDamage?.(actual, true);
                             const chargeRatio = Math.max(0, Math.min(1, this.chargeRatio || 0));
+                            const pullScale = this.pullScale ?? 1;
                             const pullX = (this.owner.x + this.owner.w/2) - (t.x + t.w/2);
                             const pullY = (this.owner.y + this.owner.h/2) - (t.y + t.h/2);
                             const pullDistance = Math.max(1, Math.hypot(pullX, pullY));
-                            t.vx = (t.vx || 0) + pullX / pullDistance * (7 + chargeRatio * 6);
-                            t.vy = (t.vy || 0) + pullY / pullDistance * (3 + chargeRatio * 4) - 1;
-                            this.owner.vx = (this.owner.vx || 0) - Math.sign(this.vx || this.owner.facing || 1) * (2 + chargeRatio * 2.5);
+                            t.vx = (t.vx || 0) + pullX / pullDistance * (7 + chargeRatio * 6) * pullScale;
+                            t.vy = (t.vy || 0) + pullY / pullDistance * (3 + chargeRatio * 4) * pullScale - 1;
+                            if (this.stunDuration && t.buffs) t.buffs.dizzy = Math.max(t.buffs.dizzy || 0, this.stunDuration);
+                            this.owner.vx = (this.owner.vx || 0) - Math.sign(this.vx || this.owner.facing || 1) * (2 + chargeRatio * 2.5) * pullScale;
                             for(let i=0;i<10+chargeRatio*12;i++)game.particles.push(new Particle(t.x+t.w/2,t.y+t.h/2,i%2?'#ffd84d':'#dffcff',(Math.random()-.5)*(10+chargeRatio*8),(Math.random()-.5)*(10+chargeRatio*8),320+chargeRatio*180,4+chargeRatio*2));
                         }
                         if (this.damage > 0 && this.owner?.heroName === 'Archor' && typeof this.owner.onArchorHit === 'function') this.owner.onArchorHit(t);
@@ -1037,19 +1054,31 @@ class Projectile extends Entity {
             ctx.translate(this.x + this.w/2, this.y + this.h/2);
             const chargeRatio = Math.max(0, Math.min(1, this.chargeRatio || 0));
             ctx.rotate(this.released ? Math.atan2(this.vy, this.vx) : Math.sin(Date.now()*.006+(this.floatSeed||0))*.42);
-            ctx.strokeStyle = 'rgba(255,216,77,.45)';
-            ctx.lineWidth = 8 + chargeRatio * 6;
-            ctx.shadowBlur = 14 + chargeRatio * 20;
+            ctx.strokeStyle = 'rgba(255,216,77,.42)';
+            ctx.lineWidth = 9 + chargeRatio * 4;
+            ctx.shadowBlur = 12 + chargeRatio * 18;
             ctx.shadowColor = '#ffd84d';
-            ctx.beginPath(); ctx.moveTo(-26 - chargeRatio * 18, 0); ctx.lineTo(18 + chargeRatio * 12, 0); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(-33 - chargeRatio * 12, 0); ctx.lineTo(40 + chargeRatio * 12, 0); ctx.stroke();
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = '#35515a';
+            ctx.fillRect(-36 - chargeRatio * 8, -4, 18, 8);
             ctx.fillStyle = '#fff7b0';
-            ctx.fillRect(-20 - chargeRatio * 12, -2 - chargeRatio, 32 + chargeRatio * 20, 4 + chargeRatio * 2);
+            ctx.fillRect(-22 - chargeRatio * 10, -3, 78 + chargeRatio * 22, 6);
             ctx.fillStyle = '#ffd84d';
+            ctx.fillRect(-10 - chargeRatio * 8, -1, 62 + chargeRatio * 14, 2);
             ctx.beginPath();
-            ctx.moveTo(28 + chargeRatio * 14, 0);
-            ctx.lineTo(10, -9 - chargeRatio * 5);
-            ctx.lineTo(15, 0);
-            ctx.lineTo(10, 9 + chargeRatio * 5);
+            ctx.moveTo(58 + chargeRatio * 14, 0);
+            ctx.lineTo(34 + chargeRatio * 6, -13 - chargeRatio * 4);
+            ctx.lineTo(40 + chargeRatio * 5, 0);
+            ctx.lineTo(34 + chargeRatio * 6, 13 + chargeRatio * 4);
+            ctx.closePath();
+            ctx.fill();
+            ctx.fillStyle = '#fff7b0';
+            ctx.beginPath();
+            ctx.moveTo(52 + chargeRatio * 12, 0);
+            ctx.lineTo(38 + chargeRatio * 5, -6 - chargeRatio * 2);
+            ctx.lineTo(42 + chargeRatio * 5, 0);
+            ctx.lineTo(38 + chargeRatio * 5, 6 + chargeRatio * 2);
             ctx.closePath();
             ctx.fill();
             ctx.shadowBlur = 0;

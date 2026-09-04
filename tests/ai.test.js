@@ -2631,12 +2631,13 @@ test('Raigo builds Energy, spends Thunder Strike, and lifesteals from actual arm
 
     ai.superCooldown = 0;
     ai.performSuper();
-    assert.equal(ai.raigoArmorTimer, 8000);
+    assert.equal(ai.raigoArmorTimer, 10000);
     assert.equal(ai.getMeleeDamage(), 28);
     ai.hp = 700;
     ai.healRaigoFromDamage(40);
     assert.equal(ai.hp, 714);
 
+    ai.raigoArmorTimer = 0;
     ai.raigoEnergy = 25;
     assert.equal(ai.startRaigoCharge(), true);
     assert.equal(ai.raigoEnergy, 0);
@@ -2644,23 +2645,29 @@ test('Raigo builds Energy, spends Thunder Strike, and lifesteals from actual arm
     const raigoHpBefore = ai.hp;
     context.checkAABB = () => true;
     ai.updateRaigoCharge(16);
-    assert.equal(target.hp, hpBefore - 45);
-    assert.equal(ai.hp, raigoHpBefore + 15.75);
+    assert.equal(target.hp, hpBefore - 30);
+    assert.equal(ai.hp, raigoHpBefore);
     assert.ok(target.vx < 0);
 
     ai.attackState = 'idle';
-    ai.raigoArmorTimer = 8000;
+    ai.raigoArmorTimer = 10000;
     const projectileCount = context.game.projectiles.length;
-    assert.equal(ai.startRaigoGoldenSpearCharge(), true);
+    assert.equal(ai.throwRaigoGoldenSpear(), true);
     assert.equal(context.game.projectiles.length, projectileCount + 1);
-    const chargedSpear = context.game.projectiles.at(-1);
-    assert.equal(chargedSpear.type, 'raigo_golden_spear');
-    assert.equal(chargedSpear.released, false);
-    ai.raigoSpearCharge = 1000;
-    assert.equal(ai.releaseRaigoGoldenSpear(), true);
-    assert.equal(chargedSpear.released, true);
-    assert.equal(chargedSpear.damage, 60);
-    assert.ok(Math.hypot(chargedSpear.vx, chargedSpear.vy) >= 39);
+    const spear = context.game.projectiles.at(-1);
+    assert.equal(spear.type, 'raigo_golden_spear');
+    assert.equal(spear.released, false);
+    assert.equal(spear.launchDelay, 150);
+    assert.equal(spear.damage, 32);
+
+    ai.attackState = 'idle';
+    const beforeTriple = context.game.projectiles.length;
+    assert.equal(ai.startRaigoCharge(), true);
+    const tripleSpears = context.game.projectiles.slice(beforeTriple);
+    assert.equal(tripleSpears.length, 3);
+    assert.deepEqual(tripleSpears.map(item => item.launchDelay), [90, 220, 350]);
+    assert.deepEqual(tripleSpears.map(item => item.damage), [18, 18, 18]);
+    assert.equal(tripleSpears.every(item => item.stunDuration === 420), true);
 });
 
 test('Raigo golden spears heal and pull enemies during Super', () => {
@@ -2677,18 +2684,43 @@ test('Raigo golden spears heal and pull enemies during Super', () => {
     };
     context.game.opponents = [target];
     context.game.projectiles = [];
-    const spear = new context.window.Projectile(642, 548, 44, 14, 40, 0, 60, owner, '#ffd84d', 'raigo_golden_spear');
+    const spear = new context.window.Projectile(642, 548, 44, 14, 40, 0, 32, owner, '#ffd84d', 'raigo_golden_spear');
     spear.released = true;
-    spear.chargeRatio = 1;
+    spear.chargeRatio = .6;
     spear.lifestealRatio = .35;
     context.game.projectiles = [spear];
 
     spear.update(16);
 
-    assert.equal(target.hp, 40);
-    assert.equal(healed, 21);
+    assert.equal(target.hp, 68);
+    assert.equal(healed, 11.2);
     assert.ok(target.vx < 0, 'golden spear should pull the enemy toward Raigo');
     assert.equal(spear.dead, true);
+});
+
+test('Raigo golden spears float upward before launching automatically', () => {
+    const context = loadProjectileContext();
+    const owner = {
+        id: 'raigo', heroName: 'Raigo', x: 500, y: 520, w: 42, h: 72, dead: false, facing: 1,
+        healRaigoFromDamage() {}
+    };
+    context.game.opponents = [];
+    const spear = new context.window.Projectile(499, 551, 44, 12, 0, 0, 32, owner, '#ffd84d', 'raigo_golden_spear');
+    spear.released = false;
+    spear.launchDelay = 150;
+    spear.launchTimer = 0;
+    spear.launchSpeed = 34;
+    spear.launchDirection = { x: 1, y: 0 };
+    spear.floatOffsetIndex = 0;
+    const startY = spear.y;
+
+    spear.update(75);
+    assert.equal(spear.released, false);
+    assert.ok(spear.y < startY, 'golden spear should rise before launching');
+
+    spear.update(75);
+    assert.equal(spear.released, true);
+    assert.equal(spear.vx, 34);
 });
 
 test('Gelann uses a fast 2 WRD scimitar and deploys both zone-control skills', () => {
