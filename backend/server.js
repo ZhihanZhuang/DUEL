@@ -132,6 +132,56 @@ function makeRoomCode() {
     return code;
 }
 
+function resetChallengerSlot(match) {
+    match.clientId = null;
+    match.clientSocket = null;
+    match.clientName = null;
+    match.clientHero = null;
+    match.status = 'lobby';
+}
+
+function clearSocketFromMatches(socketId) {
+    [...activeMatches.entries()].forEach(([mid, match]) => {
+        if (match.hostSocket === socketId) {
+            if (match.clientSocket) io.to(match.clientSocket).emit('match:opponent_left');
+            match.spectators.forEach(sid => io.to(sid).emit('spectate:ended', { matchId: mid }));
+            activeMatches.delete(mid);
+            return;
+        }
+
+        if (match.clientSocket === socketId) {
+            const oldClientSocket = match.clientSocket;
+            resetChallengerSlot(match);
+            const oldClient = getUser(oldClientSocket);
+            if (oldClient) oldClient.status = 'online';
+            if (match.hostSocket) {
+                io.to(match.hostSocket).emit('match:opponent_left', { match: matchState(match, 'host') });
+                emitMatchState(match);
+            }
+            match.spectators.forEach(sid => io.to(sid).emit('spectate:ended', { matchId: mid }));
+            return;
+        }
+
+        if (match.spectators.has(socketId)) {
+            match.spectators.delete(socketId);
+        }
+    });
+}
+
+function cleanupSocket(socketId) {
+    removeFromQueue(socketId);
+    clearSocketFromMatches(socketId);
+    const user = getUser(socketId);
+    if (user) {
+        usersByName.delete(user.name.toLowerCase());
+        broadcastOnlineFriends(user.id);
+    }
+    users.delete(socketId);
+    socketToUser.delete(socketId);
+    broadcastQueueStatus();
+    io.emit('matches:update');
+}
+
 // --- REST endpoints ---
 app.get('/api/health', (_, res) => {
     res.json({
@@ -168,8 +218,9 @@ io.on('connection', (socket) => {
         const key = trimmed.toLowerCase();
 
         if (usersByName.has(key) && usersByName.get(key) !== socket.id) {
-            socket.emit('user:error', { message: 'Nickname already in use' });
-            return;
+            const oldSocketId = usersByName.get(key);
+            cleanupSocket(oldSocketId);
+            io.sockets.sockets.get(oldSocketId)?.disconnect(true);
         }
 
         const existing = users.get(socket.id);
@@ -246,6 +297,8 @@ io.on('connection', (socket) => {
     socket.on('room:create', ({ hero }) => {
         const user = getUser(socket.id);
         if (!user) return;
+        clearSocketFromMatches(socket.id);
+        removeFromQueue(socket.id);
         const matchId = makeRoomCode();
         const match = {
             id: matchId,
@@ -276,6 +329,13 @@ io.on('connection', (socket) => {
             socket.emit('room:error', { message: 'Room not found' });
             return;
         }
+        if (match.hostSocket && !users.has(match.hostSocket)) {
+            activeMatches.delete(code);
+            socket.emit('room:error', { message: 'Host left. Please ask them to create a new room.' });
+            io.emit('matches:update');
+            return;
+        }
+        if (match.clientSocket && !users.has(match.clientSocket)) resetChallengerSlot(match);
         if (match.clientSocket && match.clientSocket !== socket.id) {
             socket.emit('room:error', { message: 'Room is full' });
             return;
@@ -321,11 +381,8 @@ io.on('connection', (socket) => {
             if (match.clientSocket) io.to(match.clientSocket).emit('match:opponent_left');
             activeMatches.delete(matchId);
         } else if (match.clientSocket === socket.id) {
-            match.clientId = null;
-            match.clientSocket = null;
-            match.clientName = null;
-            match.clientHero = null;
-            match.status = 'lobby';
+            resetChallengerSlot(match);
+            if (match.hostSocket) io.to(match.hostSocket).emit('match:opponent_left', { match: matchState(match, 'host') });
             emitMatchState(match);
         }
         if (user) user.status = 'online';
@@ -429,24 +486,7 @@ io.on('connection', (socket) => {
     });
 
     socket.on('disconnect', () => {
-        removeFromQueue(socket.id);
-        const user = getUser(socket.id);
-        if (user) {
-            usersByName.delete(user.name.toLowerCase());
-            broadcastOnlineFriends(user.id);
-            [...activeMatches.entries()].forEach(([mid, m]) => {
-                if (m.hostSocket === socket.id || m.clientSocket === socket.id) {
-                    const other = m.hostSocket === socket.id ? m.clientSocket : m.hostSocket;
-                    if (other) io.to(other).emit('match:opponent_left');
-                    m.spectators.forEach(sid => io.to(sid).emit('spectate:ended', { matchId: mid }));
-                    activeMatches.delete(mid);
-                }
-            });
-        }
-        users.delete(socket.id);
-        socketToUser.delete(socket.id);
-        broadcastQueueStatus();
-        io.emit('matches:update');
+        cleanupSocket(socket.id);
     });
 });
 

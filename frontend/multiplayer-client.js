@@ -93,10 +93,11 @@ function initMultiplayerClient() {
         window.currentMatchId = null;
         window.clearOnlineRemoteInputs?.();
     });
-    mpSocket.on('match:opponent_left', () => {
+    mpSocket.on('match:opponent_left', data => {
         window.currentMatchId = null;
         window.clearOnlineRemoteInputs?.();
-        if (window.game?.state === 'PLAYING') window.game.endGame('Remaining Player');
+        if (data?.match) showMatchLobby(data.match, 'Opponent left. Room is open again.');
+        else if (window.game?.state === 'PLAYING') window.game.endGame('Remaining Player');
         else leaveRoom(false);
     });
 
@@ -185,8 +186,30 @@ function buildOnlineHeroGrid() {
     grid.dataset.ready = 'true';
 }
 
-function showMatchLobby(state) {
+function stopOnlineArenaForLobby() {
+    const game = window.game;
+    if (game?.isOnline || game?.state === 'PLAYING' || game?.state === 'GAMEOVER') {
+        game.stopLoop?.();
+        game.audio?.stopMusic?.();
+        if (game.endGameTimer) {
+            clearTimeout(game.endGameTimer);
+            game.endGameTimer = null;
+        }
+        game.state = 'ONLINE_LOBBY';
+        game.isOnline = false;
+        game.netRole = 'spectator';
+    }
+    window.clearOnlineRemoteInputs?.();
+    document.getElementById('game-ui')?.classList.add('hidden');
+    document.getElementById('game-over-screen')?.classList.add('hidden');
+    document.getElementById('pause-screen')?.classList.add('hidden');
+    document.getElementById('spectator-banner')?.classList.add('hidden');
+    document.getElementById('ping-display')?.classList.add('hidden');
+}
+
+function showMatchLobby(state, notice = '') {
     if (!state?.matchId) return;
+    if (state.status === 'lobby') stopOnlineArenaForLobby();
     window.currentMatchId = state.matchId;
     window.onlineMatchRole = state.role;
     window.isHost = state.role === 'host';
@@ -212,7 +235,8 @@ function showMatchLobby(state) {
     const canStart = state.role === 'host' && !!state.client && state.status === 'lobby';
     start.style.display = canStart ? 'inline-block' : 'none';
     start.onclick = () => mpSocket?.emit('match:ready', { matchId: state.matchId });
-    if (state.status === 'playing') status.innerText = 'Match in progress';
+    if (notice) status.innerText = notice;
+    else if (state.status === 'playing') status.innerText = 'Match in progress';
     else if (canStart) status.innerText = 'Both fighters ready';
     else if (state.role === 'host') status.innerText = 'Waiting for challenger';
     else status.innerText = 'Waiting for host';
