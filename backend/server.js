@@ -159,6 +159,10 @@ app.get('/api/matches', (_, res) => {
 
 // --- Socket.io ---
 io.on('connection', (socket) => {
+    socket.on('ping:measure', (_sentAt, callback) => {
+        if (typeof callback === 'function') callback({ ok: true });
+    });
+
     socket.on('user:register', ({ name, hero }) => {
         const trimmed = (name || 'Fighter').trim().slice(0, 12);
         const key = trimmed.toLowerCase();

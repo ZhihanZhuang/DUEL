@@ -8,6 +8,8 @@ window.mySelectedHero = window.game?.p1Choice || 'Noae';
 window.currentMatchId = null;
 window.onlineMatchRole = null;
 window.isHost = false;
+const ONLINE_STATE_INTERVAL_MS = 33;
+const ONLINE_PARTICLE_SNAPSHOT_LIMIT = 12;
 
 function updateLoginStatus(message, isError = false) {
     const status = document.getElementById('login-status');
@@ -115,7 +117,7 @@ if (window.Game && !window.Game.prototype.socketSyncPatched) {
             p2: cloneEntity(this.p2),
             projectiles: this.projectiles.map(cloneEntity),
             minions: this.minions.map(cloneEntity),
-            particles: this.particles.slice(-40).map(cloneEntity),
+            particles: this.particles.slice(-ONLINE_PARTICLE_SNAPSHOT_LIMIT).map(cloneEntity),
             hazards: this.hazards.map(cloneEntity),
             hurricane: cloneEntity(this.hurricane),
             hitstop: this.hitstop,
@@ -170,7 +172,7 @@ if (window.Game && !window.Game.prototype.socketSyncPatched) {
         originalUpdate.call(this, dt);
         if (this.isOnline && this.netRole === 'host') {
             this.onlineStateTimer = (this.onlineStateTimer || 0) + dt;
-            if (this.onlineStateTimer >= 50) {
+            if (this.onlineStateTimer >= ONLINE_STATE_INTERVAL_MS) {
                 this.onlineStateTimer = 0;
                 window.sendBackendState?.(this.exportState());
             }

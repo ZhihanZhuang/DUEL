@@ -13,6 +13,7 @@ const BACKEND_URL = window.DUEL_BACKEND_URL || (
 let mpSocket = null;
 let mpConnected = false;
 let pendingRegistration = false;
+let latencyTimer = null;
 
 function initMultiplayerClient() {
     if (mpSocket) return mpSocket;
@@ -22,17 +23,19 @@ function initMultiplayerClient() {
         return null;
     }
 
-    mpSocket = io(BACKEND_URL, { transports: ['websocket', 'polling'] });
+    mpSocket = io(BACKEND_URL, { transports: ['websocket'], upgrade: false });
 
     mpSocket.on('connect', () => {
         mpConnected = true;
         updateMpStatus('Duel server connected');
         window.updateLoginStatus?.('Server connected. Enter a nickname.');
+        startLatencyMonitor();
         if (window.myUserName || pendingRegistration) registerBackendUser(window.myUserName);
     });
 
     mpSocket.on('disconnect', () => {
         mpConnected = false;
+        stopLatencyMonitor();
         updateMpStatus('Duel server offline', true);
         window.updateLoginStatus?.('Connection lost. Reconnecting...', true);
     });
@@ -105,6 +108,34 @@ function initMultiplayerClient() {
     mpSocket.on('spectate:error', data => window.updateLoginStatus?.(data.message, true));
 
     return mpSocket;
+}
+
+function startLatencyMonitor() {
+    stopLatencyMonitor();
+    latencyTimer = setInterval(() => {
+        if (!mpSocket?.connected) return;
+        const sentAt = performance.now();
+        mpSocket.timeout(1200).emit('ping:measure', sentAt, error => {
+            if (error) {
+                updatePingDisplay('PING TIMEOUT', true);
+                return;
+            }
+            updatePingDisplay(`${Math.round(performance.now() - sentAt)} ms`);
+        });
+    }, 2000);
+}
+
+function stopLatencyMonitor() {
+    if (latencyTimer) clearInterval(latencyTimer);
+    latencyTimer = null;
+}
+
+function updatePingDisplay(message, isError = false) {
+    const display = document.getElementById('ping-display');
+    if (!display || display.classList.contains('hidden')) return;
+    const role = window.onlineMatchRole === 'host' ? 'HOST' : window.onlineMatchRole === 'client' ? 'CHALLENGER' : 'ONLINE';
+    display.innerText = `${role} ${message}`;
+    display.style.color = isError ? '#ff6b6b' : '#7bed9f';
 }
 
 function updateMpStatus(message, isError = false) {
@@ -199,7 +230,7 @@ function startOnlineMatch(state) {
     document.getElementById('room-screen')?.classList.add('hidden');
     document.getElementById('game-ui')?.classList.remove('hidden');
     document.getElementById('ping-display')?.classList.remove('hidden');
-    document.getElementById('ping-display').innerText = state.role === 'host' ? 'ONLINE HOST' : 'ONLINE CHALLENGER';
+    document.getElementById('ping-display').innerText = state.role === 'host' ? 'HOST connecting...' : 'CHALLENGER connecting...';
     window.game.startGame(false);
     window.game.isOnline = true;
     window.game.netRole = state.role;
