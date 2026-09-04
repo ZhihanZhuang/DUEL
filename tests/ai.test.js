@@ -2649,11 +2649,18 @@ test('Raigo builds Energy, spends Thunder Strike, and lifesteals from actual arm
     assert.ok(target.vx < 0);
 
     ai.attackState = 'idle';
+    ai.raigoArmorTimer = 8000;
     const projectileCount = context.game.projectiles.length;
-    assert.equal(ai.fireRaigoGoldenSpear(), true);
+    assert.equal(ai.startRaigoGoldenSpearCharge(), true);
     assert.equal(context.game.projectiles.length, projectileCount + 1);
-    assert.equal(context.game.projectiles.at(-1).type, 'raigo_golden_spear');
-    assert.equal(context.game.projectiles.at(-1).damage, 24);
+    const chargedSpear = context.game.projectiles.at(-1);
+    assert.equal(chargedSpear.type, 'raigo_golden_spear');
+    assert.equal(chargedSpear.released, false);
+    ai.raigoSpearCharge = 1000;
+    assert.equal(ai.releaseRaigoGoldenSpear(), true);
+    assert.equal(chargedSpear.released, true);
+    assert.equal(chargedSpear.damage, 60);
+    assert.ok(Math.hypot(chargedSpear.vx, chargedSpear.vy) >= 39);
 });
 
 test('Raigo golden spears heal and pull enemies during Super', () => {
@@ -2670,13 +2677,16 @@ test('Raigo golden spears heal and pull enemies during Super', () => {
     };
     context.game.opponents = [target];
     context.game.projectiles = [];
-    const spear = new context.window.Projectile(642, 548, 28, 10, 27, 0, 24, owner, '#ffd84d', 'raigo_golden_spear');
+    const spear = new context.window.Projectile(642, 548, 44, 14, 40, 0, 60, owner, '#ffd84d', 'raigo_golden_spear');
+    spear.released = true;
+    spear.chargeRatio = 1;
+    spear.lifestealRatio = .35;
     context.game.projectiles = [spear];
 
     spear.update(16);
 
-    assert.equal(target.hp, 76);
-    assert.equal(healed, 8.399999999999999);
+    assert.equal(target.hp, 40);
+    assert.equal(healed, 21);
     assert.ok(target.vx < 0, 'golden spear should pull the enemy toward Raigo');
     assert.equal(spear.dead, true);
 });

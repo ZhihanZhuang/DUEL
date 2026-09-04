@@ -217,6 +217,9 @@ class Fighter extends Entity {
             this.raigoChargeTimer = 0;
             this.raigoChargeHitTargets = new Set();
             this.raigoArmorTimer = 0;
+            this.raigoSpearCharge = 0;
+            this.raigoSpearChargeMax = 1000;
+            this.raigoChargedSpear = null;
         }
         if (this.heroName === 'Gelann') {
             this.gelannBreathCooldown = 0;
@@ -720,6 +723,9 @@ class Fighter extends Entity {
         if (this.heroName === 'Raigo') {
             this.raigoArmorTimer = Math.max(0, this.raigoArmorTimer - dt);
             if (this.raigoChargeTimer > 0) this.updateRaigoCharge(dt);
+            if (this.attackState === 'raigo_spear_charging') {
+                this.updateRaigoGoldenSpearCharge(dt);
+            }
             if (this.raigoArmorTimer > 0 && Math.random() < 0.45) {
                 game.particles.push(new Particle(this.x+Math.random()*this.w,this.y+Math.random()*this.h,'#ffd84d',(Math.random()-.5)*5,-2-Math.random()*4,260,3));
             }
@@ -2026,7 +2032,7 @@ class Fighter extends Entity {
         if (this.heroName === 'Tonia') { this.fireToniaBullet(); return; }
         if (this.heroName === 'Raigo') {
             if (this.raigoArmorTimer > 0) {
-                this.fireRaigoGoldenSpear();
+                this.startRaigoGoldenSpearCharge();
                 return;
             }
             this.raigoEmpoweredAttack = this.raigoEnergy >= this.raigoMaxEnergy;
@@ -2459,8 +2465,8 @@ class Fighter extends Entity {
         this.vossDouble.mirrorAttack({damage,kind,targetX,targetY,facing:this.facing});
     }
 
-    healRaigoFromDamage(actualDamage) {
-        if(this.heroName!=='Raigo'||this.raigoArmorTimer<=0||actualDamage<=0)return;
+    healRaigoFromDamage(actualDamage, force = false) {
+        if(this.heroName!=='Raigo'||(!force&&this.raigoArmorTimer<=0)||actualDamage<=0)return;
         const healing=actualDamage*.35;this.heal(healing);
         for(let i=0;i<5;i++)game.particles.push(new Particle(this.x+Math.random()*this.w,this.y+Math.random()*this.h,'#fff3a6',0,-2-Math.random()*3,300,3));
     }
@@ -2472,24 +2478,67 @@ class Fighter extends Entity {
         this.healRaigoFromDamage(actualDamage);
     }
 
-    fireRaigoGoldenSpear() {
+    startRaigoGoldenSpearCharge() {
         if(this.heroName!=='Raigo'||this.raigoArmorTimer<=0||this.attackState!=='idle')return false;
+        const spear = new Projectile(this.x+this.w/2-14,this.y+this.h/2-5,28,10,0,0,18,this,'#ffd84d','raigo_golden_spear');
+        spear.raigoFloating = true;
+        spear.released = false;
+        spear.chargeRatio = 0;
+        spear.lifestealRatio = .35;
+        spear.floatSeed = Math.random() * Math.PI * 2;
+        spear.target = game.getEnemyOf(this);
+        game.projectiles.push(spear);
+        this.raigoChargedSpear = spear;
+        this.raigoSpearCharge = 0;
+        this.attackState = 'raigo_spear_charging';
+        this.stateTimer = 0;
+        this.maxStateTimer = this.raigoSpearChargeMax;
+        this.hasHit = true;
+        return true;
+    }
+
+    updateRaigoGoldenSpearCharge(dt) {
+        if(this.heroName!=='Raigo'||this.attackState!=='raigo_spear_charging')return;
+        this.raigoSpearCharge=Math.min(this.raigoSpearChargeMax,this.raigoSpearCharge+dt);
+        this.stateTimer=this.raigoSpearCharge;
+        this.maxStateTimer=this.raigoSpearChargeMax;
+        this.vx*=.82;
+        if(!this.raigoChargedSpear||this.raigoChargedSpear.dead||this.raigoArmorTimer<=0){
+            this.attackState='idle';this.raigoChargedSpear=null;return;
+        }
+        this.raigoChargedSpear.chargeRatio=Math.max(.05,Math.min(1,this.raigoSpearCharge/this.raigoSpearChargeMax));
+        if(!keys[this.controls.attack]||this.raigoSpearCharge>=this.raigoSpearChargeMax)this.releaseRaigoGoldenSpear();
+    }
+
+    releaseRaigoGoldenSpear() {
+        if(this.heroName!=='Raigo'||this.attackState!=='raigo_spear_charging'||!this.raigoChargedSpear)return false;
+        const chargeRatio=Math.max(.15,Math.min(1,this.raigoSpearCharge/this.raigoSpearChargeMax));
         let dx=(keys[this.controls.right]?1:0)-(keys[this.controls.left]?1:0);
         let dy=(keys[this.controls.down]?1:0)-(keys[this.controls.jump]?1:0);
         if(!dx&&!dy)dx=this.facing;
         const length=Math.max(1,Math.hypot(dx,dy));
         const nx=dx/length,ny=dy/length;
         if(dx)this.facing=dx>0?1:-1;
-        const px=this.x+this.w/2+nx*26-14;
-        const py=this.y+this.h/2+ny*10-5;
-        game.projectiles.push(new Projectile(px,py,28,10,nx*27,ny*27,24,this,'#ffd84d','raigo_golden_spear'));
-        this.vx-=nx*4.5;
-        this.vy-=ny*2;
+        const spear=this.raigoChargedSpear;
+        const speed=18+22*chargeRatio;
+        spear.raigoFloating=false;
+        spear.released=true;
+        spear.chargeRatio=chargeRatio;
+        spear.damage=Math.round(18+42*chargeRatio);
+        spear.vx=nx*speed;
+        spear.vy=ny*speed;
+        spear.w=28+Math.round(16*chargeRatio);
+        spear.h=10+Math.round(4*chargeRatio);
+        spear.timer=0;
+        spear.target=game.getEnemyOf(this);
+        this.vx-=nx*(3+3.5*chargeRatio);
+        this.vy-=ny*(1+2*chargeRatio);
         this.attackState='recovery';
-        this.stateTimer=150;
-        this.maxStateTimer=150;
+        this.stateTimer=170;
+        this.maxStateTimer=170;
         this.hasHit=true;
-        for(let i=0;i<10;i++)game.particles.push(new Particle(this.x+this.w/2,this.y+this.h/2,i%2?'#ffd84d':'#fff7b0',-nx*(3+Math.random()*4)+(Math.random()-.5)*3,-ny*(3+Math.random()*4)+(Math.random()-.5)*3,260,3));
+        this.raigoChargedSpear=null;
+        for(let i=0;i<10+chargeRatio*14;i++)game.particles.push(new Particle(spear.x+spear.w/2,spear.y+spear.h/2,i%2?'#ffd84d':'#fff7b0',-nx*(4+Math.random()*9)+(Math.random()-.5)*4,-ny*(4+Math.random()*9)+(Math.random()-.5)*4,280+chargeRatio*220,3+chargeRatio*3));
         return true;
     }
 
