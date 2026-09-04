@@ -370,7 +370,7 @@ var HEROES = {
     Axeron: {
         name: "Axeron", desc: "Gold-Blue Labrys Assassin",
         color: "#2468c9", maxHp: 700, speed: 6.5, jump: 16, width: 39, height: 68, superCD: 22000,
-        ui: { hp: "70 WRD", atk: "3 WRD (Very Fast Mechanical Labrys)", passive: "Every third basic attack hit applies a visible Axe Mark for 5s. Misses do not reset the hit count, and multiple marks may coexist. Hold a direction and press [Switch] to rush a marked enemy for 2.5 WRD, strong knockback, and brief hit-stun (5s CD).", super: "<span class='skill-tag'>Titan's Descent</span> Warns the target area, then drops a gigantic gold-blue labrys for 10 WRD in a large shockwave. Very strong knockback; heals Axeron for 25% of actual damage dealt." }
+        ui: { hp: "70 WRD", atk: "3 WRD (Very Fast Mechanical Labrys)", passive: "Every second consecutive basic attack hit applies a visible Axe Mark for 5s. Misses do not reset the hit count, and multiple marks may coexist. Hold a direction and press [Switch] to rush a marked enemy for 2.5 WRD, strong knockback, and brief hit-stun (3s CD).", super: "<span class='skill-tag'>Titan's Descent</span> Warns the target area, then drops a gigantic gold-blue labrys for 10 WRD in a large shockwave. Very strong knockback; heals Axeron for 25% of actual damage dealt." }
     },
     Ukon: {
         name: "Ukon", desc: "Iron Rod Burst Warrior",

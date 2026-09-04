@@ -2111,13 +2111,13 @@ test('Brom Demolition Zone triples damage and applies field slow and dizzy pulse
     assert.ok(target.hp <= 880, 'outer explosion did not use tripled damage');
 });
 
-test('Axeron applies a five-second mark on the third hit and rushes its target', () => {
+test('Axeron applies a five-second mark on the second hit and rushes its target', () => {
     const simulation = loadPhysicsGame('Axeron');
     simulation.ai.attackState = 'idle';
     simulation.ai.stateTimer = 0;
     simulation.context.checkAABB = () => true;
 
-    for (let hit=0; hit<3; hit++) {
+    for (let hit=0; hit<2; hit++) {
         simulation.ai.attackState = 'active'; simulation.ai.stateTimer = 100;
         simulation.ai.maxStateTimer = 100; simulation.ai.hasHit = false;
         simulation.ai.update(16);
@@ -2133,7 +2133,7 @@ test('Axeron applies a five-second mark on the third hit and rushes its target',
     simulation.target.y = 500;
     simulation.ai.attackState = 'idle';
     assert.equal(simulation.ai.startAxeronRush(), true);
-    assert.equal(simulation.ai.axeronRushCooldown, 5000);
+    assert.equal(simulation.ai.axeronRushCooldown, 3000);
     assert.equal(simulation.ai.startAxeronRush(), false);
     simulation.ai.updateAxeronRush(180);
 
@@ -2143,20 +2143,20 @@ test('Axeron applies a five-second mark on the third hit and rushes its target',
     assert.ok(simulation.ai.x < simulation.target.x);
 
     simulation.ai.update(1000);
-    assert.equal(simulation.ai.axeronRushCooldown, 4000);
+    assert.equal(simulation.ai.axeronRushCooldown, 2000);
     assert.equal(simulation.ai.startAxeronRush(), false);
 });
 
-test('Axeron misses do not reset his every-third-hit mark counter', () => {
+test('Axeron misses do not reset his every-second-hit mark counter', () => {
     const simulation = loadPhysicsGame('Axeron');
-    simulation.ai.axeronCombo = 2;
+    simulation.ai.axeronCombo = 1;
     simulation.ai.attackState = 'active'; simulation.ai.stateTimer = 1;
     simulation.ai.maxStateTimer = 100; simulation.ai.hasHit = false;
     simulation.context.checkAABB = () => false;
 
     simulation.ai.update(16);
 
-    assert.equal(simulation.ai.axeronCombo, 2);
+    assert.equal(simulation.ai.axeronCombo, 1);
     assert.equal(simulation.ai.axeronMarks.length, 0);
 
     simulation.ai.attackState = 'active'; simulation.ai.stateTimer = 100;

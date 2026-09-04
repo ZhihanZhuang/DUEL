@@ -1422,7 +1422,7 @@ class Fighter extends Entity {
                         if (this.heroName === 'Laegon') targetsHit.forEach(target => this.onLaegonHit(target, this.getMeleeDamage(), true));
                         if (this.heroName === 'Axeron') {
                             this.axeronCombo++;
-                            if (this.axeronCombo >= 3) {
+                            if (this.axeronCombo >= 2) {
                                 this.axeronCombo = 0;
                                 targetsHit.forEach(target => this.addAxeronMark(target));
                             }
@@ -2888,7 +2888,7 @@ class Fighter extends Entity {
         const target = this.selectAxeronMarkTarget();
         if (!target) return false;
         this.axeronRushTarget = target; this.axeronRushTimer = this.axeronRushMax; this.axeronRushHit = false;
-        this.axeronRushCooldown = 5000;
+        this.axeronRushCooldown = 3000;
         this.attackState = 'idle'; this.stateTimer = 0; this.vx = 0; this.vy = 0;
         for (let i=0;i<12;i++) game.particles.push(new Particle(this.x+this.w/2,this.y+this.h/2,'#ffcf5a',(Math.random()-.5)*12,(Math.random()-.5)*12,280,4));
         return true;
