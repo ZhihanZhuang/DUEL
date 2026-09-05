@@ -440,7 +440,7 @@ var HEROES = {
     Ocel: {
         name: "Ocel", desc: "The Godbound Warrior",
         color: "#137f78", maxHp: 900, speed: 5.7, jump: 15, width: 44, height: 73, superCD: 20000,
-        ui: { hp: "90 WRD", atk: "2.5 WRD (Divine Macuahuitl)", passive: "Attacks apply Sacred Venom. Three Venom Marks erupt for 4 WRD. Press [Switch] to release a 3 WRD Feathered Serpent; press [Extra] to invoke Tlaloc's four-second ritual zone (9s CD).", super: "<span class='skill-tag'>Gods of the Fifth Sun</span> Invoke a divine serpent for 8 WRD, then enter Godbound Form for 5s with faster movement and attacks, empowered strikes, and poison lifesteal." }
+        ui: { hp: "90 WRD", atk: "2.5 WRD (Divine Macuahuitl)", passive: "Attacks apply Sacred Venom. Three Venom Marks erupt for 4 WRD. Press [Switch] to invoke Tlaloc's heavily slowing ritual zone; press [Extra] to summon a slow homing Feathered Serpent that stuns and poisons.", super: "<span class='skill-tag'>Gods of the Fifth Sun</span> Raise the Macuahuitl to summon Tonatiuh, then Quetzalcoatl circles Ocel and crashes down for 8 WRD before five seconds of Godbound Form." }
     }
 };
 

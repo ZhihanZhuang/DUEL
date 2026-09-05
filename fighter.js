@@ -1000,13 +1000,13 @@ class Fighter extends Entity {
         const isGeLocked = this.heroName === 'Ge' && (this.geDanceTimer > 0 || this.geThrustTimer > 0);
         const isFengActionLocked = this.heroName === 'Feng' && (this.fengUltimatePhase === 'launch' || this.fengUltimatePhase === 'ending');
         const isFengHoverLocked = this.heroName === 'Feng' && (this.fengUltimatePhase === 'hover' || this.fengUltimatePhase === 'ending');
-        const isOcelActionLocked = this.heroName === 'Ocel' && (this.ocelSpawnTimer > 0 || this.ocelUltimatePhase === 'ritual');
+        const isOcelActionLocked = this.heroName === 'Ocel' && (this.ocelSpawnTimer > 0 || ['ritual','sun','serpent','strike'].includes(this.ocelUltimatePhase));
         let canAct = (this.stunTimer <= 0 && this.buffs.dizzy <= 0 && this.grapplePhase !== 1 && this.superWindupTimer <= 0 && this.euclidSwitchTimer <= 0 && !(this.itanSuperWindupTimer > 0) && !(this.veyraReversalTimer > 0) && !(this.axeronRushTimer > 0) && !(this.gelannBreathWindup > 0) && !isKilaSwitching && !isSolaForceLocked && !isSolaCharging && !isUkonBursting && !isUkonUltimateLocked && !isMoriGrappling && !isRaigoCharging && !isDogelCharging && !isGeLocked && !isFengActionLocked);
         if (isOcelActionLocked) canAct = false;
         let canMoveAndAttack = (canAct || isDogelCharging) && !hasPuppet;
 
         if (this.heroName === 'Vaeilash' && canAct && keysPressed[this.controls.extra]) this.startVaeilashReversal();
-        if (this.heroName === 'Ocel' && canAct && keysPressed[this.controls.extra]) this.castOcelRitual();
+        if (this.heroName === 'Ocel' && canAct && keysPressed[this.controls.extra]) this.castOcelSerpent();
 
         if (this.heroName === 'Gensan') {
             if (this.gensanSwitchCD > 0) this.gensanSwitchCD -= dt;
@@ -1127,6 +1127,10 @@ class Fighter extends Entity {
             this.buffs.gravitySlow -= dt;
             slowMultiplier = Math.min(slowMultiplier, 0.3);
             if(Math.random()<0.16) game.particles.push(new Particle(this.x+this.w/2, this.y+this.h/2, "#6f78ad", (Math.random()-0.5)*2, (Math.random()-0.5)*2, 260));
+        }
+        if ((this.buffs.ocelRitualSlow || 0) > 0) {
+            this.buffs.ocelRitualSlow = Math.max(0, this.buffs.ocelRitualSlow - dt);
+            slowMultiplier = Math.min(slowMultiplier, 0.32);
         }
         if (this.buffs.gelannFlameSlow > 0) {
             this.buffs.gelannFlameSlow = Math.max(0, this.buffs.gelannFlameSlow - dt);
@@ -1806,7 +1810,7 @@ class Fighter extends Entity {
                 } else if (this.heroName === 'Feng' && this.attackState === 'idle' && this.fengStepTimer <= 0) {
                     this.startFengLightStep();
                 } else if (this.heroName === 'Ocel' && this.attackState === 'idle') {
-                    this.castOcelSerpent();
+                    this.castOcelRitual();
                 }
             }
             if (mirrorCopiedSwitch) {
@@ -3366,7 +3370,7 @@ class Fighter extends Entity {
         window.audioManager?.playSkill(this, 'super');
         if (this.heroName === 'Ocel') {
             if (this.superCooldown <= 0 && !this.ocelUltimatePhase && this.ocelSpawnTimer <= 0) {
-                this.superCooldown=this.superCooldownMax; this.ocelUltimatePhase='ritual'; this.attackState='idle'; this.vx=0;
+                this.superCooldown=this.superCooldownMax; this.ocelUltimatePhase='sun'; this.attackState='idle'; this.vx=0;
                 game.hazards.push(new OcelFifthSun(this));
             }
             return;
@@ -4604,9 +4608,11 @@ class Fighter extends Entity {
         }
         else if (this.heroName === 'Ocel') {
             const godbound=this.ocelGodboundTimer>0,time=Date.now()*.006;
+            const invoking=['sun','serpent','strike'].includes(this.ocelUltimatePhase);
+            if(invoking){ctx.save();ctx.globalAlpha=.32+.12*Math.sin(time*3);ctx.fillStyle='#ffd65b';ctx.shadowBlur=24;ctx.shadowColor='#ffd65b';ctx.fillRect(-hw-9,-8,this.w+18,h+16);ctx.restore();}
             if(godbound){ctx.save();ctx.translate(0,32);ctx.strokeStyle='#f5c94f';ctx.shadowBlur=18;ctx.shadowColor='#f5c94f';ctx.lineWidth=5;ctx.beginPath();ctx.arc(0,0,38,-Math.PI*.82,Math.PI*.82);ctx.stroke();for(let i=0;i<8;i++){const a=i*Math.PI/4;ctx.beginPath();ctx.moveTo(Math.cos(a)*39,Math.sin(a)*39);ctx.lineTo(Math.cos(a)*48,Math.sin(a)*48);ctx.stroke();}ctx.restore();}
             ctx.save();ctx.translate(hw-3,31);let angle=-.5+Math.sin(time)*.035;
-            if(this.attackState==='windup')angle=-.5-1.05*phaseProg;else if(this.attackState==='active')angle=-1.55+3.1*phaseProg;else if(this.attackState==='recovery')angle=1.55-2*phaseProg;
+            if(invoking)angle=.02+Math.sin(time*2)*.025;else if(this.attackState==='windup')angle=-.5-1.05*phaseProg;else if(this.attackState==='active')angle=-1.55+3.1*phaseProg;else if(this.attackState==='recovery')angle=1.55-2*phaseProg;
             if(this.attackState==='active'){ctx.strokeStyle=godbound?'rgba(255,211,74,.52)':'rgba(48,224,204,.48)';ctx.lineWidth=15;ctx.beginPath();ctx.arc(0,0,86,-1.55,angle);ctx.stroke();}
             ctx.rotate(angle);ctx.fillStyle='#6b4822';ctx.strokeStyle='#d2a83c';ctx.lineWidth=3;ctx.fillRect(-8,-72,16,96);ctx.strokeRect(-8,-72,16,96);
             ctx.fillStyle=godbound?'#172329':'#1b2024';ctx.beginPath();ctx.moveTo(-18,-82);ctx.lineTo(-14,-144);ctx.lineTo(14,-144);ctx.lineTo(18,-82);ctx.closePath();ctx.fill();ctx.stroke();

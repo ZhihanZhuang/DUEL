@@ -954,8 +954,8 @@ function chooseHeroAction(game, ai, target, targetEntity, dist, verticalDistance
             break;
         case 'Ocel':
             if(superReady&&dist<520&&(combatState==='burst'||combatState==='pressure'||target.hp<target.maxHp*.48))return 'super';
-            if(ai.ocelRitualCooldown<=0&&dist<260&&(combatState==='setup'||combatState==='pressure'))return 'extra';
-            if(ai.ocelSerpentCooldown<=0&&dist>85&&dist<520)return 'switch';
+            if(ai.ocelRitualCooldown<=0&&dist<260&&(combatState==='setup'||combatState==='pressure'))return 'switch';
+            if(ai.ocelSerpentCooldown<=0&&dist>85&&dist<620)return 'extra';
             break;
     }
     return null;

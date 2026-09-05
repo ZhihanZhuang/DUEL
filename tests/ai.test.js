@@ -3236,12 +3236,12 @@ test('Ocel has 90 WRD and all three combat skills are reachable', () => {
     const { ai, context } = loadPhysicsGame('Ocel');
     assert.equal(ai.maxHp, 900);
     ai.ocelSpawnTimer=0;ai.attackState='idle';
-    assert.equal(ai.castOcelSerpent(),true);
-    assert.equal(context.game.projectiles.at(-1).type,'ocel_feathered_serpent');
-    ai.attackState='idle';assert.equal(ai.castOcelRitual(),true);
+    context.keysPressed[ai.controls.switch]=true;ai.update(16);delete context.keysPressed[ai.controls.switch];
     assert.equal(context.game.hazards.at(-1).type,'ocel_ritual_zone');
+    ai.attackState='idle';context.keysPressed[ai.controls.extra]=true;ai.update(16);delete context.keysPressed[ai.controls.extra];
+    assert.equal(context.game.projectiles.at(-1).type,'ocel_feathered_serpent');
     ai.attackState='idle';ai.superCooldown=0;ai.performSuper();
-    assert.equal(ai.ocelUltimatePhase,'ritual');
+    assert.equal(ai.ocelUltimatePhase,'sun');
     assert.equal(context.game.hazards.at(-1).type,'ocel_fifth_sun');
 });
 
@@ -3260,7 +3260,27 @@ test('Ocel Fifth Sun has a ritual startup, serpent impact, and five-second trans
     const owner={id:'ocel',heroName:'Ocel',x:300,y:560,w:44,h:73,facing:1,dead:false,ocelUltimatePhase:'ritual',ocelGodboundTimer:0,hp:700,maxHp:900,heal(amount){this.hp=Math.min(this.maxHp,this.hp+amount);},applyOcelPoison(target,duration,dps){target.poison=[duration,dps];}};
     const victim={id:'victim',heroName:'Hunter',x:520,y:560,w:45,h:70,hp:750,dead:false,untargetable:false,buffs:{},vx:0,vy:0,takeDamage(amount){this.hp-=amount;}};
     context.game.opponents=[victim];context.game.getFighters=()=>[owner,victim];
-    const sun=new context.window.OcelFifthSun(owner);sun.update(1499);assert.equal(owner.ocelUltimatePhase,'ritual');assert.equal(victim.hp,750);
+    const sun=new context.window.OcelFifthSun(owner);sun.update(899);assert.equal(owner.ocelUltimatePhase,'sun');assert.equal(victim.hp,750);
+    sun.update(1);assert.equal(owner.ocelUltimatePhase,'serpent');assert.equal(victim.hp,750);
+    sun.update(900);assert.equal(owner.ocelUltimatePhase,'strike');assert.equal(victim.hp,750);
+    sun.update(449);assert.equal(victim.hp,750,'damage landed before Quetzalcoatl struck the ground');
     sun.update(1);assert.equal(owner.ocelUltimatePhase,'godbound');assert.equal(owner.ocelGodboundTimer,5000);assert.equal(victim.hp,670);assert.deepEqual(victim.poison,[5000,8]);
     sun.update(5000);assert.equal(sun.dead,true);assert.equal(owner.ocelUltimatePhase,null);
+});
+
+test('Ocel Feathered Serpent turns toward enemies slowly, then stuns and heavily poisons', () => {
+    const context=loadProjectileContext();
+    const owner={id:'ocel',heroName:'Ocel',x:100,y:500,w:44,h:73,facing:1,dead:false,addOcelVenomMark(){},applyOcelPoison(target,duration,dps){target.poison=[duration,dps];}};
+    const victim={id:'victim',heroName:'Hunter',x:190,y:430,w:45,h:70,hp:750,dead:false,untargetable:false,buffs:{},vx:0,vy:0,takeDamage(amount){this.hp-=amount;}};
+    context.game.opponents=[victim];const serpent=new context.window.OcelFeatheredSerpent(owner);const startingAngle=serpent.angle;
+    serpent.update(16);assert.ok(Math.abs(serpent.angle-startingAngle)>0&&Math.abs(serpent.angle-startingAngle)<=.045,'serpent did not use limited homing turn speed');
+    serpent.x=victim.x;serpent.y=victim.y;serpent.update(16);
+    assert.equal(victim.hp,720);assert.equal(victim.buffs.dizzy,900);assert.deepEqual(victim.poison,[4000,7]);
+});
+
+test('Ocel ritual zone continuously applies its stronger movement slow', () => {
+    const context=loadProjectileContext();
+    const owner={id:'ocel',heroName:'Ocel',x:280,y:560,w:44,h:73,facing:1,dead:false,addOcelVenomMark(){},applyOcelPoison(){}};
+    const zone=new context.window.OcelRitualZone(owner);const victim={id:'victim',heroName:'Hunter',x:zone.x+100,y:560,w:45,h:70,hp:750,dead:false,untargetable:false,buffs:{},vx:0,vy:0,takeDamage(amount){this.hp-=amount;}};
+    context.game.opponents=[victim];zone.update(16);assert.equal(victim.buffs.ocelRitualSlow,240);assert.equal(victim.hp,710);
 });
