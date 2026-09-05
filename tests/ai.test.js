@@ -3409,18 +3409,22 @@ test('Nerath Twin Hands are destructible and tear only after both complete the h
     assert.equal(spare.dead,true);assert.equal(spare.maxHp,30);
 });
 
-test('Gate of Hell gives an escape window, then captures and throws a trapped target', () => {
+test('Gate of Hell gives an escape window, then captures and throws every target in range', () => {
     const context=loadProjectileContext();
     const owner={id:'nerath',x:100,y:500,w:40,h:70,facing:1,dead:false,getNerathPower:()=>1};
     const victim={id:'victim',x:590,y:590,w:45,h:70,hp:500,dead:false,untargetable:false,buffs:{},vx:0,vy:0,takeDamage(amount){this.hp-=amount;}};
     context.game.opponents=[victim];context.game.getFighters=()=>[owner,victim];
     const escaped=new context.window.GateOfHell(owner,victim);escaped.update(850);victim.x=escaped.x+escaped.w+20;escaped.update(16);
-    assert.equal(escaped.dead,true);assert.equal(victim.nerathHellCaptured,undefined);
+    assert.equal(escaped.dead,false);escaped.update(3984);assert.equal(escaped.dead,true);assert.equal(victim.nerathHellCaptured,undefined);
 
-    victim.x=590;const gate=new context.window.GateOfHell(owner,victim);gate.update(849);assert.equal(victim.hp,500);gate.update(1);
-    for(let second=0;second<4;second++){victim.x=gate.x+gate.w/2-victim.w/2;gate.update(1000);}
-    assert.equal(victim.hp,420);assert.equal(victim.nerathHellCaptured,true);assert.equal(victim.untargetable,true);
-    gate.update(1600);assert.equal(victim.nerathHellCaptured,false);assert.equal(victim.untargetable,false);assert.equal(victim.nerathFallPending,true);assert.ok(victim.y<0);assert.ok(victim.vy>0);
+    victim.x=590;const nearby={...victim,id:'nearby',x:690,hp:500,buffs:{}};const distant={...victim,id:'distant',x:1000,hp:500,buffs:{}};
+    context.game.opponents=[victim,nearby,distant];context.game.getFighters=()=>[owner,victim,nearby,distant];
+    const gate=new context.window.GateOfHell(owner,victim);gate.update(849);assert.equal(victim.hp,500);gate.update(1);
+    for(let second=0;second<4;second++)gate.update(1000);
+    assert.equal(victim.hp,420);assert.equal(nearby.hp,420);assert.equal(distant.hp,500);
+    assert.equal(victim.nerathHellCaptured,true);assert.equal(nearby.nerathHellCaptured,true);assert.notEqual(distant.nerathHellCaptured,true);
+    gate.update(1600);
+    for(const trapped of [victim,nearby]){assert.equal(trapped.nerathHellCaptured,false);assert.equal(trapped.untargetable,false);assert.equal(trapped.nerathFallPending,true);assert.ok(trapped.y<0);assert.ok(trapped.vy>0);}
 });
 
 test('Nerath cannot be interrupted while casting Gate of Hell', () => {
@@ -3429,6 +3433,14 @@ test('Nerath cannot be interrupted while casting Gate of Hell', () => {
     const hp=ai.hp,xVelocity=ai.vx,yVelocity=ai.vy;ai.takeDamage(20,target);
     assert.equal(ai.hp,hp-20,'uninterruptible cast incorrectly prevented damage');
     assert.equal(ai.stunTimer,0);assert.equal(ai.vx,xVelocity);assert.equal(ai.vy,yVelocity);
+});
+
+test('Nerath places Gate of Hell beneath the nearest survival enemy', () => {
+    const {ai,target,context}=loadPhysicsGame('Nerath');ai.isCPU=true;ai.x=400;ai.attackState='idle';ai.superCooldown=0;
+    target.x=50;const nearby={id:'nearby',x:470,y:ai.y,w:40,h:70,dead:false,untargetable:false};
+    ai.aiCombatTarget=target;context.game.isBattleRoyale=true;context.game.getOpponentsOf=()=>[target,nearby];
+    ai.performSuper();const gate=context.game.hazards.at(-1);
+    assert.equal(gate.type,'gate_of_hell');assert.equal(gate.target,nearby);
 });
 
 test('Nerath Second Death triggers once at 25% HP and recovers from half power', () => {

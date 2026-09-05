@@ -3466,7 +3466,17 @@ class Fighter extends Entity {
     performSuper() {
         window.audioManager?.playSkill(this, 'super');
         if (this.heroName === 'Nerath') {
-            if(this.superCooldown<=0){const target=this.aiCombatTarget&&!this.aiCombatTarget.dead?this.aiCombatTarget:game.getEnemyOf(this);if(target&&!target.dead&&!target.untargetable){this.superCooldown=this.superCooldownMax;this.nerathSuperArmorTimer=450;game.hazards.push(new GateOfHell(this,target));this.attackState='recovery';this.stateTimer=450;this.maxStateTimer=450;}}
+            if(this.superCooldown<=0){
+                const available=game.getOpponentsOf(this).filter(target=>target&&!target.dead&&!target.untargetable);
+                const nearest=available.reduce((best,target)=>{
+                    if(!best)return target;
+                    const sx=this.x+this.w/2,sy=this.y+this.h/2;
+                    return Math.hypot(target.x+target.w/2-sx,target.y+target.h/2-sy)<Math.hypot(best.x+best.w/2-sx,best.y+best.h/2-sy)?target:best;
+                },null);
+                const preferred=this.aiCombatTarget&&!this.aiCombatTarget.dead&&!this.aiCombatTarget.untargetable?this.aiCombatTarget:null;
+                const target=game.isBattleRoyale?nearest:(preferred||nearest||game.getEnemyOf(this));
+                if(target){this.superCooldown=this.superCooldownMax;this.nerathSuperArmorTimer=450;game.hazards.push(new GateOfHell(this,target));this.attackState='recovery';this.stateTimer=450;this.maxStateTimer=450;}
+            }
             return;
         }
         if (this.heroName === 'Magnetar') {

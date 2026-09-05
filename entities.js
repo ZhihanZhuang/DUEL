@@ -3743,10 +3743,82 @@ class HellTearEffect extends Entity {
 }
 
 class GateOfHell extends Entity {
-    constructor(owner,target){const center=Math.max(250,Math.min(CANVAS_W-250,target.x+target.w/2));super(center-250,GROUND_Y-70,500,70);this.owner=owner;this.targetId=target.id;this.type='gate_of_hell';this.phase='warning';this.elapsed=0;this.warning=850;this.pullDuration=4000;this.tickTimer=0;this.captureTimer=0;this.releaseLife=0;this.power=owner.getNerathPower?.()||1;this.untargetable=true;}
-    getTarget(){return (typeof game.getFighters==='function'?game.getFighters():[]).find(target=>target&&target.id===this.targetId)||null;}
-    release(target){target.nerathHellCaptured=false;target.untargetable=false;target.x=Math.max(30,Math.min(CANVAS_W-target.w-30,60+Math.random()*(CANVAS_W-target.w-120)));target.y=-target.h-45;target.vx=(Math.random()-.5)*9;target.vy=17;target.isGrounded=false;target.nerathFallPending=true;target.nerathFallSourceId=this.owner.id;target.nerathFallPeakY=target.y;this.phase='release';this.releaseLife=720;}
-    update(dt){const target=this.getTarget();this.elapsed+=dt;if(!target||target.dead||!this.owner||this.owner.dead){if(target?.nerathHellCaptured){target.nerathHellCaptured=false;target.untargetable=false;}this.dead=true;return;}const center=this.x+this.w/2,distance=Math.abs(target.x+target.w/2-center);if(this.phase==='warning'){if(this.elapsed>=this.warning){if(distance>240){this.dead=true;return;}this.phase='pull';this.elapsed=0;}}else if(this.phase==='pull'){if(distance>240){target.buffs.hellPull=0;this.dead=true;return;}target.buffs=target.buffs||{};target.buffs.hellPull=Math.max(target.buffs.hellPull||0,140);target.buffs.hellPullStrength=this.power;target.vx+=Math.sign(center-(target.x+target.w/2))*.7*this.power;this.tickTimer+=dt;while(this.tickTimer>=500){this.tickTimer-=500;target.takeDamage(10*this.power,this.owner,true,true);}if(this.elapsed>=this.pullDuration){target.nerathHellCaptured=true;target.untargetable=true;target.vx=0;target.vy=0;target.y=GROUND_Y+90;target.buffs.hellPull=0;this.phase='captured';this.captureTimer=1600;}}else if(this.phase==='captured'){target.x=center-target.w/2;target.y=GROUND_Y+90;this.captureTimer-=dt;if(this.captureTimer<=0)this.release(target);}else{this.releaseLife-=dt;if(this.releaseLife<=0)this.dead=true;}}
+    constructor(owner,target){
+        const center=Math.max(250,Math.min(CANVAS_W-250,target.x+target.w/2));
+        super(center-250,GROUND_Y-70,500,70);
+        this.owner=owner;this.targetId=target.id;this.type='gate_of_hell';this.phase='warning';this.elapsed=0;
+        this.warning=850;this.pullDuration=4000;this.tickTimer=0;this.captureTimer=0;this.releaseLife=0;
+        this.capturedTargetIds=[];this.power=owner.getNerathPower?.()||1;this.untargetable=true;
+    }
+    getTargets(){
+        const targets=typeof game.getOpponentsOf==='function'
+            ? game.getOpponentsOf(this.owner)
+            : (typeof game.getFighters==='function'?game.getFighters():[]).filter(target=>target!==this.owner);
+        return Array.from(new Set(targets)).filter(target=>target&&!target.dead&&!target.untargetable);
+    }
+    getCapturedTargets(){
+        const fighters=typeof game.getFighters==='function'?game.getFighters():[];
+        return this.capturedTargetIds.map(id=>fighters.find(target=>target&&target.id===id)).filter(Boolean);
+    }
+    isInRange(target){return Math.abs(target.x+target.w/2-(this.x+this.w/2))<=240;}
+    clearPull(target){
+        if(!target?.buffs||target.nerathHellPullOwnerId!==this.owner.id)return;
+        target.buffs.hellPull=0;target.nerathHellPullOwnerId=null;
+    }
+    release(target){
+        target.nerathHellCaptured=false;target.nerathHellSourceId=null;target.untargetable=false;
+        target.x=Math.max(30,Math.min(CANVAS_W-target.w-30,60+Math.random()*(CANVAS_W-target.w-120)));
+        target.y=-target.h-45;target.vx=(Math.random()-.5)*9;target.vy=17;target.isGrounded=false;
+        target.nerathFallPending=true;target.nerathFallSourceId=this.owner.id;target.nerathFallPeakY=target.y;
+    }
+    update(dt){
+        this.elapsed+=dt;
+        if(!this.owner||this.owner.dead){
+            for(const target of this.getCapturedTargets())this.release(target);
+            for(const target of this.getTargets())this.clearPull(target);
+            this.dead=true;return;
+        }
+        const center=this.x+this.w/2;
+        if(this.phase==='warning'){
+            if(this.elapsed<this.warning)return;
+            const targets=this.getTargets().filter(target=>this.isInRange(target));
+            if(!targets.length){this.dead=true;return;}
+            this.phase='pull';this.elapsed=0;return;
+        }
+        if(this.phase==='pull'){
+            const targets=this.getTargets();
+            const inRange=targets.filter(target=>this.isInRange(target));
+            for(const target of targets){
+                if(!this.isInRange(target)){this.clearPull(target);continue;}
+                target.buffs=target.buffs||{};target.buffs.hellPull=Math.max(target.buffs.hellPull||0,140);
+                target.buffs.hellPullStrength=this.power;target.nerathHellPullOwnerId=this.owner.id;
+                target.vx+=Math.sign(center-(target.x+target.w/2))*.7*this.power;
+            }
+            this.tickTimer+=dt;
+            while(this.tickTimer>=500){
+                this.tickTimer-=500;
+                for(const target of inRange)if(!target.dead)target.takeDamage(10*this.power,this.owner,true,true);
+            }
+            if(this.elapsed<this.pullDuration)return;
+            const captured=inRange.filter(target=>!target.dead);
+            for(const target of targets)this.clearPull(target);
+            for(const target of captured){
+                target.nerathHellCaptured=true;target.nerathHellSourceId=this.owner.id;target.untargetable=true;
+                target.vx=0;target.vy=0;target.y=GROUND_Y+90;
+            }
+            this.capturedTargetIds=captured.map(target=>target.id);
+            if(!captured.length){this.dead=true;return;}
+            this.phase='captured';this.captureTimer=1600;return;
+        }
+        if(this.phase==='captured'){
+            const captured=this.getCapturedTargets();
+            captured.forEach((target,index)=>{target.x=center-target.w/2+(index-(captured.length-1)/2)*22;target.y=GROUND_Y+90;});
+            this.captureTimer-=dt;
+            if(this.captureTimer<=0){for(const target of captured)this.release(target);this.phase='release';this.releaseLife=720;}
+            return;
+        }
+        this.releaseLife-=dt;if(this.releaseLife<=0)this.dead=true;
+    }
     draw(ctx){const center=this.x+this.w/2,t=Date.now()*.006;ctx.save();if(this.phase==='warning'){const p=Math.min(1,this.elapsed/this.warning);ctx.globalAlpha=.35+p*.5;ctx.strokeStyle='#c42a4b';ctx.setLineDash([12,8]);ctx.lineWidth=4;ctx.beginPath();ctx.ellipse(center,GROUND_Y-8,55+p*185,12+p*34,0,0,Math.PI*2);ctx.stroke();ctx.setLineDash([]);}else if(this.phase==='release'){ctx.translate(center,28);ctx.fillStyle='rgba(7,2,7,.85)';ctx.strokeStyle='#b01f41';ctx.lineWidth=6;ctx.beginPath();ctx.ellipse(0,0,105,25,0,0,Math.PI*2);ctx.fill();ctx.stroke();}else{ctx.translate(center,GROUND_Y-8);const pulse=1+Math.sin(t*2)*.06;ctx.scale(pulse,.34*pulse);ctx.fillStyle='rgba(5,1,5,.94)';ctx.strokeStyle='#c02649';ctx.shadowBlur=28;ctx.shadowColor='#8f102f';ctx.lineWidth=10;ctx.beginPath();ctx.arc(0,0,205,0,Math.PI*2);ctx.fill();ctx.stroke();ctx.strokeStyle='#611126';ctx.lineWidth=4;for(let ring=0;ring<3;ring++){ctx.beginPath();ctx.arc(0,0,65+ring*46,t*(ring%2?1:-1),t*(ring%2?1:-1)+Math.PI*1.55);ctx.stroke();}ctx.restore();ctx.save();for(let hand=0;hand<14;hand++){const a=hand*Math.PI*2/14+t*(hand%2?.3:-.25),r=45+(hand%4)*28,x=center+Math.cos(a)*r,y=GROUND_Y-18-Math.abs(Math.sin(a))*36;ctx.strokeStyle=hand%3?'#1a0710':'#8f1935';ctx.lineWidth=6;ctx.beginPath();ctx.moveTo(center+(x-center)*.55,GROUND_Y-4);ctx.quadraticCurveTo(x,GROUND_Y-55,x,y);ctx.stroke();ctx.fillStyle='#090509';ctx.beginPath();ctx.arc(x,y,8,0,Math.PI*2);ctx.fill();}}ctx.restore();}
 }
 
