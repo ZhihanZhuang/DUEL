@@ -57,7 +57,7 @@ function loadProjectileContext() {
     };
     vm.createContext(context);
     const source = fs.readFileSync(path.join(__dirname, '..', 'entities.js'), 'utf8');
-    vm.runInContext(`${source}\nwindow.Projectile = Projectile; window.KuroDecoy = KuroDecoy; window.UkonShadow = UkonShadow; window.PeachTree = PeachTree; window.GiantSword = GiantSword; window.GravityWell = GravityWell; window.ChiqPath = ChiqPath; window.D2FDrone = D2FDrone; window.D2FTargetBeacon = D2FTargetBeacon; window.D2FGiantRobot = D2FGiantRobot; window.TimeAnchor = TimeAnchor; window.TemporalEcho = TemporalEcho; window.LaegonLightning = LaegonLightning; window.LaegonHammer = LaegonHammer; window.LaegonHammerStrike = LaegonHammerStrike; window.BromBlastCharge = BromBlastCharge; window.BromStickyBomb = BromStickyBomb; window.DemolitionZone = DemolitionZone; window.TitanAxe = TitanAxe; window.MechanismNode = MechanismNode; window.MoriEnergyWire = MoriEnergyWire; window.MechanicFanBlade = MechanicFanBlade; window.MoriTrap = MoriTrap; window.ThousandMechanisms = ThousandMechanisms; window.GelannFlameCone = GelannFlameCone; window.GelannArrowRain = GelannArrowRain; window.RokaCannonball = RokaCannonball; window.RokaMortarShell = RokaMortarShell; window.TemporalBolt = TemporalBolt; window.VossTemporalDouble = VossTemporalDouble; window.DogelChainHook = DogelChainHook; window.LapisStone = LapisStone; window.ToniaGrenade = ToniaGrenade; window.ToniaMissile = ToniaMissile; window.LakEarthWall = LakEarthWall; window.LakShockwave = LakShockwave; window.LakMountainBreaker = LakMountainBreaker; window.PatThread = PatThread; window.PatMarionette = PatMarionette;`, context, { filename: 'entities.js' });
+    vm.runInContext(`${source}\nwindow.Projectile = Projectile; window.KuroDecoy = KuroDecoy; window.UkonShadow = UkonShadow; window.PeachTree = PeachTree; window.GiantSword = GiantSword; window.GravityWell = GravityWell; window.ChiqPath = ChiqPath; window.D2FDrone = D2FDrone; window.D2FTargetBeacon = D2FTargetBeacon; window.D2FGiantRobot = D2FGiantRobot; window.TimeAnchor = TimeAnchor; window.TemporalEcho = TemporalEcho; window.LaegonLightning = LaegonLightning; window.LaegonHammer = LaegonHammer; window.LaegonHammerStrike = LaegonHammerStrike; window.BromBlastCharge = BromBlastCharge; window.BromStickyBomb = BromStickyBomb; window.DemolitionZone = DemolitionZone; window.TitanAxe = TitanAxe; window.MechanismNode = MechanismNode; window.MoriEnergyWire = MoriEnergyWire; window.MechanicFanBlade = MechanicFanBlade; window.MoriTrap = MoriTrap; window.ThousandMechanisms = ThousandMechanisms; window.GelannFlameCone = GelannFlameCone; window.GelannArrowRain = GelannArrowRain; window.RokaCannonball = RokaCannonball; window.RokaMortarShell = RokaMortarShell; window.TemporalBolt = TemporalBolt; window.VossTemporalDouble = VossTemporalDouble; window.DogelChainHook = DogelChainHook; window.LapisStone = LapisStone; window.ToniaGrenade = ToniaGrenade; window.ToniaMissile = ToniaMissile; window.LakEarthWall = LakEarthWall; window.LakShockwave = LakShockwave; window.LakMountainBreaker = LakMountainBreaker; window.PatThread = PatThread; window.PatMarionette = PatMarionette; window.FengQigong = FengQigong; window.FengWindWave = FengWindWave;`, context, { filename: 'entities.js' });
     return context;
 }
 
@@ -313,6 +313,8 @@ function loadPhysicsGame(heroName = 'Hunter') {
     class LakMountainBreaker extends Entity { constructor(owner){super(0,0,1280,760);Object.assign(this,{owner,type:'lak_mountain_breaker',waveCount:5});} }
     class PatThread extends Entity { constructor(owner,target,binding=false){super(owner.x,owner.y,18,6);Object.assign(this,{owner,target,binding,type:binding?'pat_binding_thread':'pat_thread_lash'});} }
     class PatMarionette extends Entity { constructor(owner,target){super(0,0,1280,760);Object.assign(this,{owner,target,type:'pat_marionette',life:3000});} }
+    class FengQigong extends Entity { constructor(owner,angle){super(owner.x,owner.y,18,18);Object.assign(this,{owner,angle,type:'feng_qigong',vx:Math.cos(angle)*16,vy:Math.sin(angle)*16});} }
+    class FengWindWave extends Entity { constructor(owner,angle,ultimate=false){super(owner.x,owner.y,52,38);Object.assign(this,{owner,angle,ultimate,type:'feng_wind_wave',vx:Math.cos(angle)*12,vy:Math.sin(angle)*12});} }
     class RokaCannonball extends Entity { constructor(owner,x,y,vx,vy,artillery){super(x,y,28,28);Object.assign(this,{owner,vx,vy,artillery,type:'roka_cannonball',damage:artillery?50:40,radius:artillery?165:110});} }
     class RokaMortarShell extends Entity { constructor(owner,x,y){super(x,y,20,26);Object.assign(this,{owner,targetX:x,targetY:y,type:'roka_mortar'});} }
     class TemporalBolt extends Entity { constructor(owner,x,y,vx,vy,damage,kind){super(x,y,18,14);Object.assign(this,{owner,vx,vy,damage,kind,type:kind==='copy'?'voss_copy_bolt':'temporal_shard'});} }
@@ -353,6 +355,8 @@ function loadPhysicsGame(heroName = 'Hunter') {
         LakMountainBreaker,
         PatThread,
         PatMarionette,
+        FengQigong,
+        FengWindWave,
         RokaCannonball,
         RokaMortarShell,
         TemporalBolt,
@@ -390,7 +394,8 @@ function loadPhysicsGame(heroName = 'Hunter') {
             Tonia: { maxHp: 700, speed: 4.9, jump: 14, width: 44, height: 70, color: '#61706e', superCD: 25000 },
             Ge: { maxHp: 850, speed: 5.5, jump: 15, width: 43, height: 72, color: '#9a6a2f', superCD: 26000 },
             Lak: { maxHp: 1000, speed: 4.2, jump: 13, width: 48, height: 76, color: '#6f6759', superCD: 30000 },
-            Pat: { maxHp: 700, speed: 5.2, jump: 14.5, width: 39, height: 69, color: '#a34887', superCD: 28000 }
+            Pat: { maxHp: 700, speed: 5.2, jump: 14.5, width: 39, height: 69, color: '#a34887', superCD: 28000 },
+            Feng: { maxHp: 800, speed: 6.8, jump: 16.5, width: 40, height: 70, color: '#dffbff', superCD: 24000 }
         },
         keys: {},
         keysPressed: {},
@@ -3036,4 +3041,73 @@ test('Pat builds three Puppet Marks, empowers Binding Thread, and summons Marion
     ai.superCooldown = 0; ai.performSuper();
     assert.equal(ai.patMarionette.type, 'pat_marionette');
     assert.equal(ai.patMarionette.target, target);
+});
+
+test('Feng Light Step is a visible armored parabolic movement skill', () => {
+    const { ai, context } = loadPhysicsGame('Feng');
+    ai.attackState = 'idle';
+    context.keys[ai.controls.right] = true;
+    assert.equal(ai.startFengLightStep(), true);
+    assert.equal(ai.fengStepActive, true);
+    assert.equal(ai.fengStepTimer, 5000);
+    assert.ok(ai.vx > 0 && ai.vy <= -20, 'Light Step did not receive the increased launch height');
+    const launchVx = ai.vx;
+    const hpBefore = ai.hp;
+    ai.takeDamage(20, { x: ai.x-50, w: 40, heroName: 'Hunter' });
+    assert.equal(ai.hp, hpBefore-20, 'super armor should not make Feng invulnerable');
+    assert.equal(ai.stunTimer, 0);
+    assert.equal(ai.vx, launchVx, 'Light Step was interrupted by knockback');
+});
+
+test('Feng third basic releases one full-strength ultimate wind wave', () => {
+    const { ai, context } = loadPhysicsGame('Feng');
+    ai.attackState = 'idle';
+    ai.executeActiveAttack(); ai.executeActiveAttack(); ai.executeActiveAttack();
+    const projectiles = context.game.projectiles;
+    assert.equal(projectiles.filter(projectile => projectile.type === 'feng_qigong').length, 2);
+    const enhanced = projectiles.find(projectile => projectile.type === 'feng_wind_wave');
+    assert.ok(enhanced);
+    assert.equal(enhanced.ultimate, true);
+});
+
+test('Feng vaults before hovering, fires six snapshot-aimed waves, then falls', () => {
+    const { ai, target, context } = loadPhysicsGame('Feng');
+    ai.attackState = 'idle'; ai.superCooldown = 0; ai.x = 300; ai.y = 590;
+    target.x = 760; target.y = 250;
+    ai.performSuper();
+    assert.equal(ai.fengUltimatePhase, 'launch');
+    assert.equal(ai.vy, -21);
+    for (let frame=0; frame<33; frame++) ai.update(16);
+    assert.equal(ai.fengUltimatePhase, 'hover');
+    assert.ok(ai.y < 300, 'Feng did not visibly vault high before hovering');
+    for (let shot=0; shot<6; shot++) ai.performAttack();
+    const waves = context.game.projectiles.filter(projectile => projectile.type === 'feng_wind_wave');
+    assert.equal(waves.length, 6);
+    assert.ok(waves.every(wave => wave.vx > 0 && wave.vy > 0), 'waves did not aim at the enemy snapshot');
+    const initialVectors = waves.map(wave => [wave.vx,wave.vy]);
+    target.x = 50; target.y = 590;
+    assert.deepEqual(waves.map(wave => [wave.vx,wave.vy]), initialVectors, 'existing waves tracked the moved enemy');
+    assert.equal(ai.fengUltimatePhase, 'ending');
+    ai.update(440);
+    assert.equal(ai.fengUltimatePhase, 'fall');
+    assert.ok(ai.vy > 0);
+});
+
+test('Feng wind waves reflect from arena walls instead of sticking', () => {
+    const context = loadProjectileContext();
+    const owner = { x: 1210, y: 220, w: 40, h: 70, facing: 1, dead: false };
+    const wave = new context.window.FengWindWave(owner, 0, true);
+    context.game.projectiles.push(wave);
+    wave.update(16);
+    assert.ok(wave.vx < 0);
+    assert.equal(wave.bounces, 1);
+    assert.ok(wave.bounceFlash > 0);
+
+    const attacker = { x: 100, y: 220, w: 40, h: 70, facing: 1, dead: false };
+    const victim = { x: 152, y: 220, w: 40, h: 70, hp: 100, dead: false, untargetable: false, buffs: {}, vx: 0, vy: 0, takeDamage(amount){this.hp-=amount;} };
+    context.game.opponents = [victim];
+    const gust = new context.window.FengWindWave(attacker, 0, true);
+    gust.update(16);
+    assert.equal(victim.hp, 80);
+    assert.ok(victim.vx >= 30, 'fan-shaped wind wave did not strongly blow the enemy away');
 });

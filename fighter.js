@@ -247,6 +247,12 @@ class Fighter extends Entity {
         if (this.heroName === 'Pat') {
             this.patBindingCooldown = 0; this.patMarks = new Map(); this.patMarionette = null;
         }
+        if (this.heroName === 'Feng') {
+            this.fengCombo = 0; this.fengWindTimer = 0; this.fengWindWaves = 0;
+            this.fengStepTimer = 0; this.fengStepActive = false; this.fengStepElapsed = 0; this.fengStepApexShown = false;
+            this.fengUltimatePhase = null; this.fengUltimateTimer = 0;
+            this.fengTakeoffBurstTimer = 0; this.fengLandingBurstTimer = 0;
+        }
     }
 
     heal(amount) {
@@ -264,6 +270,7 @@ class Fighter extends Entity {
         if (this.dead || this.invincible > 0 || (this.heroName === 'Sola' && this.solaChargeTimer > 0)) return;
         const itanSuperDebuffImmune = this.heroName === 'Itan' && this.itanSuperWindupTimer > 0;
         const geDanceUninterruptible = this.heroName === 'Ge' && this.geDanceTimer > 0;
+        const fengSuperArmor = this.heroName === 'Feng' && (this.fengStepActive || ['launch','hover','ending'].includes(this.fengUltimatePhase));
 
         if (this.heroName === 'Sola' && this.solaForceActive) this.endSolaForce();
         if (this.heroName === 'Ukon' && (this.ukonDashTimer > 0 || this.ukonChargeTimer > 0)) this.finishUkonBurst(true);
@@ -308,7 +315,7 @@ class Fighter extends Entity {
 
         this.hp -= amt;
         window.audioManager?.playHit(this, attacker, amt, isDoT);
-        if (!noHitReaction && !itanSuperDebuffImmune && !geDanceUninterruptible) this.stunTimer = 150;
+        if (!noHitReaction && !itanSuperDebuffImmune && !geDanceUninterruptible && !fengSuperArmor) this.stunTimer = 150;
         this.timeSinceLastDamage = 0;
 
         if (this.heroName === 'Willi' && this.hp < this.maxHp * 0.5 && !this.williHasTriggeredHeal) {
@@ -337,7 +344,7 @@ class Fighter extends Entity {
             }
         }
 
-        if (!isDoT && !noKnockback && !this.grappledBy) {
+        if (!isDoT && !noKnockback && !this.grappledBy && !fengSuperArmor) {
             let direction = attacker ? (this.x + this.w/2 < attacker.x + attacker.w/2 ? -1 : 1) : (this.facing === 1 ? -1 : 1);
             const stability = this.heroName === 'Lak' && this.isGrounded ? 0.28 : 1;
             this.vx = direction * (amt * 0.5) * stability;
@@ -714,6 +721,41 @@ class Fighter extends Entity {
             while(angleDelta < -Math.PI) angleDelta += Math.PI*2;
             this.rokaWeaponAngle += angleDelta * Math.min(1, dt/90);
         }
+        if (this.heroName === 'Feng') {
+            this.fengStepTimer = Math.max(0, this.fengStepTimer - dt);
+            this.fengTakeoffBurstTimer = Math.max(0, this.fengTakeoffBurstTimer - dt);
+            this.fengLandingBurstTimer = Math.max(0, this.fengLandingBurstTimer - dt);
+            if (this.fengStepActive) {
+                this.fengStepElapsed += dt;
+                if (Math.random() < .7) game.particles.push(new Particle(this.x+this.w/2-this.vx*.8,this.y+this.h/2,'#dffbff',-this.vx*.18,(Math.random()-.5)*4,280,3));
+                if (!this.fengStepApexShown && this.vy >= 0) {
+                    this.fengStepApexShown = true;
+                    for(let i=0;i<16;i++){const a=i*Math.PI/8;game.particles.push(new Particle(this.x+this.w/2+Math.cos(a)*25,this.y+this.h/2+Math.sin(a)*14,'#eaffff',Math.cos(a)*4,Math.sin(a)*3,300,3));}
+                }
+                if (this.fengStepElapsed > 1400) this.fengStepActive = false;
+            }
+            if (this.fengUltimatePhase === 'launch') {
+                this.fengUltimateTimer = Math.max(0, this.fengUltimateTimer - dt);
+                if (Math.random() < .9) game.particles.push(new Particle(this.x+this.w/2+(Math.random()-.5)*45,this.y+this.h,'#dffbff',(Math.random()-.5)*6,3+Math.random()*5,340,4));
+                if (this.fengUltimateTimer <= 0) {
+                    this.fengUltimatePhase = 'hover'; this.fengUltimateTimer = 4000; this.fengWindTimer = 4000; this.vx = 0; this.vy = 0;
+                }
+            } else if (this.fengUltimatePhase === 'hover') {
+                this.fengUltimateTimer = Math.max(0, this.fengUltimateTimer - dt); this.fengWindTimer = this.fengUltimateTimer; this.vy = 0;
+                const verticalDrift = (keys[this.controls.down] ? 1 : 0) - (keys[this.controls.jump] ? 1 : 0);
+                this.y = Math.max(45, Math.min(GROUND_Y-this.h-55, this.y + verticalDrift*2.2));
+                const enemy = game.getEnemyOf(this);
+                if (enemy && !enemy.dead) this.facing = enemy.x + enemy.w/2 >= this.x + this.w/2 ? 1 : -1;
+                if (Math.random() < .75) { const a=Math.random()*Math.PI*2; game.particles.push(new Particle(this.x+this.w/2+Math.cos(a)*38,this.y+this.h/2+Math.sin(a)*42,'#dffbff',-Math.sin(a)*3,Math.cos(a)*3,300,3)); }
+                if (this.fengUltimateTimer <= 0) this.beginFengUltimateEnd();
+            } else if (this.fengUltimatePhase === 'ending') {
+                this.fengUltimateTimer = Math.max(0, this.fengUltimateTimer - dt); this.fengWindTimer = 0; this.vx *= .72; this.vy = 0;
+                for(let i=0;i<2;i++){const a=Date.now()*.018+i*Math.PI;game.particles.push(new Particle(this.x+this.w/2+Math.cos(a)*48,this.y+this.h/2+Math.sin(a)*30,'#ffffff',Math.cos(a)*5,Math.sin(a)*5,260,4));}
+                if (this.fengUltimateTimer <= 0) { this.fengUltimatePhase = 'fall'; this.vy = 2; }
+            } else if (this.fengUltimatePhase === 'fall' && Math.random() < .7) {
+                game.particles.push(new Particle(this.x+this.w/2+(Math.random()-.5)*30,this.y,'#dffbff',(Math.random()-.5)*4,-3-Math.random()*3,300,3));
+            }
+        }
         if (this.heroName === 'Voss' && !vossCopyWasActive) {
             this.vossCopyCooldown = Math.max(0, this.vossCopyCooldown - dt);
             if (this.vossDouble?.dead) this.vossDouble = null;
@@ -898,7 +940,9 @@ class Fighter extends Entity {
         const isRaigoCharging = this.heroName === 'Raigo' && this.raigoChargeTimer > 0;
         const isDogelCharging = this.heroName === 'Dogel' && this.attackState === 'dogel_charging';
         const isGeLocked = this.heroName === 'Ge' && (this.geDanceTimer > 0 || this.geThrustTimer > 0);
-        let canAct = (this.stunTimer <= 0 && this.buffs.dizzy <= 0 && this.grapplePhase !== 1 && this.superWindupTimer <= 0 && this.euclidSwitchTimer <= 0 && !(this.itanSuperWindupTimer > 0) && !(this.veyraReversalTimer > 0) && !(this.axeronRushTimer > 0) && !(this.gelannBreathWindup > 0) && !isKilaSwitching && !isSolaForceLocked && !isSolaCharging && !isUkonBursting && !isUkonUltimateLocked && !isMoriGrappling && !isRaigoCharging && !isDogelCharging && !isGeLocked);
+        const isFengActionLocked = this.heroName === 'Feng' && (this.fengUltimatePhase === 'launch' || this.fengUltimatePhase === 'ending');
+        const isFengHoverLocked = this.heroName === 'Feng' && (this.fengUltimatePhase === 'hover' || this.fengUltimatePhase === 'ending');
+        let canAct = (this.stunTimer <= 0 && this.buffs.dizzy <= 0 && this.grapplePhase !== 1 && this.superWindupTimer <= 0 && this.euclidSwitchTimer <= 0 && !(this.itanSuperWindupTimer > 0) && !(this.veyraReversalTimer > 0) && !(this.axeronRushTimer > 0) && !(this.gelannBreathWindup > 0) && !isKilaSwitching && !isSolaForceLocked && !isSolaCharging && !isUkonBursting && !isUkonUltimateLocked && !isMoriGrappling && !isRaigoCharging && !isDogelCharging && !isGeLocked && !isFengActionLocked);
         let canMoveAndAttack = (canAct || isDogelCharging) && !hasPuppet;
 
         if (this.heroName === 'Vaeilash' && canAct && keysPressed[this.controls.extra]) this.startVaeilashReversal();
@@ -1108,7 +1152,7 @@ class Fighter extends Entity {
 
         let applyGravity = true;
 
-        if (isSolaForceLocked || (this.heroName === 'Axeron' && this.axeronRushTimer > 0) || isUkonBursting || isUkonUltimateLocked || isMoriGrappling || isRaigoCharging) {
+        if (isSolaForceLocked || (this.heroName === 'Axeron' && this.axeronRushTimer > 0) || isUkonBursting || isUkonUltimateLocked || isMoriGrappling || isRaigoCharging || isFengHoverLocked) {
             applyGravity = false;
             if (isSolaForceLocked) { this.vx = 0; this.vy = 0; }
             this.jumpBuffer = 0;
@@ -1251,7 +1295,9 @@ class Fighter extends Entity {
         }
 
         let targetVx = 0;
-        if (isSolaCharging) {
+        if (this.heroName === 'Feng' && this.fengUltimatePhase === 'hover') {
+            targetVx = ((keys[this.controls.right] ? 1 : 0) - (keys[this.controls.left] ? 1 : 0)) * currentSpeed * .65;
+        } else if (isSolaCharging) {
             targetVx = this.solaChargeDirection * 18;
         } else if (isRaigoCharging) {
             targetVx = this.vx;
@@ -1675,6 +1721,8 @@ class Fighter extends Entity {
                 } else if (this.heroName === 'Pat' && this.attackState === 'idle' && this.patBindingCooldown <= 0) {
                     const target = this.aiCombatTarget && !this.aiCombatTarget.dead ? this.aiCombatTarget : game.getEnemyOf(this);
                     if (target) { this.patBindingCooldown = 9000; game.projectiles.push(new PatThread(this, target, true)); }
+                } else if (this.heroName === 'Feng' && this.attackState === 'idle' && this.fengStepTimer <= 0) {
+                    this.startFengLightStep();
                 }
             }
             if (mirrorCopiedSwitch) {
@@ -1709,7 +1757,8 @@ class Fighter extends Entity {
             if (this.vy > 0) this.vy += GRAVITY * 0.4;
         }
 
-        if (!keys[this.controls.jump] && this.vy < 0 && applyGravity) this.vy *= 0.8;
+        const fengSkillAscent = this.heroName === 'Feng' && (this.fengStepActive || this.fengUltimatePhase === 'launch');
+        if (!keys[this.controls.jump] && this.vy < 0 && applyGravity && !fengSkillAscent) this.vy *= 0.8;
 
         if (this.jumpBuffer > 0 && canMoveAndAttack && applyGravity) {
             if (this.coyoteTime > 0 || this.jumpsLeft > 0) {
@@ -1753,9 +1802,34 @@ class Fighter extends Entity {
 
         this.resolveUkonDropImpact();
         this.applySolaForceFallDamage();
+        if (this.heroName === 'Feng' && this.fengStepActive && this.isGrounded && this.fengStepElapsed > 160) {
+            this.fengStepActive = false; this.fengLandingBurstTimer = 360;
+            for(let i=0;i<18;i++){const a=Math.PI+i*Math.PI/17;game.particles.push(new Particle(this.x+this.w/2,this.y+this.h,'#dffbff',Math.cos(a)*7,Math.sin(a)*5,360,3));}
+        }
+        if (this.heroName === 'Feng' && this.fengUltimatePhase === 'fall' && this.isGrounded) {
+            this.fengUltimatePhase = null; this.fengWindWaves = 0; this.fengLandingBurstTimer = 520;
+            for(let i=0;i<28;i++){const a=Math.PI+i*Math.PI/27;game.particles.push(new Particle(this.x+this.w/2,this.y+this.h,'#eaffff',Math.cos(a)*9,Math.sin(a)*7,460,4));}
+        }
         if (this.heroName === 'Lak' && this.isGrounded && landingSpeed >= 13 && this.lakLandingCooldown <= 0) {
             this.lakLandingCooldown = 900; game.hazards.push(new LakShockwave(this, 10, 105));
         }
+    }
+
+    startFengLightStep() {
+        if (this.heroName !== 'Feng' || this.fengStepTimer > 0 || this.fengStepActive || this.fengUltimatePhase) return false;
+        const inputDirection = (keys[this.controls.right] ? 1 : 0) - (keys[this.controls.left] ? 1 : 0);
+        const direction = inputDirection || this.facing || 1;
+        this.facing = direction; this.fengStepTimer = 5000; this.fengStepActive = true; this.fengStepElapsed = 0; this.fengStepApexShown = false;
+        this.fengTakeoffBurstTimer = 520; this.vx = direction * 13.5; this.vy = -20; this.isGrounded = false; this.jumpBuffer = 0;
+        for(let i=0;i<22;i++){const a=Math.PI+i*Math.PI/21;game.particles.push(new Particle(this.x+this.w/2,this.y+this.h,'#eaffff',Math.cos(a)*9,Math.sin(a)*7,420,4));}
+        return true;
+    }
+
+    beginFengUltimateEnd() {
+        if (this.heroName !== 'Feng' || !['launch','hover'].includes(this.fengUltimatePhase)) return false;
+        this.fengUltimatePhase = 'ending'; this.fengUltimateTimer = 430; this.fengWindTimer = 0; this.attackState = 'idle';
+        for(let i=0;i<30;i++){const a=i*Math.PI/15;game.particles.push(new Particle(this.x+this.w/2+Math.cos(a)*22,this.y+this.h/2+Math.sin(a)*22,'#ffffff',Math.cos(a)*8,Math.sin(a)*8,420,4));}
+        return true;
     }
 
     getLapisOrbitPosition(index) {
@@ -1919,7 +1993,7 @@ class Fighter extends Entity {
 
     isMeleeAttack() {
         if (this.heroName === 'Lapis') return this.lapisWhipTimer > 0;
-        if (this.heroName === 'Hason' || this.heroName === 'Willi' || this.heroName === 'Ugo' || this.heroName === 'Kila' || this.heroName === 'Volt' || this.heroName === 'Noae' || this.heroName === 'Kuro' || this.heroName === 'Nyra' || this.heroName === 'Archor' || this.heroName === 'D2F1' || this.heroName === 'Veyra' || this.heroName === 'Brom' || this.heroName === 'Mori' || this.heroName === 'Roka' || this.heroName === 'Tonia' || this.heroName === 'Pat') return false;
+        if (this.heroName === 'Hason' || this.heroName === 'Willi' || this.heroName === 'Ugo' || this.heroName === 'Kila' || this.heroName === 'Volt' || this.heroName === 'Noae' || this.heroName === 'Kuro' || this.heroName === 'Nyra' || this.heroName === 'Archor' || this.heroName === 'D2F1' || this.heroName === 'Veyra' || this.heroName === 'Brom' || this.heroName === 'Mori' || this.heroName === 'Roka' || this.heroName === 'Tonia' || this.heroName === 'Pat' || this.heroName === 'Feng') return false;
         if (this.heroName === 'Voss') return this.vossCopyTimer > 0 && this.vossCopiedMelee;
         if (this.heroName === 'Laegon') return this.thunderGodTimer > 0;
         if (this.heroName === 'Euclid' && this.euclidWeapon === 'magic') return false;
@@ -1995,6 +2069,16 @@ class Fighter extends Entity {
 
     performAttack() {
         if (this.attackState !== 'idle') return;
+        if (this.heroName === 'Feng' && this.fengUltimatePhase === 'hover') {
+            if (this.fengWindWaves >= 6) return;
+            const target = this.aiCombatTarget && !this.aiCombatTarget.dead ? this.aiCombatTarget : game.getEnemyOf(this);
+            const originX = this.x + this.w/2, originY = this.y + this.h*.38;
+            const angle = target && !target.dead ? Math.atan2(target.y+target.h/2-originY,target.x+target.w/2-originX) : (this.facing>0?0:Math.PI);
+            this.fengWindWaves++;
+            game.projectiles.push(new FengWindWave(this, angle, true));
+            if (this.fengWindWaves >= 6) this.beginFengUltimateEnd();
+            return;
+        }
         if (this.heroName === 'Hason' && this.hasonAmmo <= 0) return;
         if (this.heroName === 'Hunter' && this.hunterWeapon === 'musket' && this.hunterMusketCD > 0) return;
         if (this.heroName === 'Duke' && this.isMounted && this.runTimer < 3000) return;
@@ -2090,7 +2174,7 @@ class Fighter extends Entity {
             : null;
         let target = combatTarget || game.getEnemyOf(this);
 
-        if (!combatTarget && (this.heroName === 'Hason' || this.heroName === 'Willi' || this.heroName === 'Euclid' || this.heroName === 'Ugo' || this.heroName === 'Kila' || this.heroName === 'Volt' || this.heroName === 'Noae' || this.heroName === 'Nyra' || this.heroName === 'Archor' || this.heroName === 'D2F1' || this.heroName === 'Laegon' || this.heroName === 'Veyra' || this.heroName === 'Brom')) {
+        if (!combatTarget && (this.heroName === 'Hason' || this.heroName === 'Willi' || this.heroName === 'Euclid' || this.heroName === 'Ugo' || this.heroName === 'Kila' || this.heroName === 'Volt' || this.heroName === 'Noae' || this.heroName === 'Nyra' || this.heroName === 'Archor' || this.heroName === 'D2F1' || this.heroName === 'Laegon' || this.heroName === 'Veyra' || this.heroName === 'Brom' || this.heroName === 'Feng')) {
             let minDist = target ? Math.hypot(target.x - this.x, target.y - this.y) : 9999;
             for (let m of game.minions) {
                 if (m && m.owner !== this && !m.dead) {
@@ -2131,6 +2215,12 @@ class Fighter extends Entity {
             return;
         }
 
+        if (this.heroName === 'Feng') {
+            this.fengCombo = (this.fengCombo || 0) + 1;
+            if (this.fengCombo >= 3) { this.fengCombo = 0; game.projectiles.push(new FengWindWave(this, aimAngle, true)); }
+            else game.projectiles.push(new FengQigong(this, aimAngle));
+            return;
+        }
         if (this.heroName === 'Hason') {
             this.hasonAmmo--;
             this.timeSinceLastDamage = 0;
@@ -3138,6 +3228,14 @@ class Fighter extends Entity {
 
     performSuper() {
         window.audioManager?.playSkill(this, 'super');
+        if (this.heroName === 'Feng') {
+            if (this.superCooldown <= 0 && !this.fengUltimatePhase) {
+                this.superCooldown = this.superCooldownMax; this.fengUltimatePhase = 'launch'; this.fengUltimateTimer = 520; this.fengWindTimer = 0; this.fengWindWaves = 0;
+                this.vy = -21; this.vx *= .25; this.isGrounded = false; this.attackState = 'idle'; this.fengTakeoffBurstTimer = 650;
+                for(let i=0;i<36;i++){const a=Math.PI+i*Math.PI/35;game.particles.push(new Particle(this.x+this.w/2,this.y+this.h,'#dffbff',Math.cos(a)*12,Math.sin(a)*10,600,4));}
+            }
+            return;
+        }
         if (this.heroName === 'Ge') {
             if(this.superCooldown<=0&&this.geDanceTimer<=0&&this.geGodTimer<=0){this.superCooldown=this.superCooldownMax;this.geDanceTimer=2500;this.attackState='idle';this.vx=0;for(let i=0;i<30;i++)game.particles.push(new Particle(this.x+this.w/2,this.y+this.h/2,i%2?'#d8b56c':'#74451f',(Math.random()-.5)*10,-Math.random()*9,650,5));}
             return;
@@ -4342,6 +4440,16 @@ class Fighter extends Entity {
         else if (this.heroName === 'Lak') {
             ctx.save();ctx.translate(hw-2,32);let angle=.55;if(this.attackState==='windup')angle=.55-1.55*phaseProg;else if(this.attackState==='active')angle=-1+3.25*phaseProg;else if(this.attackState==='recovery')angle=2.25-1.7*phaseProg;
             ctx.rotate(angle);ctx.fillStyle='#4d3928';ctx.fillRect(-6,-72,12,94);ctx.fillStyle='#69645d';ctx.strokeStyle='#b6aa95';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(-31,-88);ctx.lineTo(25,-93);ctx.lineTo(38,-72);ctx.lineTo(24,-49);ctx.lineTo(-34,-52);ctx.lineTo(-43,-70);ctx.closePath();ctx.fill();ctx.stroke();ctx.strokeStyle='#403b35';ctx.beginPath();ctx.moveTo(-20,-85);ctx.lineTo(-5,-57);ctx.lineTo(12,-88);ctx.stroke();ctx.restore();
+        }
+        else if (this.heroName === 'Feng') {
+            ctx.save();ctx.translate(hw-4,27);
+            const pulse=1+Math.sin(Date.now()*.014)*.12, activeWind=!!this.fengUltimatePhase;
+            ctx.strokeStyle='#9edee8';ctx.lineWidth=7;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(-10,4);ctx.quadraticCurveTo(8,-8,24,-2);ctx.stroke();
+            ctx.fillStyle='#f7ffff';ctx.beginPath();ctx.arc(27,-2,5,0,Math.PI*2);ctx.fill();
+            ctx.shadowBlur=activeWind?18:10;ctx.shadowColor='#dffbff';ctx.strokeStyle='rgba(225,253,255,.9)';ctx.lineWidth=3;
+            for(let ring=0;ring<(activeWind?4:2);ring++){const radius=(14+ring*9)*pulse;ctx.beginPath();ctx.arc(28,-2,radius,-1.3+ring*.7,1.8+ring*.7);ctx.stroke();}
+            ctx.strokeStyle='rgba(173,236,247,.6)';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(-18,32);ctx.quadraticCurveTo(8,45,35+Math.sin(Date.now()*.01)*8,30);ctx.stroke();ctx.restore();
+            if(this.fengTakeoffBurstTimer>0||this.fengLandingBurstTimer>0){const timer=Math.max(this.fengTakeoffBurstTimer,this.fengLandingBurstTimer),progress=1-timer/(this.fengLandingBurstTimer>0?520:650);ctx.save();ctx.translate(0,h);ctx.scale(1,.36);ctx.strokeStyle=`rgba(220,252,255,${Math.max(0,1-progress)})`;ctx.lineWidth=5;ctx.beginPath();ctx.arc(0,0,24+progress*70,0,Math.PI*2);ctx.stroke();ctx.restore();}
         }
         else if (this.heroName === 'Pat') {
             ctx.save();ctx.translate(hw-3,27);const snap=this.attackState==='active'?Math.sin(phaseProg*Math.PI)*42:10;ctx.strokeStyle='#ff8ad8';ctx.shadowBlur=8;ctx.shadowColor='#ff8ad8';ctx.lineWidth=3;for(let strand=-1;strand<=1;strand++){ctx.beginPath();ctx.moveTo(0,strand*5);ctx.quadraticCurveTo(28,-18+strand*8,52+snap,strand*12);ctx.stroke();}ctx.fillStyle='#f5c7e8';for(let finger=-1;finger<=1;finger++)ctx.fillRect(-2,3+finger*5,17,2);ctx.restore();

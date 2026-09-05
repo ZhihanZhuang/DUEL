@@ -431,6 +431,11 @@ var HEROES = {
         name: "Pat", desc: "The Puppet Master",
         color: "#a34887", maxHp: 700, speed: 5.2, jump: 14.5, width: 39, height: 69, superCD: 28000,
         ui: { hp: "70 WRD", atk: "1.2 WRD (Thread Lash)", passive: "Thread hits apply up to 3 Puppet Marks for 5s. Press [Switch] to fire Binding Thread for 1.5 WRD and a 1.5s root (9s CD); at 3 marks it also pulls the victim toward Pat and consumes the marks.", super: "<span class='skill-tag'>Marionette</span> Controls the enemy's movement for 3s while a puppet lashes for 0.8 WRD every 0.5s. The finale deals 3 WRD, stuns for 1s, and violently pulls the enemy toward Pat." }
+    },
+    Feng: {
+        name: "Feng", desc: "Qinggong Wind Martial Artist",
+        color: "#dffbff", maxHp: 800, speed: 6.8, jump: 16.5, width: 40, height: 70, superCD: 24000,
+        ui: { hp: "80 WRD", atk: "2 WRD (White Qigong)", passive: "Every third Qigong becomes one full-strength fan-shaped Wind Wave with extreme knockback. Press [Switch] for a higher armored Qinggong leap (5s CD).", super: "<span class='skill-tag'>Drifting Wind</span> Vault high, float for 4s, and press Attack up to 6 times. Each fan-shaped wave blows enemies away, locks its direction when fired, reflects from arena surfaces, then Feng spins and falls." }
     }
 };
 

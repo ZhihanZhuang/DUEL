@@ -73,6 +73,7 @@ const HERO_TACTICS = {
     Ge:      { role: 'initiator', aggression: 1.24, caution: 0.52, burst: 1.48, kite: 0.12, setup: 0.78, highGround: 0.48, retreatHp: 0.24, retreatFireChance: 0.08 },
     Lak:     { role: 'terrain_tank', aggression: 0.82, caution: 0.82, burst: 1.18, kite: 0.08, setup: 1.72, highGround: 0.62, retreatHp: 0.18, retreatFireChance: 0.06 },
     Pat:     { role: 'controller', aggression: 0.48, caution: 1.32, burst: 1.08, kite: 1.38, setup: 1.62, highGround: 1.12, retreatHp: 0.42, retreatFireChance: 0.56 }
+    ,Feng:   { role: 'wind_martial_artist', aggression: 1.12, caution: 0.62, burst: 1.45, kite: 0.72, setup: 0.35, highGround: 0.72, retreatHp: 0.28, retreatFireChance: 0.18 }
 };
 
 function getHeroTactic(ai) {
@@ -493,6 +494,7 @@ function getCombatProfile(ai, source = ai) {
         case 'Ge': range = 142; preferred = 92; break;
         case 'Lak': range = 110; preferred = 72; break;
         case 'Pat': range = 620; preferred = 390; break;
+        case 'Feng': range = ai.fengWindTimer > 0 ? 900 : 430; preferred = ai.fengWindTimer > 0 ? 360 : 270; break;
     }
     return { range, preferred, ranged: !ai.isMeleeAttack(), tactics };
 }
@@ -942,6 +944,10 @@ function chooseHeroAction(game, ai, target, targetEntity, dist, verticalDistance
         case 'Pat':
             if(superReady&&dist<700)return 'super';
             if(ai.patBindingCooldown<=0&&dist<700)return 'switch';
+            break;
+        case 'Feng':
+            if(superReady&&(dist<620||combatState==='burst'||combatState==='evade'))return 'super';
+            if(ai.fengStepTimer<=0&&(dist>150||Math.abs(verticalDistance)>70))return 'switch';
             break;
     }
     return null;
