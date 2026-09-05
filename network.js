@@ -167,7 +167,13 @@ if (window.Game && !window.Game.prototype.socketSyncPatched) {
         ...(typeof OcelFifthSun !== 'undefined' ? { OcelFifthSun } : {}),
         ...(typeof ElectromagneticMatrix !== 'undefined' ? { ElectromagneticMatrix } : {}),
         ...(typeof MagneticRepulsion !== 'undefined' ? { MagneticRepulsion } : {}),
-        ...(typeof MatrixBombardment !== 'undefined' ? { MatrixBombardment } : {})
+        ...(typeof MatrixBombardment !== 'undefined' ? { MatrixBombardment } : {}),
+        ...(typeof BlackSpike !== 'undefined' ? { BlackSpike } : {}),
+        ...(typeof BlackShard !== 'undefined' ? { BlackShard } : {}),
+        ...(typeof HellHand !== 'undefined' ? { HellHand } : {}),
+        ...(typeof HellTearEffect !== 'undefined' ? { HellTearEffect } : {}),
+        ...(typeof GateOfHell !== 'undefined' ? { GateOfHell } : {}),
+        ...(typeof NerathResurrection !== 'undefined' ? { NerathResurrection } : {})
     };
 
     const cloneEntity = entity => {

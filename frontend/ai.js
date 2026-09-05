@@ -75,7 +75,8 @@ const HERO_TACTICS = {
     Pat:     { role: 'controller', aggression: 0.48, caution: 1.32, burst: 1.08, kite: 1.38, setup: 1.62, highGround: 1.12, retreatHp: 0.42, retreatFireChance: 0.56 }
     ,Feng:   { role: 'wind_martial_artist', aggression: 1.12, caution: 0.62, burst: 1.45, kite: 0.72, setup: 0.35, highGround: 0.72, retreatHp: 0.28, retreatFireChance: 0.18 },
     Ocel:    { role: 'war_priest', aggression: 1.08, caution: 0.66, burst: 1.52, kite: 0.34, setup: 1.25, highGround: 0.52, retreatHp: 0.27, retreatFireChance: 0.12 },
-    Magnetar:{ role: 'heavy_artillery', aggression: 0.52, caution: 1.30, burst: 1.48, kite: 1.42, setup: 1.68, highGround: 1.30, retreatHp: 0.40, retreatFireChance: 0.72 }
+    Magnetar:{ role: 'heavy_artillery', aggression: 0.52, caution: 1.30, burst: 1.48, kite: 1.42, setup: 1.68, highGround: 1.30, retreatHp: 0.40, retreatFireChance: 0.72 },
+    Nerath:  { role: 'hell_controller', aggression: 0.66, caution: 1.08, burst: 1.34, kite: 1.16, setup: 1.82, highGround: 0.90, retreatHp: 0.31, retreatFireChance: 0.78 }
 };
 
 function getHeroTactic(ai) {
@@ -500,6 +501,7 @@ function getCombatProfile(ai, source = ai) {
         case 'Feng': range = ai.fengWindTimer > 0 ? 900 : 430; preferred = ai.fengWindTimer > 0 ? 360 : 270; break;
         case 'Ocel': range = 150; preferred = 82; break;
         case 'Magnetar': range = 800; preferred = 520; break;
+        case 'Nerath': range = 680; preferred = 390; break;
     }
     return { range, preferred, ranged: !ai.isMeleeAttack(), tactics };
 }
@@ -963,6 +965,12 @@ function chooseHeroAction(game, ai, target, targetEntity, dist, verticalDistance
             if(superReady&&dist<780&&(combatState==='setup'||combatState==='pressure'||combatState==='burst'||isVulnerableTarget(target)))return 'super';
             if(ai.magnetarPulseCooldown<=0&&(dist<230||combatState==='evade'||combatState==='retreat'))return 'switch';
             break;
+        case 'Nerath': {
+            const activeHands=minions.filter(minion=>minion&&minion.owner===ai&&minion.type==='hell_hand'&&!minion.dead).length;
+            if(superReady&&dist<760&&(combatState==='setup'||combatState==='pressure'||isVulnerableTarget(target)||target.hp<target.maxHp*.42))return 'super';
+            if(ai.nerathHandsCooldown<=0&&activeHands===0&&dist>80&&dist<620)return 'switch';
+            break;
+        }
     }
     return null;
 }

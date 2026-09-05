@@ -30,6 +30,10 @@ class Fighter extends Entity {
         this.solaForceFallPending = false;
         this.solaForceFallSourceId = null;
         this.solaForceFallPeakY = this.y;
+        this.nerathHellCaptured = false;
+        this.nerathFallPending = false;
+        this.nerathFallSourceId = null;
+        this.nerathFallPeakY = this.y;
         this.flipCooldown = 0;
         this.timeSinceLastDamage = 0;
         this.flightDisabled = false;
@@ -265,6 +269,10 @@ class Fighter extends Entity {
             this.magnetarOverload = 0; this.magnetarPulseCooldown = 0; this.magnetarArmorTimer = 0;
             this.magnetarChargeFlash = 0; this.magnetarRecoilTimer = 0;
         }
+        if (this.heroName === 'Nerath') {
+            this.nerathHandsCooldown = 0; this.nerathCastSerial = 0;
+            this.nerathSecondDeathUsed = false; this.nerathRecoveryTimer = 0; this.nerathResurrectionFlash = 0;
+        }
         this.ocelPoisonTimer = 0; this.ocelPoisonTick = 0; this.ocelPoisonDps = 0; this.ocelPoisonSourceId = null;
         this.ocelVenomMarks = 0; this.ocelVenomMarkTimer = 0; this.ocelVenomOwnerId = null;
     }
@@ -375,6 +383,13 @@ class Fighter extends Entity {
         }
 
         if (this.hp <= 0) {
+            if (this.heroName === 'Nerath' && !this.nerathSecondDeathUsed) {
+                this.nerathSecondDeathUsed = true; this.hp = this.maxHp * .25; this.dead = false;
+                this.nerathRecoveryTimer = 10000; this.nerathResurrectionFlash = 1500; this.invincible = Math.max(this.invincible, 1000);
+                this.attackState = 'idle'; this.stateTimer = 0; this.stunTimer = 0; this.buffs.dizzy = 0; this.buffs.root = 0;
+                this.vx = 0; this.vy = -5; game.hazards.push(new NerathResurrection(this));
+                return;
+            }
             this.hp = 0; this.dead = true;
             if (this.heroName === 'Kadaxi') this.breakGrapple();
             if (this.solaForceHeld) {
@@ -701,9 +716,36 @@ class Fighter extends Entity {
         return true;
     }
 
+    getNerathPower() {
+        if (this.heroName !== 'Nerath' || !this.nerathSecondDeathUsed) return 1;
+        return Math.max(.5, Math.min(1, 1 - (this.nerathRecoveryTimer || 0) / 20000));
+    }
+
+    applyNerathFallDamage() {
+        if (!this.nerathFallPending || this.nerathHellCaptured || !this.isGrounded) return false;
+        const fallDistance = Math.max(0, this.y - (this.nerathFallPeakY ?? this.y));
+        const source = typeof game.getFighters === 'function'
+            ? game.getFighters().find(fighter => fighter && fighter.id === this.nerathFallSourceId) || null
+            : null;
+        this.nerathFallPending = false; this.nerathFallSourceId = null; this.nerathFallPeakY = this.y;
+        if (fallDistance < 80) return false;
+        const damage = Math.min(75, Math.max(12, Math.round((fallDistance - 50) * .14)));
+        this.takeDamage(damage, source, false, true);
+        for(let i=0;i<24;i++) game.particles.push(new Particle(this.x+this.w/2,this.y+this.h,i%3?'#260813':'#a51f3d',(Math.random()-.5)*14,-Math.random()*11,520,4));
+        return true;
+    }
+
     update(dt) {
         const vossCopyWasActive = this.vossCopyActive === true;
         if (this.dead) return;
+        if (this.heroName === 'Nerath') {
+            this.nerathHandsCooldown = Math.max(0, this.nerathHandsCooldown - dt);
+            this.nerathRecoveryTimer = Math.max(0, this.nerathRecoveryTimer - dt);
+            this.nerathResurrectionFlash = Math.max(0, this.nerathResurrectionFlash - dt);
+        }
+        if (this.nerathHellCaptured) {
+            this.vx=0;this.vy=0;this.attackState='idle';this.stateTimer=0;return;
+        }
         if (this.solaForceHeld && keysPressed[this.controls.attack]) {
             this.tryEscapeSolaForce();
             keysPressed[this.controls.attack] = false;
@@ -936,6 +978,7 @@ class Fighter extends Entity {
         if (this.solaForceFallPending && !this.solaForceHeld) {
             this.solaForceFallPeakY = Math.min(this.solaForceFallPeakY ?? this.y, this.y);
         }
+        if (this.nerathFallPending && !this.nerathHellCaptured) this.nerathFallPeakY = Math.min(this.nerathFallPeakY ?? this.y, this.y);
 
         if (this.waterStunImmunity > 0) this.waterStunImmunity -= dt;
         if (this.kilaSwitchCD > 0) this.kilaSwitchCD -= dt;
@@ -1151,6 +1194,10 @@ class Fighter extends Entity {
         if (this.buffs.gelannArrowSlow > 0) {
             this.buffs.gelannArrowSlow = Math.max(0, this.buffs.gelannArrowSlow - dt);
             slowMultiplier = Math.min(slowMultiplier, 0.55);
+        }
+        if ((this.buffs.hellPull || 0) > 0) {
+            this.buffs.hellPull = Math.max(0, this.buffs.hellPull - dt);
+            slowMultiplier = Math.min(slowMultiplier, 1 - .68 * Math.max(.5, Math.min(1, this.buffs.hellPullStrength || 1)));
         }
         if (this.buffs.root > 0) {
             this.buffs.root = Math.max(0, this.buffs.root - dt);
@@ -1483,6 +1530,7 @@ class Fighter extends Entity {
                         if (this.heroName === 'Dogel') activeTime = this.dogelReaperTimer > 0 ? 90 : 130;
                         if (this.heroName === 'Lapis') activeTime = this.lapisWhipTimer > 0 ? 95 : 80;
                         if (this.heroName === 'Ocel') activeTime = this.ocelGodboundTimer > 0 ? 90 : 120;
+                        if (this.heroName === 'Nerath') activeTime = 35;
 
                         this.attackState = 'active';
                         this.stateTimer = activeTime;
@@ -1638,6 +1686,7 @@ class Fighter extends Entity {
                     if (this.heroName === 'Vaeilash') recTime = this.vaeilashBloodMoon > 0 ? 55 : 85;
                     if (this.heroName === 'Dogel') recTime = this.dogelReaperTimer > 0 ? 150 : 330;
                     if (this.heroName === 'Lapis') recTime = this.lapisWhipTimer > 0 ? 115 : 260;
+                    if (this.heroName === 'Nerath') recTime = 45;
 
                     this.attackState = 'recovery';
                     this.stateTimer = recTime;
@@ -1825,6 +1874,8 @@ class Fighter extends Entity {
                     this.castOcelRitual();
                 } else if (this.heroName === 'Magnetar' && this.attackState === 'idle') {
                     this.fireMagneticRepulsion();
+                } else if (this.heroName === 'Nerath' && this.attackState === 'idle') {
+                    this.castTwinHandsOfHell();
                 }
             }
             if (mirrorCopiedSwitch) {
@@ -1904,6 +1955,7 @@ class Fighter extends Entity {
 
         this.resolveUkonDropImpact();
         this.applySolaForceFallDamage();
+        this.applyNerathFallDamage();
         if (this.heroName === 'Feng' && this.fengStepActive && this.isGrounded && this.fengStepElapsed > 160) {
             this.fengStepActive = false; this.fengLandingBurstTimer = 360;
             for(let i=0;i<18;i++){const a=Math.PI+i*Math.PI/17;game.particles.push(new Particle(this.x+this.w/2,this.y+this.h,'#dffbff',Math.cos(a)*7,Math.sin(a)*5,360,3));}
@@ -2139,9 +2191,18 @@ class Fighter extends Entity {
         game.hazards.push(new MagneticRepulsion(this));return true;
     }
 
+    castTwinHandsOfHell() {
+        if (this.heroName !== 'Nerath' || this.nerathHandsCooldown > 0) return false;
+        const target=this.aiCombatTarget&&!this.aiCombatTarget.dead?this.aiCombatTarget:game.getEnemyOf(this);
+        if(!target||target.dead||target.untargetable)return false;
+        this.nerathHandsCooldown=10000;const castId=`${this.id}-hell-hands-${++this.nerathCastSerial}`;
+        game.minions.push(new HellHand(this,target,-1,castId),new HellHand(this,target,1,castId));
+        this.attackState='recovery';this.stateTimer=300;this.maxStateTimer=300;return true;
+    }
+
     isMeleeAttack() {
         if (this.heroName === 'Lapis') return this.lapisWhipTimer > 0;
-        if (this.heroName === 'Hason' || this.heroName === 'Willi' || this.heroName === 'Ugo' || this.heroName === 'Kila' || this.heroName === 'Volt' || this.heroName === 'Noae' || this.heroName === 'Kuro' || this.heroName === 'Nyra' || this.heroName === 'Archor' || this.heroName === 'D2F1' || this.heroName === 'Veyra' || this.heroName === 'Brom' || this.heroName === 'Mori' || this.heroName === 'Roka' || this.heroName === 'Tonia' || this.heroName === 'Pat' || this.heroName === 'Feng' || this.heroName === 'Magnetar') return false;
+        if (this.heroName === 'Hason' || this.heroName === 'Willi' || this.heroName === 'Ugo' || this.heroName === 'Kila' || this.heroName === 'Volt' || this.heroName === 'Noae' || this.heroName === 'Kuro' || this.heroName === 'Nyra' || this.heroName === 'Archor' || this.heroName === 'D2F1' || this.heroName === 'Veyra' || this.heroName === 'Brom' || this.heroName === 'Mori' || this.heroName === 'Roka' || this.heroName === 'Tonia' || this.heroName === 'Pat' || this.heroName === 'Feng' || this.heroName === 'Magnetar' || this.heroName === 'Nerath') return false;
         if (this.heroName === 'Voss') return this.vossCopyTimer > 0 && this.vossCopiedMelee;
         if (this.heroName === 'Laegon') return this.thunderGodTimer > 0;
         if (this.heroName === 'Euclid' && this.euclidWeapon === 'magic') return false;
@@ -2306,6 +2367,7 @@ class Fighter extends Entity {
         if (this.heroName === 'Pat') this.stateTimer = 90;
         if (this.heroName === 'Ocel') this.stateTimer = this.ocelGodboundTimer > 0 ? 55 : 90;
         if (this.heroName === 'Magnetar') this.stateTimer = 800;
+        if (this.heroName === 'Nerath') this.stateTimer = 35;
         if (this.heroName === 'Wolf') {
             this.stateTimer = 50;
             this.wolfPassiveReady = this.wolfAttackTimer >= 1500;
@@ -2326,7 +2388,7 @@ class Fighter extends Entity {
             : null;
         let target = combatTarget || game.getEnemyOf(this);
 
-        if (!combatTarget && (this.heroName === 'Hason' || this.heroName === 'Willi' || this.heroName === 'Euclid' || this.heroName === 'Ugo' || this.heroName === 'Kila' || this.heroName === 'Volt' || this.heroName === 'Noae' || this.heroName === 'Nyra' || this.heroName === 'Archor' || this.heroName === 'D2F1' || this.heroName === 'Laegon' || this.heroName === 'Veyra' || this.heroName === 'Brom' || this.heroName === 'Feng' || this.heroName === 'Magnetar')) {
+        if (!combatTarget && (this.heroName === 'Hason' || this.heroName === 'Willi' || this.heroName === 'Euclid' || this.heroName === 'Ugo' || this.heroName === 'Kila' || this.heroName === 'Volt' || this.heroName === 'Noae' || this.heroName === 'Nyra' || this.heroName === 'Archor' || this.heroName === 'D2F1' || this.heroName === 'Laegon' || this.heroName === 'Veyra' || this.heroName === 'Brom' || this.heroName === 'Feng' || this.heroName === 'Magnetar' || this.heroName === 'Nerath')) {
             let minDist = target ? Math.hypot(target.x - this.x, target.y - this.y) : 9999;
             for (let m of game.minions) {
                 if (m && m.owner !== this && !m.dead) {
@@ -2378,6 +2440,10 @@ class Fighter extends Entity {
             game.projectiles.push(new ElectromagneticMatrix(this,aimAngle,overcharged));
             this.vx-=Math.cos(aimAngle)*8;this.vy-=Math.sin(aimAngle)*2;this.magnetarChargeFlash=220;this.magnetarRecoilTimer=280;
             for(let i=0;i<18;i++)game.particles.push(new Particle(px,py,i%3?'#7eeaff':'#ffffff',-Math.cos(aimAngle)*(2+Math.random()*7),(Math.random()-.5)*8,320,3));
+            return;
+        }
+        if (this.heroName === 'Nerath') {
+            game.projectiles.push(new BlackShard(this,aimAngle));
             return;
         }
         if (this.heroName === 'Hason') {
@@ -3396,6 +3462,10 @@ class Fighter extends Entity {
 
     performSuper() {
         window.audioManager?.playSkill(this, 'super');
+        if (this.heroName === 'Nerath') {
+            if(this.superCooldown<=0){const target=this.aiCombatTarget&&!this.aiCombatTarget.dead?this.aiCombatTarget:game.getEnemyOf(this);if(target&&!target.dead&&!target.untargetable){this.superCooldown=this.superCooldownMax;game.hazards.push(new GateOfHell(this,target));this.attackState='recovery';this.stateTimer=450;this.maxStateTimer=450;}}
+            return;
+        }
         if (this.heroName === 'Magnetar') {
             if(this.superCooldown<=0){const target=this.aiCombatTarget&&!this.aiCombatTarget.dead?this.aiCombatTarget:game.getEnemyOf(this);this.superCooldown=this.superCooldownMax;game.hazards.push(new MatrixBombardment(this,target));this.vx*=.2;}
             return;
@@ -4647,6 +4717,14 @@ class Fighter extends Entity {
             if(charging){const size=22+charge*44,pulse=.45+Math.sin(Date.now()*.035)*.25;ctx.save();ctx.translate(78,0);ctx.strokeStyle=`rgba(169,244,255,${pulse+charge*.25})`;ctx.lineWidth=2+charge*2;ctx.shadowBlur=20;ctx.shadowColor='#6eeaff';ctx.strokeRect(-size/2,-size*.34,size,size*.68);for(let line=1;line<4;line++){ctx.beginPath();ctx.moveTo(-size/2+line*size/4,-size*.34);ctx.lineTo(-size/2+line*size/4,size*.34);ctx.stroke();}for(let line=1;line<3;line++){ctx.beginPath();ctx.moveTo(-size/2,-size*.34+line*size*.68/3);ctx.lineTo(size/2,-size*.34+line*size*.68/3);ctx.stroke();}ctx.restore();}
             ctx.restore();
             ctx.save();ctx.translate(-11,-8);for(let stack=0;stack<3;stack++){ctx.fillStyle=stack<(this.magnetarOverload||0)?'#b9f7ff':'#172735';ctx.strokeStyle='#5bdcf5';ctx.lineWidth=2;ctx.fillRect(stack*11,0,8,8);ctx.strokeRect(stack*11,0,8,8);}ctx.restore();
+        }
+        else if (this.heroName === 'Nerath') {
+            const time=Date.now()*.008,power=this.getNerathPower(),attacking=this.attackState==='windup'||this.attackState==='active';
+            ctx.save();ctx.translate(hw-2,25);ctx.shadowBlur=14;ctx.shadowColor='#b32346';
+            ctx.strokeStyle='#2a0a17';ctx.lineWidth=8;ctx.beginPath();ctx.moveTo(-4,7);ctx.quadraticCurveTo(18,-18,37,-5);ctx.stroke();
+            ctx.fillStyle='#080609';ctx.strokeStyle='#a82645';ctx.lineWidth=2.5;ctx.translate(42+(attacking?Math.sin(phaseProg*Math.PI)*17:0),-6);ctx.rotate(time+(attacking?phaseProg*3:0));ctx.beginPath();ctx.moveTo(0,-15);ctx.lineTo(14,0);ctx.lineTo(0,15);ctx.lineTo(-14,0);ctx.closePath();ctx.fill();ctx.stroke();ctx.strokeStyle='#e13a60';ctx.beginPath();ctx.moveTo(0,-10);ctx.lineTo(0,10);ctx.moveTo(-9,0);ctx.lineTo(9,0);ctx.stroke();ctx.restore();
+            ctx.save();ctx.translate(0,8);ctx.fillStyle='#10070d';ctx.beginPath();ctx.moveTo(-hw+5,0);ctx.lineTo(-hw-12,h-2);ctx.lineTo(0,h-18);ctx.lineTo(hw+12,h-2);ctx.lineTo(hw-5,0);ctx.closePath();ctx.fill();ctx.strokeStyle='#722039';ctx.lineWidth=3;ctx.stroke();ctx.fillStyle='#d62d51';ctx.fillRect(-8,10,5,3);ctx.fillRect(3,10,5,3);ctx.restore();
+            if(this.nerathSecondDeathUsed){ctx.save();ctx.globalAlpha=.28+.18*power;ctx.strokeStyle='#d22b50';ctx.setLineDash([5,7]);ctx.lineDashOffset=-time*5;ctx.lineWidth=3;ctx.beginPath();ctx.ellipse(0,h+2,30+power*12,8+power*3,0,0,Math.PI*2);ctx.stroke();ctx.setLineDash([]);ctx.restore();}
         }
         else if (this.heroName === 'Ocel') {
             const godbound=this.ocelGodboundTimer>0,time=Date.now()*.006;

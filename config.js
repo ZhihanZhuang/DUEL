@@ -446,6 +446,11 @@ var HEROES = {
         name: "Magnetar", desc: "Heavy Electromancer",
         color: "#385985", maxHp: 850, speed: 4.2, jump: 13.5, width: 48, height: 75, superCD: 28000,
         ui: { hp: "85 WRD", atk: "6 WRD (Electromagnetic Matrix)", passive: "Charge for 0.8s and fire a slow, large piercing matrix. Successful shots build Overload; after 3 stacks the next matrix deals 9 WRD and stuns. Press [Switch] for Magnetic Repulsion (8s CD).", super: "<span class='skill-tag'>Matrix Bombardment</span> Mark a large area for 3s, then call down six 10 WRD electromagnetic matrices. Each impact leaves a short electric slowing field." }
+    },
+    Nerath: {
+        name: "Nerath", desc: "Hellbound Controller",
+        color: "#541627", maxHp: 720, speed: 5.5, jump: 14.5, width: 40, height: 70, superCD: 26000,
+        ui: { hp: "72 WRD", atk: "1.2 WRD (Black Shard + Shatter)", passive: "<span class='skill-tag'>Second Death</span> Revives once at 25% HP with 50% power, recovering to full strength over 10s. Press [Switch] to summon two destructible Hands of Hell (10s CD).", super: "<span class='skill-tag'>Gate of Hell</span> Warns beneath the enemy, then pulls for up to 4s. Escape the outer edge or be dragged into Hell and thrown from a random point above the arena for height-based fall damage." }
     }
 };
 

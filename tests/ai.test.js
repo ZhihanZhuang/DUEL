@@ -49,6 +49,7 @@ function loadProjectileContext() {
         minions: [],
         projectiles: [],
         particles: [],
+        hazards: [],
         opponents: [],
         getEnemyOf: () => null,
         getOpponentsOf() { return this.opponents; },
@@ -57,7 +58,7 @@ function loadProjectileContext() {
     };
     vm.createContext(context);
     const source = fs.readFileSync(path.join(__dirname, '..', 'entities.js'), 'utf8');
-    vm.runInContext(`${source}\nwindow.Projectile = Projectile; window.KuroDecoy = KuroDecoy; window.UkonShadow = UkonShadow; window.PeachTree = PeachTree; window.GiantSword = GiantSword; window.GravityWell = GravityWell; window.ChiqPath = ChiqPath; window.D2FDrone = D2FDrone; window.D2FTargetBeacon = D2FTargetBeacon; window.D2FGiantRobot = D2FGiantRobot; window.TimeAnchor = TimeAnchor; window.TemporalEcho = TemporalEcho; window.LaegonLightning = LaegonLightning; window.LaegonHammer = LaegonHammer; window.LaegonHammerStrike = LaegonHammerStrike; window.BromBlastCharge = BromBlastCharge; window.BromStickyBomb = BromStickyBomb; window.DemolitionZone = DemolitionZone; window.TitanAxe = TitanAxe; window.MechanismNode = MechanismNode; window.MoriEnergyWire = MoriEnergyWire; window.MechanicFanBlade = MechanicFanBlade; window.MoriTrap = MoriTrap; window.ThousandMechanisms = ThousandMechanisms; window.GelannFlameCone = GelannFlameCone; window.GelannArrowRain = GelannArrowRain; window.RokaCannonball = RokaCannonball; window.RokaMortarShell = RokaMortarShell; window.TemporalBolt = TemporalBolt; window.VossTemporalDouble = VossTemporalDouble; window.DogelChainHook = DogelChainHook; window.LapisStone = LapisStone; window.ToniaGrenade = ToniaGrenade; window.ToniaMissile = ToniaMissile; window.LakEarthWall = LakEarthWall; window.LakShockwave = LakShockwave; window.LakMountainBreaker = LakMountainBreaker; window.PatThread = PatThread; window.PatMarionette = PatMarionette; window.FengQigong = FengQigong; window.FengWindWave = FengWindWave; window.OcelFeatheredSerpent = OcelFeatheredSerpent; window.OcelRitualZone = OcelRitualZone; window.OcelFifthSun = OcelFifthSun; window.ElectromagneticMatrix = ElectromagneticMatrix; window.MagneticRepulsion = MagneticRepulsion; window.MatrixBombardment = MatrixBombardment;`, context, { filename: 'entities.js' });
+    vm.runInContext(`${source}\nwindow.Projectile = Projectile; window.KuroDecoy = KuroDecoy; window.UkonShadow = UkonShadow; window.PeachTree = PeachTree; window.GiantSword = GiantSword; window.GravityWell = GravityWell; window.ChiqPath = ChiqPath; window.D2FDrone = D2FDrone; window.D2FTargetBeacon = D2FTargetBeacon; window.D2FGiantRobot = D2FGiantRobot; window.TimeAnchor = TimeAnchor; window.TemporalEcho = TemporalEcho; window.LaegonLightning = LaegonLightning; window.LaegonHammer = LaegonHammer; window.LaegonHammerStrike = LaegonHammerStrike; window.BromBlastCharge = BromBlastCharge; window.BromStickyBomb = BromStickyBomb; window.DemolitionZone = DemolitionZone; window.TitanAxe = TitanAxe; window.MechanismNode = MechanismNode; window.MoriEnergyWire = MoriEnergyWire; window.MechanicFanBlade = MechanicFanBlade; window.MoriTrap = MoriTrap; window.ThousandMechanisms = ThousandMechanisms; window.GelannFlameCone = GelannFlameCone; window.GelannArrowRain = GelannArrowRain; window.RokaCannonball = RokaCannonball; window.RokaMortarShell = RokaMortarShell; window.TemporalBolt = TemporalBolt; window.VossTemporalDouble = VossTemporalDouble; window.DogelChainHook = DogelChainHook; window.LapisStone = LapisStone; window.ToniaGrenade = ToniaGrenade; window.ToniaMissile = ToniaMissile; window.LakEarthWall = LakEarthWall; window.LakShockwave = LakShockwave; window.LakMountainBreaker = LakMountainBreaker; window.PatThread = PatThread; window.PatMarionette = PatMarionette; window.FengQigong = FengQigong; window.FengWindWave = FengWindWave; window.OcelFeatheredSerpent = OcelFeatheredSerpent; window.OcelRitualZone = OcelRitualZone; window.OcelFifthSun = OcelFifthSun; window.ElectromagneticMatrix = ElectromagneticMatrix; window.MagneticRepulsion = MagneticRepulsion; window.MatrixBombardment = MatrixBombardment; window.BlackSpike = BlackSpike; window.BlackShard = BlackShard; window.HellHand = HellHand; window.HellTearEffect = HellTearEffect; window.GateOfHell = GateOfHell; window.NerathResurrection = NerathResurrection;`, context, { filename: 'entities.js' });
     return context;
 }
 
@@ -321,6 +322,10 @@ function loadPhysicsGame(heroName = 'Hunter') {
     class ElectromagneticMatrix extends Entity { constructor(owner,angle,overcharged=false){super(owner.x,owner.y,overcharged?142:112,overcharged?82:64);Object.assign(this,{owner,angle,overcharged,type:'electromagnetic_matrix'});} }
     class MagneticRepulsion extends Entity { constructor(owner){super(owner.x,owner.y,380,380);Object.assign(this,{owner,type:'magnetic_repulsion'});} }
     class MatrixBombardment extends Entity { constructor(owner,target){super(0,0,620,660);Object.assign(this,{owner,target,type:'matrix_bombardment'});} }
+    class BlackShard extends Entity { constructor(owner,angle){super(owner.x,owner.y,22,16);Object.assign(this,{owner,angle,type:'black_shard'});} }
+    class HellHand extends Entity { constructor(owner,target,side,castId){super(target.x,target.y,48,50);Object.assign(this,{owner,target,side,castId,type:'hell_hand',hp:30});} }
+    class GateOfHell extends Entity { constructor(owner,target){super(target.x,590,500,70);Object.assign(this,{owner,target,type:'gate_of_hell'});} }
+    class NerathResurrection extends Entity { constructor(owner){super(owner.x,owner.y,180,150);Object.assign(this,{owner,type:'nerath_resurrection'});} }
     class RokaCannonball extends Entity { constructor(owner,x,y,vx,vy,artillery){super(x,y,28,28);Object.assign(this,{owner,vx,vy,artillery,type:'roka_cannonball',damage:artillery?50:40,radius:artillery?165:110});} }
     class RokaMortarShell extends Entity { constructor(owner,x,y){super(x,y,20,26);Object.assign(this,{owner,targetX:x,targetY:y,type:'roka_mortar'});} }
     class TemporalBolt extends Entity { constructor(owner,x,y,vx,vy,damage,kind){super(x,y,18,14);Object.assign(this,{owner,vx,vy,damage,kind,type:kind==='copy'?'voss_copy_bolt':'temporal_shard'});} }
@@ -369,6 +374,10 @@ function loadPhysicsGame(heroName = 'Hunter') {
         ElectromagneticMatrix,
         MagneticRepulsion,
         MatrixBombardment,
+        BlackShard,
+        HellHand,
+        GateOfHell,
+        NerathResurrection,
         RokaCannonball,
         RokaMortarShell,
         TemporalBolt,
@@ -409,7 +418,8 @@ function loadPhysicsGame(heroName = 'Hunter') {
             Pat: { maxHp: 700, speed: 5.2, jump: 14.5, width: 39, height: 69, color: '#a34887', superCD: 28000 },
             Feng: { maxHp: 800, speed: 6.8, jump: 16.5, width: 40, height: 70, color: '#dffbff', superCD: 24000 },
             Ocel: { maxHp: 900, speed: 5.7, jump: 15, width: 44, height: 73, color: '#137f78', superCD: 20000 },
-            Magnetar: { maxHp: 850, speed: 4.2, jump: 13.5, width: 48, height: 75, color: '#385985', superCD: 28000 }
+            Magnetar: { maxHp: 850, speed: 4.2, jump: 13.5, width: 48, height: 75, color: '#385985', superCD: 28000 },
+            Nerath: { maxHp: 720, speed: 5.5, jump: 14.5, width: 40, height: 70, color: '#541627', superCD: 26000 }
         },
         keys: {},
         keysPressed: {},
@@ -3372,4 +3382,62 @@ test('Magnetar CPU uses repulsion up close and bombardment to control a setup', 
     ai.magnetarPulseCooldown=5000;ai.superCooldown=0;target.x=760;readyBrain(ai,target);ai.aiBrain.combatState='setup';ai.aiBrain.tacticTimer=9999;
     context.window.runAI(makeGame(ai,target),16);
     assert.equal(context.keysPressed[ai.controls.super],true);
+});
+
+test('Nerath fires a fast 1.2 WRD shard that shatters into four spikes', () => {
+    const context=loadProjectileContext();
+    const owner={id:'nerath',x:100,y:500,w:40,h:70,facing:1,dead:false,getNerathPower:()=>1};
+    const victim={id:'victim',x:145,y:500,w:45,h:70,hp:200,dead:false,untargetable:false,buffs:{},takeDamage(amount){this.hp-=amount;}};
+    context.game.opponents=[victim];const shard=new context.window.BlackShard(owner,0);shard.update(16);
+    assert.equal(victim.hp,188);assert.equal(shard.dead,true);
+    assert.equal(context.game.projectiles.filter(item=>item.type==='black_spike').length,4);
+});
+
+test('Nerath Twin Hands are destructible and tear only after both complete the hold', () => {
+    const context=loadProjectileContext();
+    const owner={id:'nerath',x:100,y:500,w:40,h:70,facing:1,dead:false,getNerathPower:()=>1};
+    const victim={id:'victim',x:500,y:500,w:45,h:70,hp:300,dead:false,untargetable:false,buffs:{},vx:0,vy:0,takeDamage(amount){this.hp-=amount;}};
+    context.game.opponents=[victim];context.game.getFighters=()=>[victim];
+    const left=new context.window.HellHand(owner,victim,-1,'cast');const right=new context.window.HellHand(owner,victim,1,'cast');context.game.minions=[left,right];
+    left.x=victim.x-43;left.y=victim.y+10;right.x=victim.x+victim.w+1;right.y=victim.y+10;
+    left.update(16);right.update(16);assert.equal(left.phase,'holding');assert.equal(right.phase,'holding');assert.equal(victim.hp,300);
+    left.update(799);right.update(799);left.update(1);
+    assert.equal(victim.hp,270);assert.equal(victim.buffs.slow,1500);assert.equal(context.game.hazards.at(-1).type,'hell_tear_effect');
+
+    const spare=new context.window.HellHand(owner,victim,-1,'spare');spare.takeDamage(30,owner);
+    assert.equal(spare.dead,true);assert.equal(spare.maxHp,30);
+});
+
+test('Gate of Hell gives an escape window, then captures and throws a trapped target', () => {
+    const context=loadProjectileContext();
+    const owner={id:'nerath',x:100,y:500,w:40,h:70,facing:1,dead:false,getNerathPower:()=>1};
+    const victim={id:'victim',x:590,y:590,w:45,h:70,hp:500,dead:false,untargetable:false,buffs:{},vx:0,vy:0,takeDamage(amount){this.hp-=amount;}};
+    context.game.opponents=[victim];context.game.getFighters=()=>[owner,victim];
+    const escaped=new context.window.GateOfHell(owner,victim);escaped.update(850);victim.x=escaped.x+escaped.w+20;escaped.update(16);
+    assert.equal(escaped.dead,true);assert.equal(victim.nerathHellCaptured,undefined);
+
+    victim.x=590;const gate=new context.window.GateOfHell(owner,victim);gate.update(849);assert.equal(victim.hp,500);gate.update(1);
+    for(let second=0;second<4;second++){victim.x=gate.x+gate.w/2-victim.w/2;gate.update(1000);}
+    assert.equal(victim.hp,420);assert.equal(victim.nerathHellCaptured,true);assert.equal(victim.untargetable,true);
+    gate.update(1600);assert.equal(victim.nerathHellCaptured,false);assert.equal(victim.untargetable,false);assert.equal(victim.nerathFallPending,true);assert.ok(victim.y<0);assert.ok(victim.vy>0);
+});
+
+test('Nerath Second Death triggers once at 25% HP and recovers from half power', () => {
+    const {ai,context}=loadPhysicsGame('Nerath');assert.equal(ai.maxHp,720);
+    ai.takeDamage(900,context.game.p1);assert.equal(ai.dead,false);assert.equal(ai.hp,180);assert.equal(ai.nerathSecondDeathUsed,true);assert.equal(ai.getNerathPower(),.5);assert.equal(context.game.hazards.at(-1).type,'nerath_resurrection');
+    ai.nerathRecoveryTimer=5000;assert.equal(ai.getNerathPower(),.75);ai.nerathRecoveryTimer=0;assert.equal(ai.getNerathPower(),1);
+    ai.invincible=0;ai.takeDamage(900,context.game.p1);assert.equal(ai.dead,true);
+});
+
+test('Nerath height-based Hell fall damage resolves only on landing', () => {
+    const {ai,target}=loadPhysicsGame('Nerath');ai.nerathFallPending=true;ai.nerathFallSourceId=target.id;ai.nerathFallPeakY=-100;ai.y=590;ai.isGrounded=false;
+    const hp=ai.hp;ai.applyNerathFallDamage();assert.equal(ai.hp,hp);
+    ai.isGrounded=true;ai.applyNerathFallDamage();assert.equal(ai.hp,hp-75);assert.equal(ai.nerathFallPending,false);
+});
+
+test('Nerath CPU sets up Twin Hands and commits Gate of Hell on pressure', () => {
+    const context=loadAI();const ai=makeFighter('Nerath');const target=makeFighter('Hunter','player');ai.x=200;target.x=570;ai.nerathHandsCooldown=0;ai.superCooldown=5000;readyBrain(ai,target);
+    context.window.runAI(makeGame(ai,target),16);assert.equal(context.keysPressed[ai.controls.switch],true);
+    Object.keys(context.keysPressed).forEach(key=>delete context.keysPressed[key]);ai.nerathHandsCooldown=5000;ai.superCooldown=0;readyBrain(ai,target);ai.aiBrain.combatState='pressure';ai.aiBrain.tacticTimer=9999;
+    context.window.runAI(makeGame(ai,target),16);assert.equal(context.keysPressed[ai.controls.super],true);
 });
