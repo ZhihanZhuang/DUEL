@@ -395,7 +395,7 @@ var HEROES = {
     Raigo: {
         name: "Raigo", desc: "Golden Thunder Rider",
         color: "#287b8f", maxHp: 800, speed: 6.4, jump: 16, width: 42, height: 72, superCD: 22000,
-        ui: { hp: "80 WRD", atk: "2.8 WRD (Lightning Spear)", passive: "<span class='skill-tag'>Static Energy</span> Basic hits generate 15 Energy. At 70, the next attack becomes a 6 WRD Thunder Strike with a brief stun and consumes all Energy. Press [Switch] to spend 25 Energy on a directional 3 WRD Thunder Charge.", super: "<span class='skill-tag'>Golden Spear Arsenal</span> For 10s, Raigo switches into a marksman stance. Basic Attack floats a golden spear upward, then instantly hurls it. During Arsenal, [Switch] launches three lower-damage spears one after another; each hit briefly stuns." }
+        ui: { hp: "80 WRD", atk: "2.8 WRD (Lightning Spear)", passive: "<span class='skill-tag'>Static Energy</span> Basic hits generate 15 Energy. At 70, the next attack becomes a 6 WRD Thunder Strike with a brief stun and consumes all Energy. Press [Switch] to spend 25 Energy on a directional 3 WRD Thunder Charge.", super: "<span class='skill-tag'>Golden Spear Arsenal</span> For 10s, Raigo switches into a marksman stance. Basic Attack floats a golden spear upward for 1s, then rapidly hurls it toward the enemy's position. During Arsenal, [Switch] launches three lower-damage spears one after another; each hit briefly stuns." }
     },
     Gelann: {
         name: "Gelann", desc: "Flameblade Archer",

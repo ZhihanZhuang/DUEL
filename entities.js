@@ -736,9 +736,19 @@ class Projectile extends Entity {
             this.x = this.owner.x + this.owner.w/2 + side * orbit - this.w/2 + offset;
             this.y = this.owner.y + this.owner.h/2 - 16 - lift * 72 + bob - this.h/2 - Math.abs(offset) * .25;
             if (this.launchTimer >= delay) {
-                const direction = this.launchDirection || { x: side, y: 0 };
+                let direction = this.launchDirection || { x: side, y: 0 };
+                if (this.aimAtTargetOnLaunch) {
+                    const target = this.target && !this.target.dead ? this.target : game.getEnemyOf(this.owner);
+                    if (target && !target.dead) {
+                        const dx = target.x + target.w/2 - (this.x + this.w/2);
+                        const dy = target.y + target.h/2 - (this.y + this.h/2);
+                        const distance = Math.max(1, Math.hypot(dx, dy));
+                        direction = { x: dx / distance, y: dy / distance };
+                    }
+                }
                 const speed = this.launchSpeed || 34;
                 this.released = true;
+                this.launchDirection = direction;
                 this.vx = direction.x * speed;
                 this.vy = direction.y * speed;
                 this.timer = 0;
@@ -811,7 +821,7 @@ class Projectile extends Entity {
         } else if (this.type === "raigo_golden_spear") {
             this.timer += dt;
             const chargeRatio = Math.max(0, Math.min(1, this.chargeRatio || 0));
-            const target = chargeRatio > .55 && this.timer < 520
+            const target = !this.straightFlight && chargeRatio > .55 && this.timer < 520
                 ? (this.target && !this.target.dead ? this.target : game.getEnemyOf(this.owner))
                 : null;
             if (target && !target.dead && !(target.invincible > 0)) {

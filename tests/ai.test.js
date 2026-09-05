@@ -2662,7 +2662,10 @@ test('Raigo builds Energy, spends Thunder Strike, and lifesteals from actual arm
     const spear = context.game.projectiles.at(-1);
     assert.equal(spear.type, 'raigo_golden_spear');
     assert.equal(spear.released, false);
-    assert.equal(spear.launchDelay, 150);
+    assert.equal(spear.launchDelay, 1000);
+    assert.equal(spear.launchSpeed, 42);
+    assert.equal(spear.aimAtTargetOnLaunch, true);
+    assert.equal(spear.straightFlight, true);
     assert.equal(spear.damage, 32);
 
     ai.attackState = 'idle';
@@ -2726,6 +2729,42 @@ test('Raigo golden spears float upward before launching automatically', () => {
     spear.update(75);
     assert.equal(spear.released, true);
     assert.equal(spear.vx, 34);
+});
+
+test('Raigo Arsenal basic floats for one second then snapshots the enemy direction', () => {
+    const context = loadProjectileContext();
+    const owner = {
+        id: 'raigo', heroName: 'Raigo', x: 500, y: 520, w: 42, h: 72, dead: false, facing: 1,
+        healRaigoFromDamage() {}
+    };
+    const target = { id: 'target', x: 620, y: 520, w: 40, h: 70, dead: false, invincible: 0 };
+    context.game.opponents = [target];
+    const spear = new context.window.Projectile(499, 551, 44, 12, 0, 0, 32, owner, '#ffd84d', 'raigo_golden_spear');
+    Object.assign(spear, {
+        released: false, launchDelay: 1000, launchTimer: 0, launchSpeed: 42,
+        launchDirection: { x: 1, y: 0 }, aimAtTargetOnLaunch: true, straightFlight: true,
+        target, chargeRatio: .6, floatOffsetIndex: 0
+    });
+
+    spear.update(500);
+    assert.equal(spear.released, false);
+    target.x = 390;
+    target.y = 360;
+    spear.update(499);
+    assert.equal(spear.released, false);
+    spear.update(1);
+    assert.equal(spear.released, true);
+    assert.ok(spear.vx < 0, 'spear should aim at the enemy position when the float ends');
+    assert.ok(spear.vy < 0, 'spear should aim vertically toward the enemy as well');
+    assert.ok(Math.abs(Math.hypot(spear.vx, spear.vy) - 42) < 0.001);
+
+    const vx = spear.vx;
+    const vy = spear.vy;
+    target.x = 900;
+    target.y = 600;
+    spear.update(16);
+    assert.equal(spear.vx, vx, 'released spear must not track horizontally');
+    assert.equal(spear.vy, vy, 'released spear must not track vertically');
 });
 
 test('Gelann uses a fast 2 WRD scimitar and deploys both zone-control skills', () => {

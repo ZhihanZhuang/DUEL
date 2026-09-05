@@ -2569,11 +2569,12 @@ class Fighter extends Entity {
         const direction = this.getRaigoSpearDirection();
         const spear = this.createRaigoGoldenSpear(direction, {
             damage: options.damage ?? 32,
-            speed: options.speed ?? 34,
-            launchDelay: options.launchDelay ?? 150,
+            speed: options.speed ?? 42,
+            launchDelay: options.launchDelay ?? 1000,
             stun: options.stun ?? 0,
             offsetIndex: options.offsetIndex ?? 0,
-            pullScale: options.pullScale ?? 1
+            pullScale: options.pullScale ?? 1,
+            aimAtTargetOnLaunch: true
         });
         game.projectiles.push(spear);
         this.vx -= direction.x * 3.5;
@@ -2599,6 +2600,8 @@ class Fighter extends Entity {
         spear.lifestealRatio = .35;
         spear.floatSeed = Math.random() * Math.PI * 2;
         spear.target = game.getEnemyOf(this);
+        spear.aimAtTargetOnLaunch = options.aimAtTargetOnLaunch ?? false;
+        spear.straightFlight = options.straightFlight ?? spear.aimAtTargetOnLaunch;
         return spear;
     }
 
