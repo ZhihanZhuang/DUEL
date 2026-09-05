@@ -161,7 +161,10 @@ if (window.Game && !window.Game.prototype.socketSyncPatched) {
         Minion,
         Skeleton,
         Puppet,
-        Hurricane
+        Hurricane,
+        ...(typeof OcelFeatheredSerpent !== 'undefined' ? { OcelFeatheredSerpent } : {}),
+        ...(typeof OcelRitualZone !== 'undefined' ? { OcelRitualZone } : {}),
+        ...(typeof OcelFifthSun !== 'undefined' ? { OcelFifthSun } : {})
     };
 
     const cloneEntity = entity => {

@@ -57,7 +57,7 @@ function loadProjectileContext() {
     };
     vm.createContext(context);
     const source = fs.readFileSync(path.join(__dirname, '..', 'entities.js'), 'utf8');
-    vm.runInContext(`${source}\nwindow.Projectile = Projectile; window.KuroDecoy = KuroDecoy; window.UkonShadow = UkonShadow; window.PeachTree = PeachTree; window.GiantSword = GiantSword; window.GravityWell = GravityWell; window.ChiqPath = ChiqPath; window.D2FDrone = D2FDrone; window.D2FTargetBeacon = D2FTargetBeacon; window.D2FGiantRobot = D2FGiantRobot; window.TimeAnchor = TimeAnchor; window.TemporalEcho = TemporalEcho; window.LaegonLightning = LaegonLightning; window.LaegonHammer = LaegonHammer; window.LaegonHammerStrike = LaegonHammerStrike; window.BromBlastCharge = BromBlastCharge; window.BromStickyBomb = BromStickyBomb; window.DemolitionZone = DemolitionZone; window.TitanAxe = TitanAxe; window.MechanismNode = MechanismNode; window.MoriEnergyWire = MoriEnergyWire; window.MechanicFanBlade = MechanicFanBlade; window.MoriTrap = MoriTrap; window.ThousandMechanisms = ThousandMechanisms; window.GelannFlameCone = GelannFlameCone; window.GelannArrowRain = GelannArrowRain; window.RokaCannonball = RokaCannonball; window.RokaMortarShell = RokaMortarShell; window.TemporalBolt = TemporalBolt; window.VossTemporalDouble = VossTemporalDouble; window.DogelChainHook = DogelChainHook; window.LapisStone = LapisStone; window.ToniaGrenade = ToniaGrenade; window.ToniaMissile = ToniaMissile; window.LakEarthWall = LakEarthWall; window.LakShockwave = LakShockwave; window.LakMountainBreaker = LakMountainBreaker; window.PatThread = PatThread; window.PatMarionette = PatMarionette; window.FengQigong = FengQigong; window.FengWindWave = FengWindWave;`, context, { filename: 'entities.js' });
+    vm.runInContext(`${source}\nwindow.Projectile = Projectile; window.KuroDecoy = KuroDecoy; window.UkonShadow = UkonShadow; window.PeachTree = PeachTree; window.GiantSword = GiantSword; window.GravityWell = GravityWell; window.ChiqPath = ChiqPath; window.D2FDrone = D2FDrone; window.D2FTargetBeacon = D2FTargetBeacon; window.D2FGiantRobot = D2FGiantRobot; window.TimeAnchor = TimeAnchor; window.TemporalEcho = TemporalEcho; window.LaegonLightning = LaegonLightning; window.LaegonHammer = LaegonHammer; window.LaegonHammerStrike = LaegonHammerStrike; window.BromBlastCharge = BromBlastCharge; window.BromStickyBomb = BromStickyBomb; window.DemolitionZone = DemolitionZone; window.TitanAxe = TitanAxe; window.MechanismNode = MechanismNode; window.MoriEnergyWire = MoriEnergyWire; window.MechanicFanBlade = MechanicFanBlade; window.MoriTrap = MoriTrap; window.ThousandMechanisms = ThousandMechanisms; window.GelannFlameCone = GelannFlameCone; window.GelannArrowRain = GelannArrowRain; window.RokaCannonball = RokaCannonball; window.RokaMortarShell = RokaMortarShell; window.TemporalBolt = TemporalBolt; window.VossTemporalDouble = VossTemporalDouble; window.DogelChainHook = DogelChainHook; window.LapisStone = LapisStone; window.ToniaGrenade = ToniaGrenade; window.ToniaMissile = ToniaMissile; window.LakEarthWall = LakEarthWall; window.LakShockwave = LakShockwave; window.LakMountainBreaker = LakMountainBreaker; window.PatThread = PatThread; window.PatMarionette = PatMarionette; window.FengQigong = FengQigong; window.FengWindWave = FengWindWave; window.OcelFeatheredSerpent = OcelFeatheredSerpent; window.OcelRitualZone = OcelRitualZone; window.OcelFifthSun = OcelFifthSun;`, context, { filename: 'entities.js' });
     return context;
 }
 
@@ -315,6 +315,9 @@ function loadPhysicsGame(heroName = 'Hunter') {
     class PatMarionette extends Entity { constructor(owner,target){super(0,0,1280,760);Object.assign(this,{owner,target,type:'pat_marionette',life:3000});} }
     class FengQigong extends Entity { constructor(owner,angle){super(owner.x,owner.y,18,18);Object.assign(this,{owner,angle,type:'feng_qigong',vx:Math.cos(angle)*16,vy:Math.sin(angle)*16});} }
     class FengWindWave extends Entity { constructor(owner,angle,ultimate=false){super(owner.x,owner.y,52,38);Object.assign(this,{owner,angle,ultimate,type:'feng_wind_wave',vx:Math.cos(angle)*12,vy:Math.sin(angle)*12});} }
+    class OcelFeatheredSerpent extends Entity { constructor(owner){super(owner.x,owner.y,112,58);Object.assign(this,{owner,type:'ocel_feathered_serpent'});} }
+    class OcelRitualZone extends Entity { constructor(owner){super(owner.x,owner.y,290,34);Object.assign(this,{owner,type:'ocel_ritual_zone',life:4000});} }
+    class OcelFifthSun extends Entity { constructor(owner){super(0,0,1280,760);Object.assign(this,{owner,type:'ocel_fifth_sun',life:6500});} }
     class RokaCannonball extends Entity { constructor(owner,x,y,vx,vy,artillery){super(x,y,28,28);Object.assign(this,{owner,vx,vy,artillery,type:'roka_cannonball',damage:artillery?50:40,radius:artillery?165:110});} }
     class RokaMortarShell extends Entity { constructor(owner,x,y){super(x,y,20,26);Object.assign(this,{owner,targetX:x,targetY:y,type:'roka_mortar'});} }
     class TemporalBolt extends Entity { constructor(owner,x,y,vx,vy,damage,kind){super(x,y,18,14);Object.assign(this,{owner,vx,vy,damage,kind,type:kind==='copy'?'voss_copy_bolt':'temporal_shard'});} }
@@ -357,6 +360,9 @@ function loadPhysicsGame(heroName = 'Hunter') {
         PatMarionette,
         FengQigong,
         FengWindWave,
+        OcelFeatheredSerpent,
+        OcelRitualZone,
+        OcelFifthSun,
         RokaCannonball,
         RokaMortarShell,
         TemporalBolt,
@@ -395,7 +401,8 @@ function loadPhysicsGame(heroName = 'Hunter') {
             Ge: { maxHp: 850, speed: 5.5, jump: 15, width: 43, height: 72, color: '#9a6a2f', superCD: 26000 },
             Lak: { maxHp: 1000, speed: 4.2, jump: 13, width: 48, height: 76, color: '#6f6759', superCD: 30000 },
             Pat: { maxHp: 700, speed: 5.2, jump: 14.5, width: 39, height: 69, color: '#a34887', superCD: 28000 },
-            Feng: { maxHp: 800, speed: 6.8, jump: 16.5, width: 40, height: 70, color: '#dffbff', superCD: 24000 }
+            Feng: { maxHp: 800, speed: 6.8, jump: 16.5, width: 40, height: 70, color: '#dffbff', superCD: 24000 },
+            Ocel: { maxHp: 900, speed: 5.7, jump: 15, width: 44, height: 73, color: '#137f78', superCD: 20000 }
         },
         keys: {},
         keysPressed: {},
@@ -3223,4 +3230,37 @@ test('Feng wind waves reflect from arena walls instead of sticking', () => {
     gust.update(16);
     assert.equal(victim.hp, 80);
     assert.ok(victim.vx >= 30, 'fan-shaped wind wave did not strongly blow the enemy away');
+});
+
+test('Ocel has 90 WRD and all three combat skills are reachable', () => {
+    const { ai, context } = loadPhysicsGame('Ocel');
+    assert.equal(ai.maxHp, 900);
+    ai.ocelSpawnTimer=0;ai.attackState='idle';
+    assert.equal(ai.castOcelSerpent(),true);
+    assert.equal(context.game.projectiles.at(-1).type,'ocel_feathered_serpent');
+    ai.attackState='idle';assert.equal(ai.castOcelRitual(),true);
+    assert.equal(context.game.hazards.at(-1).type,'ocel_ritual_zone');
+    ai.attackState='idle';ai.superCooldown=0;ai.performSuper();
+    assert.equal(ai.ocelUltimatePhase,'ritual');
+    assert.equal(context.game.hazards.at(-1).type,'ocel_fifth_sun');
+});
+
+test('Ocel third Venom Mark erupts and Godbound changes his basic attack', () => {
+    const { ai, target } = loadPhysicsGame('Ocel');
+    ai.ocelSpawnTimer=0;const start=target.hp;
+    ai.onOcelBasicHit(target);ai.onOcelBasicHit(target);
+    assert.equal(target.ocelVenomMarks,2);assert.equal(target.ocelVenomMarkTimer,5000);
+    ai.onOcelBasicHit(target);
+    assert.equal(target.hp,start-40);assert.equal(target.ocelVenomMarks,0);
+    assert.equal(ai.getMeleeDamage(),25);ai.ocelGodboundTimer=5000;assert.equal(ai.getMeleeDamage(),28);
+});
+
+test('Ocel Fifth Sun has a ritual startup, serpent impact, and five-second transformation', () => {
+    const context=loadProjectileContext();
+    const owner={id:'ocel',heroName:'Ocel',x:300,y:560,w:44,h:73,facing:1,dead:false,ocelUltimatePhase:'ritual',ocelGodboundTimer:0,hp:700,maxHp:900,heal(amount){this.hp=Math.min(this.maxHp,this.hp+amount);},applyOcelPoison(target,duration,dps){target.poison=[duration,dps];}};
+    const victim={id:'victim',heroName:'Hunter',x:520,y:560,w:45,h:70,hp:750,dead:false,untargetable:false,buffs:{},vx:0,vy:0,takeDamage(amount){this.hp-=amount;}};
+    context.game.opponents=[victim];context.game.getFighters=()=>[owner,victim];
+    const sun=new context.window.OcelFifthSun(owner);sun.update(1499);assert.equal(owner.ocelUltimatePhase,'ritual');assert.equal(victim.hp,750);
+    sun.update(1);assert.equal(owner.ocelUltimatePhase,'godbound');assert.equal(owner.ocelGodboundTimer,5000);assert.equal(victim.hp,670);assert.deepEqual(victim.poison,[5000,8]);
+    sun.update(5000);assert.equal(sun.dead,true);assert.equal(owner.ocelUltimatePhase,null);
 });

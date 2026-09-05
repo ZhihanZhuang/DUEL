@@ -3518,3 +3518,104 @@ class FengWindWave extends Entity {
     }
     draw(ctx) { const t=this.phase*.014,compression=this.bounceFlash>0?.58:1,rear=-this.w*.46,front=this.w*.5;ctx.save();ctx.globalAlpha=Math.max(.08,this.life/this.maxLife);ctx.translate(this.x+this.w/2,this.y+this.h/2);ctx.rotate(Math.atan2(this.vy,this.vx));ctx.scale(compression,1);ctx.shadowBlur=17;ctx.shadowColor='#dffbff';ctx.fillStyle='rgba(218,250,255,.18)';ctx.beginPath();ctx.moveTo(rear,0);ctx.quadraticCurveTo(0,-this.h*.62,front,-this.h*.46);ctx.lineTo(front,this.h*.46);ctx.quadraticCurveTo(0,this.h*.62,rear,0);ctx.fill();for(let i=0;i<6;i++){const side=i%2?-1:1,spread=(.16+i*.065)*this.h,flutter=Math.sin(t+i*1.7)*5;ctx.strokeStyle=i%2?'rgba(175,237,248,.72)':'rgba(255,255,255,.94)';ctx.lineWidth=2.5+(i%3);ctx.beginPath();ctx.moveTo(rear-i*2,flutter*.22);ctx.quadraticCurveTo(-8,side*(spread*.72)+flutter,front+i*3,side*spread);ctx.stroke();}ctx.strokeStyle='rgba(238,255,255,.75)';ctx.lineWidth=3;ctx.beginPath();ctx.arc(rear+4,0,15+Math.sin(t)*4,-1.15,1.15);ctx.stroke();ctx.restore(); }
 }
+
+class OcelFeatheredSerpent extends Entity {
+    constructor(owner) {
+        const direction=owner.facing||1;
+        super(owner.x+(direction>0?owner.w:-112),owner.y+5,112,58);
+        this.owner=owner;this.type='ocel_feathered_serpent';this.direction=direction;this.vx=direction*12.5;
+        this.life=1450;this.maxLife=this.life;this.phase=0;this.originY=this.y;this.hitTargets=new Set();
+    }
+    update(dt) {
+        this.phase+=dt;this.life-=dt;this.x+=this.vx;this.y=this.originY+Math.sin(this.phase*.018)*12;
+        for(const target of getHostileTargets(this.owner,this)){
+            if(!target||target.dead||this.hitTargets.has(target)||!checkAABB(this,target))continue;
+            this.hitTargets.add(target);target.takeDamage(30,this.owner,false,true);target.vx=this.direction*11;target.vy=-4;
+            target.buffs=target.buffs||{};target.buffs.slow=Math.max(target.buffs.slow||0,1500);
+            this.owner.applyOcelPoison?.(target,3000,6);this.owner.addOcelVenomMark?.(target);
+            for(let i=0;i<20;i++)game.particles.push(new Particle(target.x+target.w/2,target.y+target.h/2,i%4?'#39e0d0':'#f2ca52',this.direction*(3+Math.random()*9),(Math.random()-.5)*11,420,4));
+            this.dead=true;break;
+        }
+        if(this.life<=0||this.x<-140||this.x>CANVAS_W+140)this.dead=true;
+    }
+    draw(ctx) {
+        const fade=Math.min(1,this.life/260),time=this.phase*.018;
+        ctx.save();ctx.globalAlpha=fade;ctx.translate(this.x+(this.direction<0?this.w:0),this.y+this.h/2);ctx.scale(this.direction,1);
+        ctx.shadowBlur=16;ctx.shadowColor='#22d8c5';
+        for(let i=0;i<8;i++){
+            const sx=i*13,sy=Math.sin(time-i*.72)*12,r=16-i*.8;
+            ctx.fillStyle=i%2?'rgba(36,209,181,.72)':'rgba(113,245,223,.82)';ctx.beginPath();ctx.arc(sx,sy,r,0,Math.PI*2);ctx.fill();
+            ctx.fillStyle=i%3===0?'#f1c84b':'#78ead7';ctx.beginPath();ctx.moveTo(sx,sy-r);ctx.lineTo(sx-10,sy-r-10);ctx.lineTo(sx+3,sy-r+2);ctx.fill();
+        }
+        ctx.fillStyle='#1b796f';ctx.beginPath();ctx.moveTo(99,-17);ctx.quadraticCurveTo(126,0,99,18);ctx.lineTo(82,10);ctx.lineTo(82,-10);ctx.closePath();ctx.fill();
+        ctx.fillStyle='#ffd75e';ctx.beginPath();ctx.arc(105,-6,3.2,0,Math.PI*2);ctx.fill();ctx.strokeStyle='#f5cf54';ctx.lineWidth=2;
+        for(let i=0;i<4;i++){ctx.beginPath();ctx.moveTo(30+i*18,Math.sin(time-i*.7)*12);ctx.lineTo(21+i*18,-25+(i%2)*8);ctx.stroke();}
+        ctx.restore();
+    }
+}
+
+class OcelRitualZone extends Entity {
+    constructor(owner) {
+        const centerX=Math.max(145,Math.min(CANVAS_W-145,owner.x+owner.w/2+owner.facing*105));
+        super(centerX-145,GROUND_Y-34,290,34);this.owner=owner;this.type='ocel_ritual_zone';this.life=4000;this.maxLife=4000;
+        this.phase=0;this.initialTargets=new Set();
+    }
+    update(dt) {
+        this.phase+=dt;this.life-=dt;
+        for(const target of getHostileTargets(this.owner,this)){
+            if(!target||target.dead)continue;
+            const tx=target.x+target.w/2,inside=tx>=this.x&&tx<=this.x+this.w&&target.y+target.h>=this.y-95;
+            if(!inside)continue;
+            if(!this.initialTargets.has(target)){this.initialTargets.add(target);target.takeDamage(40,this.owner,false,true);target.vy=-5;this.owner.addOcelVenomMark?.(target);}
+            target.buffs=target.buffs||{};target.buffs.slow=Math.max(target.buffs.slow||0,180);this.owner.applyOcelPoison?.(target,700,5);
+        }
+        if(Math.floor((this.life+dt)/850)!==Math.floor(this.life/850)){
+            const x=this.x+35+Math.random()*(this.w-70);for(let i=0;i<12;i++)game.particles.push(new Particle(x,this.y-80,i%3?'#43e4d3':'#f6cf52',(Math.random()-.5)*6,5+Math.random()*8,350,4));
+        }
+        if(this.life<=0)this.dead=true;
+    }
+    draw(ctx) {
+        const fade=Math.min(1,this.life/450),t=this.phase*.0025,cx=this.x+this.w/2,cy=this.y+12;
+        ctx.save();ctx.globalAlpha=fade;ctx.translate(cx,cy);ctx.scale(1,.28);ctx.shadowBlur=18;ctx.shadowColor='#32ddca';
+        ctx.strokeStyle='rgba(55,224,204,.86)';ctx.lineWidth=8;ctx.beginPath();ctx.arc(0,0,132,0,Math.PI*2);ctx.stroke();
+        ctx.rotate(t);ctx.strokeStyle='#e8bd43';ctx.lineWidth=5;for(let i=0;i<12;i++){ctx.rotate(Math.PI/6);ctx.beginPath();ctx.moveTo(70,0);ctx.lineTo(122,0);ctx.stroke();}
+        ctx.rotate(-t*2.1);ctx.strokeStyle='#55f0d9';ctx.lineWidth=7;ctx.beginPath();for(let i=0;i<=12;i++){const a=i*Math.PI/6,r=i%2?43:66;const x=Math.cos(a)*r,y=Math.sin(a)*r;i?ctx.lineTo(x,y):ctx.moveTo(x,y);}ctx.closePath();ctx.stroke();ctx.restore();
+        ctx.save();ctx.globalAlpha=.18*fade;ctx.fillStyle='#21bb83';ctx.fillRect(this.x,this.y-90,this.w,105);ctx.restore();
+    }
+}
+
+class OcelFifthSun extends Entity {
+    constructor(owner) {
+        super(0,0,CANVAS_W,CANVAS_H);this.owner=owner;this.type='ocel_fifth_sun';this.life=6500;this.maxLife=6500;
+        this.phase=0;this.struck=false;this.godTick=0;this.untargetable=true;
+    }
+    update(dt) {
+        if(!this.owner||this.owner.dead){this.dead=true;return;}
+        this.phase+=dt;this.life-=dt;
+        if(!this.struck&&this.phase>=1500){
+            this.struck=true;this.owner.ocelUltimatePhase='godbound';this.owner.ocelGodboundTimer=5000;
+            const ox=this.owner.x+this.owner.w/2;
+            for(const target of getHostileTargets(this.owner,this)){
+                if(!target||target.dead)continue;const tx=target.x+target.w/2,ty=target.y+target.h/2;
+                if(Math.hypot(tx-ox,ty-(this.owner.y+this.owner.h/2))>430)continue;
+                target.takeDamage(80,this.owner,false,true);const direction=Math.sign(tx-ox)||this.owner.facing;target.vx=direction*24;target.vy=-13;
+                target.buffs=target.buffs||{};target.buffs.slow=Math.max(target.buffs.slow||0,3000);this.owner.applyOcelPoison?.(target,5000,8);
+            }
+            for(let i=0;i<55;i++){const a=Math.random()*Math.PI*2;game.particles.push(new Particle(ox,this.owner.y+this.owner.h/2,i%4?'#35dfca':'#ffd75e',Math.cos(a)*(5+Math.random()*16),Math.sin(a)*(5+Math.random()*16),700,5));}
+        }
+        if(this.struck){
+            this.godTick+=dt;
+            if(this.godTick>=1250){this.godTick-=1250;const targets=getHostileTargets(this.owner,this).filter(t=>t&&!t.dead);const target=targets[0];if(target){target.takeDamage(12,this.owner,false,true);target.buffs=target.buffs||{};target.buffs.slow=Math.max(target.buffs.slow||0,450);this.owner.applyOcelPoison?.(target,1500,6);for(let i=0;i<16;i++)game.particles.push(new Particle(target.x+target.w/2,target.y-45,i%3?'#f5c84d':'#48e8da',(Math.random()-.5)*7,6+Math.random()*9,420,4));}}
+        }
+        if(this.life<=0){this.owner.ocelUltimatePhase=null;this.owner.ocelGodboundTimer=0;for(let i=0;i<28;i++){const a=Math.random()*Math.PI*2;game.particles.push(new Particle(this.owner.x+this.owner.w/2,this.owner.y+this.owner.h/2,i%2?'#f4c94f':'#39decb',Math.cos(a)*10,Math.sin(a)*10,520,4));}this.dead=true;}
+    }
+    draw(ctx) {
+        const ritual=Math.min(1,this.phase/1500),god=Math.max(0,(this.life)/5000),t=this.phase*.002;
+        ctx.save();ctx.fillStyle=`rgba(32,18,10,${this.struck?.12:.06+ritual*.14})`;ctx.fillRect(0,0,CANVAS_W,CANVAS_H);
+        const sx=this.owner.x+this.owner.w/2,sy=Math.max(82,this.owner.y-115);
+        ctx.translate(sx,sy);ctx.rotate(t*.35);ctx.shadowBlur=28;ctx.shadowColor='#ffd45b';ctx.strokeStyle=`rgba(255,211,82,${.35+ritual*.55})`;ctx.lineWidth=9;ctx.beginPath();ctx.arc(0,0,62+ritual*45,0,Math.PI*2);ctx.stroke();
+        for(let i=0;i<16;i++){ctx.rotate(Math.PI/8);ctx.beginPath();ctx.moveTo(72+ritual*35,0);ctx.lineTo(91+ritual*58,0);ctx.stroke();}ctx.restore();
+        if(this.struck){ctx.save();ctx.globalAlpha=Math.min(.58,god);ctx.translate(sx,this.owner.y+this.owner.h/2);ctx.strokeStyle='#5af0dc';ctx.lineWidth=18;ctx.shadowBlur=25;ctx.shadowColor='#38e0ca';ctx.beginPath();ctx.moveTo(-260*this.owner.facing,40);for(let i=0;i<9;i++){const x=(-215+i*58)*this.owner.facing,y=Math.sin(t*7+i*.85)*38;ctx.lineTo(x,y);}ctx.stroke();ctx.restore();
+            ctx.save();ctx.globalAlpha=.16+Math.sin(t*3)*.04;ctx.fillStyle='#f8d665';ctx.beginPath();ctx.arc(CANVAS_W*.5,115,72,0,Math.PI*2);ctx.fill();ctx.fillStyle='#47dfce';ctx.beginPath();ctx.arc(CANVAS_W*.24,180,44,0,Math.PI*2);ctx.fill();ctx.fillStyle='#111';ctx.fillRect(CANVAS_W*.72-48,135,96,70);ctx.restore();}
+    }
+}

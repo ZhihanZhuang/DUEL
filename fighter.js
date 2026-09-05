@@ -255,6 +255,14 @@ class Fighter extends Entity {
             this.fengUltimatePhase = null; this.fengUltimateTimer = 0;
             this.fengTakeoffBurstTimer = 0; this.fengLandingBurstTimer = 0;
         }
+        if (this.heroName === 'Ocel') {
+            this.ocelSpawnTimer = 1800; this.ocelSpawnMax = 1800;
+            this.ocelSerpentCooldown = 0; this.ocelRitualCooldown = 0;
+            this.ocelGodboundTimer = 0; this.ocelUltimatePhase = null;
+            this.ocelAttackCount = 0; this.ocelSwingFlash = 0;
+        }
+        this.ocelPoisonTimer = 0; this.ocelPoisonTick = 0; this.ocelPoisonDps = 0; this.ocelPoisonSourceId = null;
+        this.ocelVenomMarks = 0; this.ocelVenomMarkTimer = 0; this.ocelVenomOwnerId = null;
     }
 
     heal(amount) {
@@ -794,6 +802,18 @@ class Fighter extends Entity {
                 game.particles.push(new Particle(this.x+this.w/2+(Math.random()-.5)*30,this.y,'#dffbff',(Math.random()-.5)*4,-3-Math.random()*3,300,3));
             }
         }
+        if (this.heroName === 'Ocel') {
+            this.ocelSpawnTimer = Math.max(0, this.ocelSpawnTimer - dt);
+            this.ocelSerpentCooldown = Math.max(0, this.ocelSerpentCooldown - dt);
+            this.ocelRitualCooldown = Math.max(0, this.ocelRitualCooldown - dt);
+            this.ocelGodboundTimer = Math.max(0, this.ocelGodboundTimer - dt);
+            this.ocelSwingFlash = Math.max(0, this.ocelSwingFlash - dt);
+            if (this.ocelGodboundTimer > 0 && Math.random() < .45) {
+                const a=Math.random()*Math.PI*2;
+                game.particles.push(new Particle(this.x+this.w/2+Math.cos(a)*34,this.y+this.h/2+Math.sin(a)*42,Math.random()<.45?'#f6c94c':'#39e0d0',-Math.sin(a)*2,Math.cos(a)*2,360,3));
+            }
+            if (this.ocelSpawnTimer > 0) this.vx *= .3;
+        }
         if (this.heroName === 'Voss' && !vossCopyWasActive) {
             this.vossCopyCooldown = Math.max(0, this.vossCopyCooldown - dt);
             if (this.vossDouble?.dead) this.vossDouble = null;
@@ -980,10 +1000,13 @@ class Fighter extends Entity {
         const isGeLocked = this.heroName === 'Ge' && (this.geDanceTimer > 0 || this.geThrustTimer > 0);
         const isFengActionLocked = this.heroName === 'Feng' && (this.fengUltimatePhase === 'launch' || this.fengUltimatePhase === 'ending');
         const isFengHoverLocked = this.heroName === 'Feng' && (this.fengUltimatePhase === 'hover' || this.fengUltimatePhase === 'ending');
+        const isOcelActionLocked = this.heroName === 'Ocel' && (this.ocelSpawnTimer > 0 || this.ocelUltimatePhase === 'ritual');
         let canAct = (this.stunTimer <= 0 && this.buffs.dizzy <= 0 && this.grapplePhase !== 1 && this.superWindupTimer <= 0 && this.euclidSwitchTimer <= 0 && !(this.itanSuperWindupTimer > 0) && !(this.veyraReversalTimer > 0) && !(this.axeronRushTimer > 0) && !(this.gelannBreathWindup > 0) && !isKilaSwitching && !isSolaForceLocked && !isSolaCharging && !isUkonBursting && !isUkonUltimateLocked && !isMoriGrappling && !isRaigoCharging && !isDogelCharging && !isGeLocked && !isFengActionLocked);
+        if (isOcelActionLocked) canAct = false;
         let canMoveAndAttack = (canAct || isDogelCharging) && !hasPuppet;
 
         if (this.heroName === 'Vaeilash' && canAct && keysPressed[this.controls.extra]) this.startVaeilashReversal();
+        if (this.heroName === 'Ocel' && canAct && keysPressed[this.controls.extra]) this.castOcelRitual();
 
         if (this.heroName === 'Gensan') {
             if (this.gensanSwitchCD > 0) this.gensanSwitchCD -= dt;
@@ -1086,6 +1109,7 @@ class Fighter extends Entity {
         if (this.heroName === 'Gelann' && this.gelannBreathTimer > 0) currentSpeed *= 0.35;
         if (this.heroName === 'Dogel' && this.dogelReaperTimer > 0) currentSpeed *= 1.2;
         if (this.heroName === 'Ge' && this.geGodTimer > 0) currentSpeed *= 1.3;
+        if (this.heroName === 'Ocel' && this.ocelGodboundTimer > 0) currentSpeed *= 1.2;
         if (this.heroName === 'Pat' && this.patMarionette && !this.patMarionette.dead) { currentSpeed = 0; currentJump = 0; }
 
         if (this.buffs.dizzy > 0) {
@@ -1127,7 +1151,24 @@ class Fighter extends Entity {
             }
             if(Math.random()<0.1) game.particles.push(new Particle(this.x+this.w/2, this.y, "#ff4500", 0, -2, 300));
         }
-        if (this.buffs.poison > 0) {
+        if (this.ocelVenomMarkTimer > 0) {
+            this.ocelVenomMarkTimer = Math.max(0, this.ocelVenomMarkTimer - dt);
+            if (this.ocelVenomMarkTimer <= 0) { this.ocelVenomMarks = 0; this.ocelVenomOwnerId = null; }
+        }
+        if (this.ocelPoisonTimer > 0) {
+            this.ocelPoisonTimer = Math.max(0, this.ocelPoisonTimer - dt);
+            this.ocelPoisonTick += dt;
+            const fighters = game.fighters || (typeof game.getFighters === 'function' ? game.getFighters() : []);
+            const source = fighters.find(f => f && f.id === this.ocelPoisonSourceId);
+            while (this.ocelPoisonTick >= 500) {
+                this.ocelPoisonTick -= 500;
+                const before = this.hp;
+                this.takeDamage(this.ocelPoisonDps * .5, source || null, true, true);
+                if (source?.heroName === 'Ocel' && source.ocelGodboundTimer > 0) source.heal(Math.max(0, before-this.hp)*.25);
+            }
+            if(Math.random()<.16) game.particles.push(new Particle(this.x+this.w/2+(Math.random()-.5)*this.w,this.y+this.h/2,'#37c88b',(Math.random()-.5)*2,-2,320,3));
+        }
+        if (this.buffs.poison > 0 && this.ocelPoisonTimer <= 0) {
             this.buffs.poison -= dt;
             if (!(this.heroName === 'Duke' && this.isMounted && this.runTimer > 0 && this.runTimer <= 3000)) currentSpeed *= 0.6;
             if (Math.floor(this.buffs.poison/1000) !== Math.floor((this.buffs.poison+dt)/1000)) this.takeDamage(2, null, true);
@@ -1425,6 +1466,7 @@ class Fighter extends Entity {
                         if (this.heroName === 'Vaeilash') activeTime = this.vaeilashBloodMoon > 0 ? 45 : 70;
                         if (this.heroName === 'Dogel') activeTime = this.dogelReaperTimer > 0 ? 90 : 130;
                         if (this.heroName === 'Lapis') activeTime = this.lapisWhipTimer > 0 ? 95 : 80;
+                        if (this.heroName === 'Ocel') activeTime = this.ocelGodboundTimer > 0 ? 90 : 120;
 
                         this.attackState = 'active';
                         this.stateTimer = activeTime;
@@ -1452,6 +1494,7 @@ class Fighter extends Entity {
                             if ((this.heroName === 'Dogel' && this.dogelReaperTimer > 0) || (this.heroName === 'Lapis' && this.lapisWhipTimer > 0) || (this.heroName === 'Ge' && this.geGodTimer > 0)) this.heal(actualDamage * (this.heroName === 'Lapis' ? .2 : .25));
                         if (this.heroName === 'Raigo') this.onRaigoBasicHit(enemy, hpBefore === null ? this.getMeleeDamage() : Math.max(0, hpBefore - Math.max(0, enemy.hp)));
                             if (this.heroName === 'Vaeilash') this.onVaeilashBasicHit(enemy, actualDamage);
+                            if (this.heroName === 'Ocel') this.onOcelBasicHit(enemy);
                             targetsHit.push(enemy);
                         }
                     }
@@ -1462,6 +1505,7 @@ class Fighter extends Entity {
                             const actualDamage = hpBefore === null ? this.getMeleeDamage() : Math.max(0, hpBefore - Math.max(0, m.hp));
                             if ((this.heroName === 'Dogel' && this.dogelReaperTimer > 0) || (this.heroName === 'Lapis' && this.lapisWhipTimer > 0) || (this.heroName === 'Ge' && this.geGodTimer > 0)) this.heal(actualDamage * (this.heroName === 'Lapis' ? .2 : .25));
                             if (this.heroName === 'Raigo') this.onRaigoBasicHit(m, hpBefore === null ? this.getMeleeDamage() : Math.max(0, hpBefore - Math.max(0, m.hp)));
+                            if (this.heroName === 'Ocel') this.onOcelBasicHit(m);
                             targetsHit.push(m);
                         }
                     }
@@ -1761,6 +1805,8 @@ class Fighter extends Entity {
                     if (target) { this.patBindingCooldown = 9000; game.projectiles.push(new PatThread(this, target, true)); }
                 } else if (this.heroName === 'Feng' && this.attackState === 'idle' && this.fengStepTimer <= 0) {
                     this.startFengLightStep();
+                } else if (this.heroName === 'Ocel' && this.attackState === 'idle') {
+                    this.castOcelSerpent();
                 }
             }
             if (mirrorCopiedSwitch) {
@@ -2029,6 +2075,46 @@ class Fighter extends Entity {
         return true;
     }
 
+    applyOcelPoison(target, duration=2000, dps=3) {
+        if (!target || target.dead) return;
+        if (target.heroName) {
+            target.ocelPoisonTimer = Math.max(target.ocelPoisonTimer || 0, duration);
+            target.ocelPoisonDps = Math.max(target.ocelPoisonDps || 0, dps);
+            target.ocelPoisonSourceId = this.id;
+        } else if (target.buffs) target.buffs.poison = Math.max(target.buffs.poison || 0, duration);
+    }
+
+    addOcelVenomMark(target) {
+        if (!target || target.dead) return false;
+        if (target.ocelVenomOwnerId !== this.id || (target.ocelVenomMarkTimer || 0) <= 0) target.ocelVenomMarks = 0;
+        target.ocelVenomOwnerId = this.id; target.ocelVenomMarkTimer = 5000;
+        target.ocelVenomMarks = Math.min(3, (target.ocelVenomMarks || 0) + 1);
+        if (target.ocelVenomMarks < 3) return false;
+        target.ocelVenomMarks = 0; target.ocelVenomMarkTimer = 0;
+        target.takeDamage(40, this, false, true);
+        this.applyOcelPoison(target, 3000, 5);
+        for(let i=0;i<24;i++){const a=i*Math.PI/12;game.particles.push(new Particle(target.x+target.w/2+Math.cos(a)*24,target.y+target.h/2+Math.sin(a)*30,i%3?'#33dfc9':'#f2ca52',Math.cos(a)*7,Math.sin(a)*7,480,4));}
+        return true;
+    }
+
+    onOcelBasicHit(target) {
+        this.ocelAttackCount = ((this.ocelAttackCount || 0) + 1) % 3; this.ocelSwingFlash = 260;
+        this.applyOcelPoison(target, 2000, 3); this.addOcelVenomMark(target);
+        for(let i=0;i<7;i++)game.particles.push(new Particle(target.x+target.w/2,target.y+target.h/2,i===0?'#36dfcb':'#111820',(Math.random()-.5)*9,(Math.random()-.5)*9,320,3));
+    }
+
+    castOcelSerpent() {
+        if (this.heroName !== 'Ocel' || this.ocelSerpentCooldown > 0 || this.ocelSpawnTimer > 0) return false;
+        this.ocelSerpentCooldown = 7000; this.attackState='recovery'; this.stateTimer=380; this.maxStateTimer=380;
+        game.projectiles.push(new OcelFeatheredSerpent(this)); return true;
+    }
+
+    castOcelRitual() {
+        if (this.heroName !== 'Ocel' || this.ocelRitualCooldown > 0 || this.ocelSpawnTimer > 0) return false;
+        this.ocelRitualCooldown = 9000; this.attackState='recovery'; this.stateTimer=520; this.maxStateTimer=520; this.vx*=.2;
+        game.hazards.push(new OcelRitualZone(this)); return true;
+    }
+
     isMeleeAttack() {
         if (this.heroName === 'Lapis') return this.lapisWhipTimer > 0;
         if (this.heroName === 'Hason' || this.heroName === 'Willi' || this.heroName === 'Ugo' || this.heroName === 'Kila' || this.heroName === 'Volt' || this.heroName === 'Noae' || this.heroName === 'Kuro' || this.heroName === 'Nyra' || this.heroName === 'Archor' || this.heroName === 'D2F1' || this.heroName === 'Veyra' || this.heroName === 'Brom' || this.heroName === 'Mori' || this.heroName === 'Roka' || this.heroName === 'Tonia' || this.heroName === 'Pat' || this.heroName === 'Feng') return false;
@@ -2062,6 +2148,7 @@ class Fighter extends Entity {
         if (this.heroName === 'Lapis' && this.lapisWhipTimer > 0) { range=165; yOffset=-35; h=135; }
         if (this.heroName === 'Ge') { range=128; yOffset=-5; h=70; }
         if (this.heroName === 'Lak') { range=86; yOffset=-4; h=76; }
+        if (this.heroName === 'Ocel') { range=92; yOffset=-8; h=78; }
 
         if (this.heroName === 'Macu') {
             range = 110;
@@ -2102,6 +2189,7 @@ class Fighter extends Entity {
         if (this.heroName === 'Lapis' && this.lapisWhipTimer > 0) return 24;
         if (this.heroName === 'Ge') return this.geGodTimer > 0 ? 60 : 30;
         if (this.heroName === 'Lak') return 25;
+        if (this.heroName === 'Ocel') return this.ocelGodboundTimer > 0 ? 28 : 25;
         return 13;
     }
 
@@ -2192,6 +2280,7 @@ class Fighter extends Entity {
         if (this.heroName === 'Ge') this.stateTimer = 120;
         if (this.heroName === 'Lak') this.stateTimer = 220;
         if (this.heroName === 'Pat') this.stateTimer = 90;
+        if (this.heroName === 'Ocel') this.stateTimer = this.ocelGodboundTimer > 0 ? 55 : 90;
         if (this.heroName === 'Wolf') {
             this.stateTimer = 50;
             this.wolfPassiveReady = this.wolfAttackTimer >= 1500;
@@ -3275,6 +3364,13 @@ class Fighter extends Entity {
 
     performSuper() {
         window.audioManager?.playSkill(this, 'super');
+        if (this.heroName === 'Ocel') {
+            if (this.superCooldown <= 0 && !this.ocelUltimatePhase && this.ocelSpawnTimer <= 0) {
+                this.superCooldown=this.superCooldownMax; this.ocelUltimatePhase='ritual'; this.attackState='idle'; this.vx=0;
+                game.hazards.push(new OcelFifthSun(this));
+            }
+            return;
+        }
         if (this.heroName === 'Feng') {
             if (this.superCooldown <= 0 && !this.fengUltimatePhase) {
                 this.superCooldown = this.superCooldownMax; this.fengUltimatePhase = 'launch'; this.fengUltimateTimer = 520; this.fengWindTimer = 0; this.fengWindWaves = 0;
@@ -4506,6 +4602,21 @@ class Fighter extends Entity {
             ctx.save();ctx.translate(hw-2,32);let angle=.55;if(this.attackState==='windup')angle=.55-1.55*phaseProg;else if(this.attackState==='active')angle=-1+3.25*phaseProg;else if(this.attackState==='recovery')angle=2.25-1.7*phaseProg;
             ctx.rotate(angle);ctx.fillStyle='#4d3928';ctx.fillRect(-6,-72,12,94);ctx.fillStyle='#69645d';ctx.strokeStyle='#b6aa95';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(-31,-88);ctx.lineTo(25,-93);ctx.lineTo(38,-72);ctx.lineTo(24,-49);ctx.lineTo(-34,-52);ctx.lineTo(-43,-70);ctx.closePath();ctx.fill();ctx.stroke();ctx.strokeStyle='#403b35';ctx.beginPath();ctx.moveTo(-20,-85);ctx.lineTo(-5,-57);ctx.lineTo(12,-88);ctx.stroke();ctx.restore();
         }
+        else if (this.heroName === 'Ocel') {
+            const godbound=this.ocelGodboundTimer>0,time=Date.now()*.006;
+            if(godbound){ctx.save();ctx.translate(0,32);ctx.strokeStyle='#f5c94f';ctx.shadowBlur=18;ctx.shadowColor='#f5c94f';ctx.lineWidth=5;ctx.beginPath();ctx.arc(0,0,38,-Math.PI*.82,Math.PI*.82);ctx.stroke();for(let i=0;i<8;i++){const a=i*Math.PI/4;ctx.beginPath();ctx.moveTo(Math.cos(a)*39,Math.sin(a)*39);ctx.lineTo(Math.cos(a)*48,Math.sin(a)*48);ctx.stroke();}ctx.restore();}
+            ctx.save();ctx.translate(hw-3,31);let angle=-.5+Math.sin(time)*.035;
+            if(this.attackState==='windup')angle=-.5-1.05*phaseProg;else if(this.attackState==='active')angle=-1.55+3.1*phaseProg;else if(this.attackState==='recovery')angle=1.55-2*phaseProg;
+            if(this.attackState==='active'){ctx.strokeStyle=godbound?'rgba(255,211,74,.52)':'rgba(48,224,204,.48)';ctx.lineWidth=15;ctx.beginPath();ctx.arc(0,0,86,-1.55,angle);ctx.stroke();}
+            ctx.rotate(angle);ctx.fillStyle='#6b4822';ctx.strokeStyle='#d2a83c';ctx.lineWidth=3;ctx.fillRect(-8,-72,16,96);ctx.strokeRect(-8,-72,16,96);
+            ctx.fillStyle=godbound?'#172329':'#1b2024';ctx.beginPath();ctx.moveTo(-18,-82);ctx.lineTo(-14,-144);ctx.lineTo(14,-144);ctx.lineTo(18,-82);ctx.closePath();ctx.fill();ctx.stroke();
+            ctx.fillStyle='#050708';for(let tooth=0;tooth<6;tooth++){const y=-137+tooth*10;ctx.beginPath();ctx.moveTo(-15,y);ctx.lineTo(-28,y+5);ctx.lineTo(-15,y+10);ctx.fill();ctx.beginPath();ctx.moveTo(15,y);ctx.lineTo(28,y+5);ctx.lineTo(15,y+10);ctx.fill();}
+            ctx.fillStyle='#35dfca';ctx.shadowBlur=godbound?18:8;ctx.shadowColor='#35dfca';ctx.beginPath();ctx.arc(0,-91,6,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;
+            ctx.strokeStyle=this.ocelSwingFlash>0&&this.ocelAttackCount===0?'#69ffee':'#f0c34a';ctx.shadowBlur=this.ocelSwingFlash>0&&this.ocelAttackCount===0?13:0;ctx.shadowColor='#55f3df';ctx.lineWidth=2;for(let rune=0;rune<4;rune++){const y=-130+rune*11;ctx.beginPath();ctx.moveTo(-6,y);ctx.lineTo(0,y-5);ctx.lineTo(6,y);ctx.lineTo(0,y+5);ctx.closePath();ctx.stroke();}ctx.shadowBlur=0;
+            ctx.fillStyle='#23bfae';ctx.beginPath();ctx.moveTo(-8,16);ctx.lineTo(-27,32);ctx.lineTo(-5,27);ctx.fill();ctx.fillStyle='#f2c44b';ctx.beginPath();ctx.moveTo(8,16);ctx.lineTo(25,35);ctx.lineTo(6,27);ctx.fill();ctx.restore();
+            ctx.fillStyle='#082b2b';ctx.fillRect(-hw+7,8,this.w-14,20);ctx.fillStyle='#49f0db';ctx.shadowBlur=12;ctx.shadowColor='#49f0db';ctx.fillRect(-10,14,7,3);ctx.fillRect(3,14,7,3);ctx.shadowBlur=0;
+            if(this.ocelSpawnTimer>0){const progress=1-this.ocelSpawnTimer/this.ocelSpawnMax,fade=Math.sin(progress*Math.PI);ctx.save();ctx.globalAlpha=fade;ctx.fillStyle='rgba(255,211,75,.16)';ctx.fillRect(-62,-170,124,245);ctx.translate(0,h);ctx.scale(1,.3);ctx.rotate(progress*1.6);ctx.strokeStyle='#f3c84c';ctx.lineWidth=8;ctx.beginPath();ctx.arc(0,0,68,0,Math.PI*2);ctx.stroke();ctx.strokeStyle='#3ce2d0';ctx.lineWidth=5;for(let i=0;i<12;i++){ctx.rotate(Math.PI/6);ctx.beginPath();ctx.moveTo(31,0);ctx.lineTo(62,0);ctx.stroke();}ctx.restore();for(let i=0;i<5;i++){const a=time+i*1.25;ctx.fillStyle=i%2?'rgba(65,230,211,.55)':'rgba(244,201,75,.6)';ctx.beginPath();ctx.ellipse(Math.cos(a)*54,-18+Math.sin(a)*24,10,4,a,0,Math.PI*2);ctx.fill();}}
+        }
         else if (this.heroName === 'Feng') {
             ctx.save();ctx.translate(hw-4,27);
             const pulse=1+Math.sin(Date.now()*.014)*.12, activeWind=!!this.fengUltimatePhase;
@@ -4814,7 +4925,13 @@ class Fighter extends Entity {
             for(let mark=0;mark<Math.min(3,this.patMarkCount);mark++){ctx.beginPath();ctx.arc((mark-(this.patMarkCount-1)/2)*12,0,4,0,Math.PI*2);ctx.fill();}ctx.restore();
         }
 
-        if (this.buffs.poison > 0) { ctx.fillStyle = "rgba(0, 255, 0, 0.3)"; ctx.fillRect(this.x, this.y, this.w, this.h); }
+        if ((this.ocelVenomMarks || 0) > 0) {
+            const count=Math.min(3,this.ocelVenomMarks),time=Date.now()*.004;
+            ctx.save();ctx.translate(this.x+this.w/2,this.y-30);ctx.rotate(time*.2);ctx.strokeStyle=count===3?'#f3c94f':'#3ce1ce';ctx.fillStyle='rgba(25,95,83,.32)';ctx.shadowBlur=12;ctx.shadowColor=ctx.strokeStyle;ctx.lineWidth=3;
+            for(let i=0;i<count;i++){ctx.save();ctx.rotate(i*Math.PI*2/count);ctx.translate(0,-13);ctx.beginPath();ctx.moveTo(0,-7);ctx.lineTo(6,2);ctx.lineTo(0,7);ctx.lineTo(-6,2);ctx.closePath();ctx.fill();ctx.stroke();ctx.restore();}ctx.restore();
+        }
+
+        if (this.buffs.poison > 0 || this.ocelPoisonTimer > 0) { ctx.fillStyle = this.ocelPoisonTimer>0?"rgba(30, 190, 125, 0.24)":"rgba(0, 255, 0, 0.3)"; ctx.fillRect(this.x, this.y, this.w, this.h); }
 
         if (this.heroName === 'Duke' && this.isMounted && this.runTimer >= 3000) {
             ctx.strokeStyle = "rgba(255, 255, 255, 0.5)"; ctx.lineWidth = 2; ctx.strokeRect(this.x-2, this.y-2, this.w+4, this.h+4);

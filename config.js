@@ -436,6 +436,11 @@ var HEROES = {
         name: "Feng", desc: "Qinggong Wind Martial Artist",
         color: "#dffbff", maxHp: 800, speed: 6.8, jump: 16.5, width: 40, height: 70, superCD: 24000,
         ui: { hp: "80 WRD", atk: "2 WRD (White Qigong)", passive: "Every third Qigong becomes one full-strength fan-shaped Wind Wave with extreme knockback. Press [Switch] for a higher armored Qinggong leap (5s CD).", super: "<span class='skill-tag'>Drifting Wind</span> Vault high, float for 4s, and press Attack up to 6 times. Each fan-shaped wave blows enemies away, locks its direction when fired, reflects from arena surfaces, then Feng spins and falls." }
+    },
+    Ocel: {
+        name: "Ocel", desc: "The Godbound Warrior",
+        color: "#137f78", maxHp: 900, speed: 5.7, jump: 15, width: 44, height: 73, superCD: 20000,
+        ui: { hp: "90 WRD", atk: "2.5 WRD (Divine Macuahuitl)", passive: "Attacks apply Sacred Venom. Three Venom Marks erupt for 4 WRD. Press [Switch] to release a 3 WRD Feathered Serpent; press [Extra] to invoke Tlaloc's four-second ritual zone (9s CD).", super: "<span class='skill-tag'>Gods of the Fifth Sun</span> Invoke a divine serpent for 8 WRD, then enter Godbound Form for 5s with faster movement and attacks, empowered strikes, and poison lifesteal." }
     }
 };
 
