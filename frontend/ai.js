@@ -151,6 +151,7 @@ function makeBrain(ai) {
         targetWasVulnerable: false,
         voltRecovering: false,
         kuroChargeTimer: 0,
+        solaEscapeTapTimer: 0,
         stuckTimer: 0,
         lastX: ai.x,
         lastY: ai.y,
@@ -1118,6 +1119,22 @@ function runFighterAI(game, ai, dt, diff) {
     const brain = makeBrain(ai);
     if (ai.dead) {
         clearAIInput(ai);
+        return;
+    }
+
+    if (ai.solaForceHeld) {
+        brain.intent.left = false;
+        brain.intent.right = false;
+        brain.intent.down = false;
+        brain.intent.holdJump = false;
+        brain.intent.holdAttack = false;
+        brain.intent.holdSuper = false;
+        brain.solaEscapeTapTimer = Math.max(0, (brain.solaEscapeTapTimer || 0) - dt);
+        if (brain.solaEscapeTapTimer <= 0) {
+            press(ai, 'attack');
+            brain.solaEscapeTapTimer = 105 + Math.random() * 95;
+        }
+        applyHeldInput(ai, brain);
         return;
     }
 

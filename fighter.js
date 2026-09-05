@@ -25,6 +25,8 @@ class Fighter extends Entity {
         this.solaForceHeld = false;
         this.solaForceSourceId = null;
         this.solaForceProgress = 0;
+        this.solaForceEscapeTarget = 0;
+        this.solaForceEscapeTaps = 0;
         this.solaForceFallPending = false;
         this.solaForceFallSourceId = null;
         this.solaForceFallPeakY = this.y;
@@ -371,6 +373,8 @@ class Fighter extends Entity {
                     this.solaForceHeld = false;
                     this.solaForceSourceId = null;
                     this.solaForceProgress = 0;
+                    this.solaForceEscapeTarget = 0;
+                    this.solaForceEscapeTaps = 0;
                 }
             }
             game.handleFighterDefeat(this, attacker);
@@ -476,6 +480,8 @@ class Fighter extends Entity {
         target.solaForceHeld = true;
         target.solaForceSourceId = this.id;
         target.solaForceProgress = 0;
+        target.solaForceEscapeTarget = 5 + Math.floor(Math.random() * 11);
+        target.solaForceEscapeTaps = 0;
         target.solaForceFallPending = false;
         target.solaForceFallSourceId = null;
         target.solaForceFallPeakY = target.y;
@@ -500,6 +506,8 @@ class Fighter extends Entity {
             target.solaForceHeld = false;
             target.solaForceSourceId = null;
             target.solaForceProgress = 0;
+            target.solaForceEscapeTarget = 0;
+            target.solaForceEscapeTaps = 0;
             target.solaForceFallPending = !target.dead;
             target.solaForceFallSourceId = this.id;
             target.solaForceFallPeakY = Math.min(target.solaForceFallPeakY ?? target.y, target.y);
@@ -511,6 +519,32 @@ class Fighter extends Entity {
         this.solaForceTargetId = null;
         this.solaForceElapsed = 0;
         this.solaForceTickTimer = 0;
+    }
+
+    tryEscapeSolaForce() {
+        if (!this.solaForceHeld) return false;
+        this.solaForceEscapeTaps = (this.solaForceEscapeTaps || 0) + 1;
+        for (let i = 0; i < 3; i++) {
+            game.particles.push(new Particle(this.x + this.w/2, this.y + this.h/2, '#ffffff', (Math.random()-0.5)*9, (Math.random()-0.5)*9, 180, 3));
+        }
+        if (this.solaForceEscapeTaps < Math.max(5, this.solaForceEscapeTarget || 15)) return false;
+
+        const source = typeof game.getFighters === 'function'
+            ? game.getFighters().find(fighter => fighter && fighter.id === this.solaForceSourceId)
+            : null;
+        if (source && typeof source.endSolaForce === 'function') source.endSolaForce();
+        else {
+            this.solaForceHeld = false;
+            this.solaForceSourceId = null;
+            this.solaForceProgress = 0;
+            this.solaForceEscapeTarget = 0;
+            this.solaForceEscapeTaps = 0;
+        }
+        for (let i = 0; i < 22; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            game.particles.push(new Particle(this.x + this.w/2, this.y + this.h/2, i % 2 ? '#ffffff' : '#bdefff', Math.cos(angle)*(5+Math.random()*7), Math.sin(angle)*(5+Math.random()*7), 360, 4));
+        }
+        return true;
     }
 
     updateSolaForce(dt) {
@@ -657,6 +691,10 @@ class Fighter extends Entity {
     update(dt) {
         const vossCopyWasActive = this.vossCopyActive === true;
         if (this.dead) return;
+        if (this.solaForceHeld && keysPressed[this.controls.attack]) {
+            this.tryEscapeSolaForce();
+            keysPressed[this.controls.attack] = false;
+        }
 
         if (this.heroName === 'Laegon') {
             this.laegonEnergy = Math.min(this.laegonMaxEnergy, this.laegonEnergy + dt / 30);
@@ -3170,6 +3208,8 @@ class Fighter extends Entity {
                 this.solaForceHeld = false;
                 this.solaForceSourceId = null;
                 this.solaForceProgress = 0;
+                this.solaForceEscapeTarget = 0;
+                this.solaForceEscapeTaps = 0;
             }
         }
         this.stunTimer = 0;
@@ -3681,6 +3721,24 @@ class Fighter extends Entity {
                 }
                 ctx.stroke();
             }
+            ctx.restore();
+            const labelOnRight = centerX + radius + 250 < CANVAS_W;
+            const labelX = labelOnRight ? centerX + radius + 16 : centerX - radius - 16;
+            const pulse = 0.82 + Math.sin(time * 1.7) * 0.18;
+            ctx.save();
+            ctx.globalAlpha = pulse;
+            ctx.textAlign = labelOnRight ? 'left' : 'right';
+            ctx.textBaseline = 'middle';
+            ctx.font = 'bold 13px monospace';
+            ctx.lineWidth = 4;
+            ctx.strokeStyle = 'rgba(0, 12, 22, 0.9)';
+            ctx.fillStyle = '#ffffff';
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = '#bdefff';
+            ctx.strokeText('RAPIDLY TAP REGULAR', labelX, centerY - 8);
+            ctx.fillText('RAPIDLY TAP REGULAR', labelX, centerY - 8);
+            ctx.strokeText('ATTACK TO ESCAPE', labelX, centerY + 10);
+            ctx.fillText('ATTACK TO ESCAPE', labelX, centerY + 10);
             ctx.restore();
         }
         if (this.heroName === 'Ukon' && (this.ukonDashTimer > 0 || this.ukonChargeTimer > 0 || this.ukonUltimatePhase === 'drop')) {

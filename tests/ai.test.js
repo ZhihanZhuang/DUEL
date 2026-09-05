@@ -1620,6 +1620,56 @@ test('Sola deflects projectiles into Focus and channels Force Choke at arena ran
     assert.ok(simulation.target.solaForceFallPeakY < targetStartY);
 });
 
+test('Force Choke victims escape through a hidden five-to-fifteen attack-tap check', () => {
+    const simulation = loadPhysicsGame('Sola');
+    const { ai, context } = simulation;
+    const target = new context.window.Fighter('victim', 'Hunter', 175, makeControls('VICTIM'), true);
+    target.isGrounded = true;
+    target.y = context.GROUND_Y - target.h;
+    context.game.p1 = target;
+    context.game.getOpponentsOf = fighter => fighter === ai ? [target] : [ai];
+    context.game.getEnemyOf = fighter => fighter === ai ? target : ai;
+    context.game.getFighters = () => [ai, target];
+    ai.attackState = 'idle';
+    ai.superCooldown = 0;
+    context.keys[ai.controls.super] = true;
+    ai.performSuper();
+
+    assert.ok(target.solaForceEscapeTarget >= 5 && target.solaForceEscapeTarget <= 15);
+    assert.equal(target.solaForceEscapeTaps, 0);
+    target.solaForceEscapeTarget = 5;
+
+    for (let tap = 1; tap < 5; tap++) {
+        context.keysPressed[target.controls.attack] = true;
+        target.update(16);
+        assert.equal(target.solaForceHeld, true);
+        assert.equal(target.solaForceEscapeTaps, tap);
+        assert.equal(target.attackState, 'idle', 'escape tap triggered a normal attack');
+    }
+
+    context.keysPressed[target.controls.attack] = true;
+    target.update(16);
+    assert.equal(target.solaForceHeld, false);
+    assert.equal(ai.solaForceActive, false);
+    assert.equal(target.solaForceEscapeTarget, 0);
+    assert.equal(target.solaForceEscapeTaps, 0);
+    assert.equal(target.attackState, 'idle');
+
+    target.solaForceHeld = true;
+    const calls = [];
+    const drawContext = new Proxy({ calls }, {
+        get(object, key) {
+            if (key in object) return object[key];
+            return (...args) => calls.push({ method: key, args });
+        },
+        set(object, key, value) { object[key] = value; return true; }
+    });
+    target.draw(drawContext);
+    const promptText = calls.filter(call => call.method === 'fillText').map(call => call.args[0]);
+    assert.deepEqual(promptText.slice(0, 2), ['RAPIDLY TAP REGULAR', 'ATTACK TO ESCAPE']);
+    assert.equal(promptText.some(text => /\d/.test(String(text))), false, 'escape requirement leaked its hidden tap count');
+});
+
 test('Sola attacks faster and charges in a locked direction with continuous saber protection', () => {
     const simulation = loadPhysicsGame('Sola');
     const { ai, target, context } = simulation;
@@ -1783,6 +1833,22 @@ test('Sola CPU starts and holds Force Choke without movement input', () => {
     context.window.runAI(game, 16);
     assert.equal(context.keys[ai.controls.super], true);
     assert.equal(context.keys[ai.controls.left], false);
+});
+
+test('CPU fighters rapidly tap Basic Attack while held by Force Choke', () => {
+    const context = loadAI();
+    const ai = makeFighter('Hunter');
+    const sola = makeFighter('Sola', 'player');
+    readyBrain(ai, sola);
+    const game = makeGame(ai, sola);
+    ai.solaForceHeld = true;
+    ai.solaForceEscapeTarget = 10;
+
+    context.window.runAI(game, 16);
+
+    assert.equal(context.keysPressed[ai.controls.attack], true);
+    assert.equal(context.keys[ai.controls.left], false);
+    assert.equal(context.keys[ai.controls.right], false);
 });
 
 test('Nyra chakrams return, support Rift Shift, and launch as a six-way Halo Storm', () => {
