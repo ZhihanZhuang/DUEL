@@ -3423,6 +3423,14 @@ test('Gate of Hell gives an escape window, then captures and throws a trapped ta
     gate.update(1600);assert.equal(victim.nerathHellCaptured,false);assert.equal(victim.untargetable,false);assert.equal(victim.nerathFallPending,true);assert.ok(victim.y<0);assert.ok(victim.vy>0);
 });
 
+test('Nerath cannot be interrupted while casting Gate of Hell', () => {
+    const {ai,target,context}=loadPhysicsGame('Nerath');ai.isCPU=false;ai.attackState='idle';ai.superCooldown=0;
+    ai.performSuper();assert.equal(ai.nerathSuperArmorTimer,450);assert.equal(context.game.hazards.at(-1).type,'gate_of_hell');
+    const hp=ai.hp,xVelocity=ai.vx,yVelocity=ai.vy;ai.takeDamage(20,target);
+    assert.equal(ai.hp,hp-20,'uninterruptible cast incorrectly prevented damage');
+    assert.equal(ai.stunTimer,0);assert.equal(ai.vx,xVelocity);assert.equal(ai.vy,yVelocity);
+});
+
 test('Nerath Second Death triggers once at 25% HP and recovers from half power', () => {
     const {ai,context}=loadPhysicsGame('Nerath');assert.equal(ai.maxHp,720);
     ai.takeDamage(900,context.game.p1);assert.equal(ai.dead,false);assert.equal(ai.hp,180);assert.equal(ai.nerathSecondDeathUsed,true);assert.equal(ai.getNerathPower(),.5);assert.equal(context.game.hazards.at(-1).type,'nerath_resurrection');

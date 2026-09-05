@@ -272,6 +272,7 @@ class Fighter extends Entity {
         if (this.heroName === 'Nerath') {
             this.nerathHandsCooldown = 0; this.nerathCastSerial = 0;
             this.nerathSecondDeathUsed = false; this.nerathRecoveryTimer = 0; this.nerathResurrectionFlash = 0;
+            this.nerathSuperArmorTimer = 0;
         }
         this.ocelPoisonTimer = 0; this.ocelPoisonTick = 0; this.ocelPoisonDps = 0; this.ocelPoisonSourceId = null;
         this.ocelVenomMarks = 0; this.ocelVenomMarkTimer = 0; this.ocelVenomOwnerId = null;
@@ -294,6 +295,7 @@ class Fighter extends Entity {
         const geDanceUninterruptible = this.heroName === 'Ge' && this.geDanceTimer > 0;
         const fengSuperArmor = this.heroName === 'Feng' && (this.fengStepActive || ['launch','hover','ending'].includes(this.fengUltimatePhase));
         const magnetarSuperArmor = this.heroName === 'Magnetar' && this.magnetarArmorTimer > 0;
+        const nerathSuperArmor = this.heroName === 'Nerath' && this.nerathSuperArmorTimer > 0;
 
         if (this.heroName === 'Sola' && this.solaForceActive) this.endSolaForce();
         if (this.heroName === 'Ukon' && (this.ukonDashTimer > 0 || this.ukonChargeTimer > 0)) this.finishUkonBurst(true);
@@ -338,7 +340,7 @@ class Fighter extends Entity {
 
         this.hp -= amt;
         window.audioManager?.playHit(this, attacker, amt, isDoT);
-        if (!noHitReaction && !itanSuperDebuffImmune && !geDanceUninterruptible && !fengSuperArmor && !magnetarSuperArmor) this.stunTimer = 150;
+        if (!noHitReaction && !itanSuperDebuffImmune && !geDanceUninterruptible && !fengSuperArmor && !magnetarSuperArmor && !nerathSuperArmor) this.stunTimer = 150;
         this.timeSinceLastDamage = 0;
 
         if (this.heroName === 'Willi' && this.hp < this.maxHp * 0.5 && !this.williHasTriggeredHeal) {
@@ -367,7 +369,7 @@ class Fighter extends Entity {
             }
         }
 
-        if (!isDoT && !noKnockback && !this.grappledBy && !fengSuperArmor && !magnetarSuperArmor) {
+        if (!isDoT && !noKnockback && !this.grappledBy && !fengSuperArmor && !magnetarSuperArmor && !nerathSuperArmor) {
             let direction = attacker ? (this.x + this.w/2 < attacker.x + attacker.w/2 ? -1 : 1) : (this.facing === 1 ? -1 : 1);
             const stability = this.heroName === 'Lak' && this.isGrounded ? 0.28 : 1;
             this.vx = direction * (amt * 0.5) * stability;
@@ -742,6 +744,7 @@ class Fighter extends Entity {
             this.nerathHandsCooldown = Math.max(0, this.nerathHandsCooldown - dt);
             this.nerathRecoveryTimer = Math.max(0, this.nerathRecoveryTimer - dt);
             this.nerathResurrectionFlash = Math.max(0, this.nerathResurrectionFlash - dt);
+            this.nerathSuperArmorTimer = Math.max(0, this.nerathSuperArmorTimer - dt);
         }
         if (this.nerathHellCaptured) {
             this.vx=0;this.vy=0;this.attackState='idle';this.stateTimer=0;return;
@@ -3463,7 +3466,7 @@ class Fighter extends Entity {
     performSuper() {
         window.audioManager?.playSkill(this, 'super');
         if (this.heroName === 'Nerath') {
-            if(this.superCooldown<=0){const target=this.aiCombatTarget&&!this.aiCombatTarget.dead?this.aiCombatTarget:game.getEnemyOf(this);if(target&&!target.dead&&!target.untargetable){this.superCooldown=this.superCooldownMax;game.hazards.push(new GateOfHell(this,target));this.attackState='recovery';this.stateTimer=450;this.maxStateTimer=450;}}
+            if(this.superCooldown<=0){const target=this.aiCombatTarget&&!this.aiCombatTarget.dead?this.aiCombatTarget:game.getEnemyOf(this);if(target&&!target.dead&&!target.untargetable){this.superCooldown=this.superCooldownMax;this.nerathSuperArmorTimer=450;game.hazards.push(new GateOfHell(this,target));this.attackState='recovery';this.stateTimer=450;this.maxStateTimer=450;}}
             return;
         }
         if (this.heroName === 'Magnetar') {
