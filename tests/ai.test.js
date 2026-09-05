@@ -57,7 +57,7 @@ function loadProjectileContext() {
     };
     vm.createContext(context);
     const source = fs.readFileSync(path.join(__dirname, '..', 'entities.js'), 'utf8');
-    vm.runInContext(`${source}\nwindow.Projectile = Projectile; window.KuroDecoy = KuroDecoy; window.UkonShadow = UkonShadow; window.PeachTree = PeachTree; window.GiantSword = GiantSword; window.GravityWell = GravityWell; window.ChiqPath = ChiqPath; window.D2FDrone = D2FDrone; window.D2FTargetBeacon = D2FTargetBeacon; window.D2FGiantRobot = D2FGiantRobot; window.TimeAnchor = TimeAnchor; window.TemporalEcho = TemporalEcho; window.LaegonLightning = LaegonLightning; window.LaegonHammer = LaegonHammer; window.LaegonHammerStrike = LaegonHammerStrike; window.BromBlastCharge = BromBlastCharge; window.BromStickyBomb = BromStickyBomb; window.DemolitionZone = DemolitionZone; window.TitanAxe = TitanAxe; window.MechanismNode = MechanismNode; window.MoriEnergyWire = MoriEnergyWire; window.MechanicFanBlade = MechanicFanBlade; window.MoriTrap = MoriTrap; window.ThousandMechanisms = ThousandMechanisms; window.GelannFlameCone = GelannFlameCone; window.GelannArrowRain = GelannArrowRain; window.RokaCannonball = RokaCannonball; window.RokaMortarShell = RokaMortarShell; window.TemporalBolt = TemporalBolt; window.VossTemporalDouble = VossTemporalDouble; window.DogelChainHook = DogelChainHook; window.LapisStone = LapisStone; window.ToniaGrenade = ToniaGrenade; window.ToniaMissile = ToniaMissile; window.LakEarthWall = LakEarthWall; window.LakShockwave = LakShockwave; window.LakMountainBreaker = LakMountainBreaker; window.PatThread = PatThread; window.PatMarionette = PatMarionette; window.FengQigong = FengQigong; window.FengWindWave = FengWindWave; window.OcelFeatheredSerpent = OcelFeatheredSerpent; window.OcelRitualZone = OcelRitualZone; window.OcelFifthSun = OcelFifthSun;`, context, { filename: 'entities.js' });
+    vm.runInContext(`${source}\nwindow.Projectile = Projectile; window.KuroDecoy = KuroDecoy; window.UkonShadow = UkonShadow; window.PeachTree = PeachTree; window.GiantSword = GiantSword; window.GravityWell = GravityWell; window.ChiqPath = ChiqPath; window.D2FDrone = D2FDrone; window.D2FTargetBeacon = D2FTargetBeacon; window.D2FGiantRobot = D2FGiantRobot; window.TimeAnchor = TimeAnchor; window.TemporalEcho = TemporalEcho; window.LaegonLightning = LaegonLightning; window.LaegonHammer = LaegonHammer; window.LaegonHammerStrike = LaegonHammerStrike; window.BromBlastCharge = BromBlastCharge; window.BromStickyBomb = BromStickyBomb; window.DemolitionZone = DemolitionZone; window.TitanAxe = TitanAxe; window.MechanismNode = MechanismNode; window.MoriEnergyWire = MoriEnergyWire; window.MechanicFanBlade = MechanicFanBlade; window.MoriTrap = MoriTrap; window.ThousandMechanisms = ThousandMechanisms; window.GelannFlameCone = GelannFlameCone; window.GelannArrowRain = GelannArrowRain; window.RokaCannonball = RokaCannonball; window.RokaMortarShell = RokaMortarShell; window.TemporalBolt = TemporalBolt; window.VossTemporalDouble = VossTemporalDouble; window.DogelChainHook = DogelChainHook; window.LapisStone = LapisStone; window.ToniaGrenade = ToniaGrenade; window.ToniaMissile = ToniaMissile; window.LakEarthWall = LakEarthWall; window.LakShockwave = LakShockwave; window.LakMountainBreaker = LakMountainBreaker; window.PatThread = PatThread; window.PatMarionette = PatMarionette; window.FengQigong = FengQigong; window.FengWindWave = FengWindWave; window.OcelFeatheredSerpent = OcelFeatheredSerpent; window.OcelRitualZone = OcelRitualZone; window.OcelFifthSun = OcelFifthSun; window.ElectromagneticMatrix = ElectromagneticMatrix; window.MagneticRepulsion = MagneticRepulsion; window.MatrixBombardment = MatrixBombardment;`, context, { filename: 'entities.js' });
     return context;
 }
 
@@ -318,6 +318,9 @@ function loadPhysicsGame(heroName = 'Hunter') {
     class OcelFeatheredSerpent extends Entity { constructor(owner){super(owner.x,owner.y,112,58);Object.assign(this,{owner,type:'ocel_feathered_serpent'});} }
     class OcelRitualZone extends Entity { constructor(owner){super(owner.x,owner.y,290,34);Object.assign(this,{owner,type:'ocel_ritual_zone',life:4000});} }
     class OcelFifthSun extends Entity { constructor(owner){super(0,0,1280,760);Object.assign(this,{owner,type:'ocel_fifth_sun',life:6500});} }
+    class ElectromagneticMatrix extends Entity { constructor(owner,angle,overcharged=false){super(owner.x,owner.y,overcharged?142:112,overcharged?82:64);Object.assign(this,{owner,angle,overcharged,type:'electromagnetic_matrix'});} }
+    class MagneticRepulsion extends Entity { constructor(owner){super(owner.x,owner.y,380,380);Object.assign(this,{owner,type:'magnetic_repulsion'});} }
+    class MatrixBombardment extends Entity { constructor(owner,target){super(0,0,620,660);Object.assign(this,{owner,target,type:'matrix_bombardment'});} }
     class RokaCannonball extends Entity { constructor(owner,x,y,vx,vy,artillery){super(x,y,28,28);Object.assign(this,{owner,vx,vy,artillery,type:'roka_cannonball',damage:artillery?50:40,radius:artillery?165:110});} }
     class RokaMortarShell extends Entity { constructor(owner,x,y){super(x,y,20,26);Object.assign(this,{owner,targetX:x,targetY:y,type:'roka_mortar'});} }
     class TemporalBolt extends Entity { constructor(owner,x,y,vx,vy,damage,kind){super(x,y,18,14);Object.assign(this,{owner,vx,vy,damage,kind,type:kind==='copy'?'voss_copy_bolt':'temporal_shard'});} }
@@ -363,6 +366,9 @@ function loadPhysicsGame(heroName = 'Hunter') {
         OcelFeatheredSerpent,
         OcelRitualZone,
         OcelFifthSun,
+        ElectromagneticMatrix,
+        MagneticRepulsion,
+        MatrixBombardment,
         RokaCannonball,
         RokaMortarShell,
         TemporalBolt,
@@ -402,7 +408,8 @@ function loadPhysicsGame(heroName = 'Hunter') {
             Lak: { maxHp: 1000, speed: 4.2, jump: 13, width: 48, height: 76, color: '#6f6759', superCD: 30000 },
             Pat: { maxHp: 700, speed: 5.2, jump: 14.5, width: 39, height: 69, color: '#a34887', superCD: 28000 },
             Feng: { maxHp: 800, speed: 6.8, jump: 16.5, width: 40, height: 70, color: '#dffbff', superCD: 24000 },
-            Ocel: { maxHp: 900, speed: 5.7, jump: 15, width: 44, height: 73, color: '#137f78', superCD: 20000 }
+            Ocel: { maxHp: 900, speed: 5.7, jump: 15, width: 44, height: 73, color: '#137f78', superCD: 20000 },
+            Magnetar: { maxHp: 850, speed: 4.2, jump: 13.5, width: 48, height: 75, color: '#385985', superCD: 28000 }
         },
         keys: {},
         keysPressed: {},
@@ -3283,4 +3290,86 @@ test('Ocel ritual zone continuously applies its stronger movement slow', () => {
     const owner={id:'ocel',heroName:'Ocel',x:280,y:560,w:44,h:73,facing:1,dead:false,addOcelVenomMark(){},applyOcelPoison(){}};
     const zone=new context.window.OcelRitualZone(owner);const victim={id:'victim',heroName:'Hunter',x:zone.x+100,y:560,w:45,h:70,hp:750,dead:false,untargetable:false,buffs:{},vx:0,vy:0,takeDamage(amount){this.hp-=amount;}};
     context.game.opponents=[victim];zone.update(16);assert.equal(victim.buffs.ocelRitualSlow,240);assert.equal(victim.hp,710);
+});
+
+test('Magnetar has 85 WRD and charges its matrix for 0.8 seconds', () => {
+    const { ai, context } = loadPhysicsGame('Magnetar');
+    assert.equal(ai.maxHp, 850);
+    ai.attackState = 'idle';
+    ai.performAttack();
+    assert.equal(ai.attackState, 'windup');
+    assert.equal(ai.stateTimer, 800);
+    ai.update(799);
+    assert.equal(context.game.projectiles.length, 0);
+    ai.update(1);
+    assert.equal(context.game.projectiles.at(-1).type, 'electromagnetic_matrix');
+});
+
+test('Magnetar matrix pierces targets and grants only one Overload stack per shot', () => {
+    const context = loadProjectileContext();
+    const owner = { id:'magnetar', x:100, y:500, w:48, h:75, facing:1, dead:false, magnetarOverload:0 };
+    const makeVictim = (id, x) => ({ id, x, y:510, w:45, h:70, hp:300, dead:false, untargetable:false, buffs:{}, vx:0, vy:0, takeDamage(amount){this.hp-=amount;} });
+    const first=makeVictim('first',150),second=makeVictim('second',180);
+    context.game.opponents=[first,second];
+    const matrix=new context.window.ElectromagneticMatrix(owner,0,false);
+    matrix.update(16);
+    assert.equal(first.hp,240);assert.equal(second.hp,240);
+    assert.equal(owner.magnetarOverload,1);
+    assert.equal(matrix.dead,false);
+});
+
+test('Magnetar consumes three Overload stacks to fire a 9 WRD stunning matrix', () => {
+    const { ai, context } = loadPhysicsGame('Magnetar');
+    ai.magnetarOverload=3;ai.attackState='idle';ai.executeActiveAttack();
+    const matrix=context.game.projectiles.at(-1);
+    assert.equal(ai.magnetarOverload,0);assert.equal(matrix.overcharged,true);
+
+    const projectileContext=loadProjectileContext();
+    const owner={id:'magnetar',x:100,y:500,w:48,h:75,facing:1,dead:false,magnetarOverload:0};
+    const victim={id:'victim',x:150,y:500,w:45,h:70,hp:300,dead:false,untargetable:false,buffs:{},vx:0,vy:0,takeDamage(amount){this.hp-=amount;}};
+    projectileContext.game.opponents=[victim];const charged=new projectileContext.window.ElectromagneticMatrix(owner,0,true);charged.update(16);
+    assert.equal(victim.hp,210);assert.equal(victim.buffs.dizzy,800);
+});
+
+test('Magnetic Repulsion damages, launches, clears small shots, and grants brief armor', () => {
+    const context=loadProjectileContext();
+    const owner={id:'magnetar',x:300,y:500,w:48,h:75,facing:1,dead:false};
+    const victim={id:'victim',x:360,y:510,w:45,h:70,hp:300,dead:false,untargetable:false,buffs:{},vx:0,vy:0,takeDamage(amount){this.hp-=amount;}};
+    const small={owner:victim,x:340,y:520,w:12,h:8,dead:false};const large={owner:victim,x:340,y:520,w:60,h:60,dead:false};
+    context.game.opponents=[victim];context.game.projectiles=[small,large];
+    const pulse=new context.window.MagneticRepulsion(owner);pulse.update(16);
+    assert.equal(victim.hp,280);assert.ok(victim.vx>20);assert.ok(victim.vy<0);
+    assert.equal(small.dead,true);assert.equal(large.dead,false);
+
+    const simulation=loadPhysicsGame('Magnetar');simulation.ai.attackState='idle';
+    assert.equal(simulation.ai.fireMagneticRepulsion(),true);assert.equal(simulation.ai.magnetarArmorTimer,300);
+    const xVelocity=simulation.ai.vx;simulation.ai.takeDamage(20,simulation.target);
+    assert.equal(simulation.ai.vx,xVelocity,'super armor should prevent knockback');
+    assert.equal(simulation.ai.hp,830,'super armor should not prevent damage');
+});
+
+test('Matrix Bombardment warns for 3 seconds before six 10 WRD slowing strikes', () => {
+    const context=loadProjectileContext();
+    const owner={id:'magnetar',x:300,y:500,w:48,h:75,facing:1,dead:false};
+    const victim={id:'victim',x:600,y:590,w:45,h:70,hp:1000,dead:false,untargetable:false,buffs:{},vx:0,vy:0,takeDamage(amount){this.hp-=amount;}};
+    context.game.opponents=[victim];const bombardment=new context.window.MatrixBombardment(owner,victim);
+    bombardment.update(2999);assert.equal(victim.hp,1000);
+    for(let strike=0;strike<6;strike++){
+        victim.x=bombardment.strikeXs[strike]-victim.w/2;
+        bombardment.update(strike===0?1:430);
+    }
+    assert.equal(victim.hp,400);assert.equal(victim.buffs.slow,1500);
+    assert.equal(bombardment.struck.length,6);assert.equal(bombardment.struck.every(Boolean),true);
+});
+
+test('Magnetar CPU uses repulsion up close and bombardment to control a setup', () => {
+    const context=loadAI();const ai=makeFighter('Magnetar');const target=makeFighter('Hunter','player');
+    ai.magnetarPulseCooldown=0;ai.superCooldown=5000;ai.x=300;target.x=410;readyBrain(ai,target);
+    context.window.runAI(makeGame(ai,target),16);
+    assert.equal(context.keysPressed[ai.controls.switch],true);
+
+    Object.keys(context.keysPressed).forEach(key=>delete context.keysPressed[key]);
+    ai.magnetarPulseCooldown=5000;ai.superCooldown=0;target.x=760;readyBrain(ai,target);ai.aiBrain.combatState='setup';ai.aiBrain.tacticTimer=9999;
+    context.window.runAI(makeGame(ai,target),16);
+    assert.equal(context.keysPressed[ai.controls.super],true);
 });

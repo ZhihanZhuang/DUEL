@@ -164,7 +164,10 @@ if (window.Game && !window.Game.prototype.socketSyncPatched) {
         Hurricane,
         ...(typeof OcelFeatheredSerpent !== 'undefined' ? { OcelFeatheredSerpent } : {}),
         ...(typeof OcelRitualZone !== 'undefined' ? { OcelRitualZone } : {}),
-        ...(typeof OcelFifthSun !== 'undefined' ? { OcelFifthSun } : {})
+        ...(typeof OcelFifthSun !== 'undefined' ? { OcelFifthSun } : {}),
+        ...(typeof ElectromagneticMatrix !== 'undefined' ? { ElectromagneticMatrix } : {}),
+        ...(typeof MagneticRepulsion !== 'undefined' ? { MagneticRepulsion } : {}),
+        ...(typeof MatrixBombardment !== 'undefined' ? { MatrixBombardment } : {})
     };
 
     const cloneEntity = entity => {

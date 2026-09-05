@@ -261,6 +261,10 @@ class Fighter extends Entity {
             this.ocelGodboundTimer = 0; this.ocelUltimatePhase = null;
             this.ocelAttackCount = 0; this.ocelSwingFlash = 0;
         }
+        if (this.heroName === 'Magnetar') {
+            this.magnetarOverload = 0; this.magnetarPulseCooldown = 0; this.magnetarArmorTimer = 0;
+            this.magnetarChargeFlash = 0; this.magnetarRecoilTimer = 0;
+        }
         this.ocelPoisonTimer = 0; this.ocelPoisonTick = 0; this.ocelPoisonDps = 0; this.ocelPoisonSourceId = null;
         this.ocelVenomMarks = 0; this.ocelVenomMarkTimer = 0; this.ocelVenomOwnerId = null;
     }
@@ -281,6 +285,7 @@ class Fighter extends Entity {
         const itanSuperDebuffImmune = this.heroName === 'Itan' && this.itanSuperWindupTimer > 0;
         const geDanceUninterruptible = this.heroName === 'Ge' && this.geDanceTimer > 0;
         const fengSuperArmor = this.heroName === 'Feng' && (this.fengStepActive || ['launch','hover','ending'].includes(this.fengUltimatePhase));
+        const magnetarSuperArmor = this.heroName === 'Magnetar' && this.magnetarArmorTimer > 0;
 
         if (this.heroName === 'Sola' && this.solaForceActive) this.endSolaForce();
         if (this.heroName === 'Ukon' && (this.ukonDashTimer > 0 || this.ukonChargeTimer > 0)) this.finishUkonBurst(true);
@@ -325,7 +330,7 @@ class Fighter extends Entity {
 
         this.hp -= amt;
         window.audioManager?.playHit(this, attacker, amt, isDoT);
-        if (!noHitReaction && !itanSuperDebuffImmune && !geDanceUninterruptible && !fengSuperArmor) this.stunTimer = 150;
+        if (!noHitReaction && !itanSuperDebuffImmune && !geDanceUninterruptible && !fengSuperArmor && !magnetarSuperArmor) this.stunTimer = 150;
         this.timeSinceLastDamage = 0;
 
         if (this.heroName === 'Willi' && this.hp < this.maxHp * 0.5 && !this.williHasTriggeredHeal) {
@@ -354,7 +359,7 @@ class Fighter extends Entity {
             }
         }
 
-        if (!isDoT && !noKnockback && !this.grappledBy && !fengSuperArmor) {
+        if (!isDoT && !noKnockback && !this.grappledBy && !fengSuperArmor && !magnetarSuperArmor) {
             let direction = attacker ? (this.x + this.w/2 < attacker.x + attacker.w/2 ? -1 : 1) : (this.facing === 1 ? -1 : 1);
             const stability = this.heroName === 'Lak' && this.isGrounded ? 0.28 : 1;
             this.vx = direction * (amt * 0.5) * stability;
@@ -814,6 +819,12 @@ class Fighter extends Entity {
             }
             if (this.ocelSpawnTimer > 0) this.vx *= .3;
         }
+        if (this.heroName === 'Magnetar') {
+            this.magnetarPulseCooldown = Math.max(0, this.magnetarPulseCooldown - dt);
+            this.magnetarArmorTimer = Math.max(0, this.magnetarArmorTimer - dt);
+            this.magnetarChargeFlash = Math.max(0, this.magnetarChargeFlash - dt);
+            this.magnetarRecoilTimer = Math.max(0, this.magnetarRecoilTimer - dt);
+        }
         if (this.heroName === 'Voss' && !vossCopyWasActive) {
             this.vossCopyCooldown = Math.max(0, this.vossCopyCooldown - dt);
             if (this.vossDouble?.dead) this.vossDouble = null;
@@ -1102,6 +1113,7 @@ class Fighter extends Entity {
         let currentJump = this.baseJump;
 
         if (this.heroName === 'Kuro' && this.attackState === 'charging') currentSpeed *= 0.55;
+        if (this.heroName === 'Magnetar' && this.attackState === 'windup') currentSpeed *= 0.3;
 
         if (this.buffs.msBoost > 0) currentSpeed *= (this.heroName === 'Wolf' ? 1.3 : 1.2);
         if (this.heroName === 'Vaeilash' && this.vaeilashBloodMoon > 0) currentSpeed *= 1.35;
@@ -1811,6 +1823,8 @@ class Fighter extends Entity {
                     this.startFengLightStep();
                 } else if (this.heroName === 'Ocel' && this.attackState === 'idle') {
                     this.castOcelRitual();
+                } else if (this.heroName === 'Magnetar' && this.attackState === 'idle') {
+                    this.fireMagneticRepulsion();
                 }
             }
             if (mirrorCopiedSwitch) {
@@ -2119,9 +2133,15 @@ class Fighter extends Entity {
         game.hazards.push(new OcelRitualZone(this)); return true;
     }
 
+    fireMagneticRepulsion() {
+        if (this.heroName !== 'Magnetar' || this.magnetarPulseCooldown > 0) return false;
+        this.magnetarPulseCooldown=8000;this.magnetarArmorTimer=300;this.attackState='recovery';this.stateTimer=330;this.maxStateTimer=330;
+        game.hazards.push(new MagneticRepulsion(this));return true;
+    }
+
     isMeleeAttack() {
         if (this.heroName === 'Lapis') return this.lapisWhipTimer > 0;
-        if (this.heroName === 'Hason' || this.heroName === 'Willi' || this.heroName === 'Ugo' || this.heroName === 'Kila' || this.heroName === 'Volt' || this.heroName === 'Noae' || this.heroName === 'Kuro' || this.heroName === 'Nyra' || this.heroName === 'Archor' || this.heroName === 'D2F1' || this.heroName === 'Veyra' || this.heroName === 'Brom' || this.heroName === 'Mori' || this.heroName === 'Roka' || this.heroName === 'Tonia' || this.heroName === 'Pat' || this.heroName === 'Feng') return false;
+        if (this.heroName === 'Hason' || this.heroName === 'Willi' || this.heroName === 'Ugo' || this.heroName === 'Kila' || this.heroName === 'Volt' || this.heroName === 'Noae' || this.heroName === 'Kuro' || this.heroName === 'Nyra' || this.heroName === 'Archor' || this.heroName === 'D2F1' || this.heroName === 'Veyra' || this.heroName === 'Brom' || this.heroName === 'Mori' || this.heroName === 'Roka' || this.heroName === 'Tonia' || this.heroName === 'Pat' || this.heroName === 'Feng' || this.heroName === 'Magnetar') return false;
         if (this.heroName === 'Voss') return this.vossCopyTimer > 0 && this.vossCopiedMelee;
         if (this.heroName === 'Laegon') return this.thunderGodTimer > 0;
         if (this.heroName === 'Euclid' && this.euclidWeapon === 'magic') return false;
@@ -2285,6 +2305,7 @@ class Fighter extends Entity {
         if (this.heroName === 'Lak') this.stateTimer = 220;
         if (this.heroName === 'Pat') this.stateTimer = 90;
         if (this.heroName === 'Ocel') this.stateTimer = this.ocelGodboundTimer > 0 ? 55 : 90;
+        if (this.heroName === 'Magnetar') this.stateTimer = 800;
         if (this.heroName === 'Wolf') {
             this.stateTimer = 50;
             this.wolfPassiveReady = this.wolfAttackTimer >= 1500;
@@ -2305,7 +2326,7 @@ class Fighter extends Entity {
             : null;
         let target = combatTarget || game.getEnemyOf(this);
 
-        if (!combatTarget && (this.heroName === 'Hason' || this.heroName === 'Willi' || this.heroName === 'Euclid' || this.heroName === 'Ugo' || this.heroName === 'Kila' || this.heroName === 'Volt' || this.heroName === 'Noae' || this.heroName === 'Nyra' || this.heroName === 'Archor' || this.heroName === 'D2F1' || this.heroName === 'Laegon' || this.heroName === 'Veyra' || this.heroName === 'Brom' || this.heroName === 'Feng')) {
+        if (!combatTarget && (this.heroName === 'Hason' || this.heroName === 'Willi' || this.heroName === 'Euclid' || this.heroName === 'Ugo' || this.heroName === 'Kila' || this.heroName === 'Volt' || this.heroName === 'Noae' || this.heroName === 'Nyra' || this.heroName === 'Archor' || this.heroName === 'D2F1' || this.heroName === 'Laegon' || this.heroName === 'Veyra' || this.heroName === 'Brom' || this.heroName === 'Feng' || this.heroName === 'Magnetar')) {
             let minDist = target ? Math.hypot(target.x - this.x, target.y - this.y) : 9999;
             for (let m of game.minions) {
                 if (m && m.owner !== this && !m.dead) {
@@ -2350,6 +2371,13 @@ class Fighter extends Entity {
             this.fengCombo = (this.fengCombo || 0) + 1;
             if (this.fengCombo >= 3) { this.fengCombo = 0; game.projectiles.push(new FengWindWave(this, aimAngle, true)); }
             else game.projectiles.push(new FengQigong(this, aimAngle));
+            return;
+        }
+        if (this.heroName === 'Magnetar') {
+            const overcharged=this.magnetarOverload>=3;if(overcharged)this.magnetarOverload=0;
+            game.projectiles.push(new ElectromagneticMatrix(this,aimAngle,overcharged));
+            this.vx-=Math.cos(aimAngle)*8;this.vy-=Math.sin(aimAngle)*2;this.magnetarChargeFlash=220;this.magnetarRecoilTimer=280;
+            for(let i=0;i<18;i++)game.particles.push(new Particle(px,py,i%3?'#7eeaff':'#ffffff',-Math.cos(aimAngle)*(2+Math.random()*7),(Math.random()-.5)*8,320,3));
             return;
         }
         if (this.heroName === 'Hason') {
@@ -3368,6 +3396,10 @@ class Fighter extends Entity {
 
     performSuper() {
         window.audioManager?.playSkill(this, 'super');
+        if (this.heroName === 'Magnetar') {
+            if(this.superCooldown<=0){const target=this.aiCombatTarget&&!this.aiCombatTarget.dead?this.aiCombatTarget:game.getEnemyOf(this);this.superCooldown=this.superCooldownMax;game.hazards.push(new MatrixBombardment(this,target));this.vx*=.2;}
+            return;
+        }
         if (this.heroName === 'Ocel') {
             if (this.superCooldown <= 0 && !this.ocelUltimatePhase && this.ocelSpawnTimer <= 0) {
                 this.superCooldown=this.superCooldownMax; this.ocelUltimatePhase='sun'; this.attackState='idle'; this.vx=0;
@@ -4605,6 +4637,16 @@ class Fighter extends Entity {
         else if (this.heroName === 'Lak') {
             ctx.save();ctx.translate(hw-2,32);let angle=.55;if(this.attackState==='windup')angle=.55-1.55*phaseProg;else if(this.attackState==='active')angle=-1+3.25*phaseProg;else if(this.attackState==='recovery')angle=2.25-1.7*phaseProg;
             ctx.rotate(angle);ctx.fillStyle='#4d3928';ctx.fillRect(-6,-72,12,94);ctx.fillStyle='#69645d';ctx.strokeStyle='#b6aa95';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(-31,-88);ctx.lineTo(25,-93);ctx.lineTo(38,-72);ctx.lineTo(24,-49);ctx.lineTo(-34,-52);ctx.lineTo(-43,-70);ctx.closePath();ctx.fill();ctx.stroke();ctx.strokeStyle='#403b35';ctx.beginPath();ctx.moveTo(-20,-85);ctx.lineTo(-5,-57);ctx.lineTo(12,-88);ctx.stroke();ctx.restore();
+        }
+        else if (this.heroName === 'Magnetar') {
+            const charging=this.attackState==='windup',charge=charging?phaseProg:0,recoil=this.magnetarRecoilTimer>0?(this.magnetarRecoilTimer/280)*15:0;
+            ctx.save();ctx.translate(-hw+4-recoil,25);ctx.fillStyle='#1b2634';ctx.strokeStyle='#7fa8bb';ctx.lineWidth=3;ctx.fillRect(-15,-18,73,36);ctx.strokeRect(-15,-18,73,36);
+            ctx.fillStyle='#334e68';ctx.fillRect(-9,-13,60,26);ctx.fillStyle='#17202c';ctx.fillRect(51,-16,25,32);ctx.strokeStyle='#91efff';ctx.strokeRect(54,-12,19,24);
+            ctx.strokeStyle='#62dff8';ctx.shadowBlur=charging?18:8;ctx.shadowColor='#55ddff';ctx.lineWidth=4;for(let coil=0;coil<3;coil++){ctx.beginPath();ctx.arc(7+coil*17,0,12,0,Math.PI*2);ctx.stroke();}
+            ctx.shadowBlur=0;ctx.fillStyle='#0f1722';ctx.fillRect(-11,18,18,27);ctx.fillRect(26,18,18,19);ctx.fillStyle='#879eaa';ctx.fillRect(-8,20,12,20);ctx.fillRect(29,20,12,13);
+            if(charging){const size=22+charge*44,pulse=.45+Math.sin(Date.now()*.035)*.25;ctx.save();ctx.translate(78,0);ctx.strokeStyle=`rgba(169,244,255,${pulse+charge*.25})`;ctx.lineWidth=2+charge*2;ctx.shadowBlur=20;ctx.shadowColor='#6eeaff';ctx.strokeRect(-size/2,-size*.34,size,size*.68);for(let line=1;line<4;line++){ctx.beginPath();ctx.moveTo(-size/2+line*size/4,-size*.34);ctx.lineTo(-size/2+line*size/4,size*.34);ctx.stroke();}for(let line=1;line<3;line++){ctx.beginPath();ctx.moveTo(-size/2,-size*.34+line*size*.68/3);ctx.lineTo(size/2,-size*.34+line*size*.68/3);ctx.stroke();}ctx.restore();}
+            ctx.restore();
+            ctx.save();ctx.translate(-11,-8);for(let stack=0;stack<3;stack++){ctx.fillStyle=stack<(this.magnetarOverload||0)?'#b9f7ff':'#172735';ctx.strokeStyle='#5bdcf5';ctx.lineWidth=2;ctx.fillRect(stack*11,0,8,8);ctx.strokeRect(stack*11,0,8,8);}ctx.restore();
         }
         else if (this.heroName === 'Ocel') {
             const godbound=this.ocelGodboundTimer>0,time=Date.now()*.006;

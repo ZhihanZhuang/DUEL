@@ -74,7 +74,8 @@ const HERO_TACTICS = {
     Lak:     { role: 'terrain_tank', aggression: 0.82, caution: 0.82, burst: 1.18, kite: 0.08, setup: 1.72, highGround: 0.62, retreatHp: 0.18, retreatFireChance: 0.06 },
     Pat:     { role: 'controller', aggression: 0.48, caution: 1.32, burst: 1.08, kite: 1.38, setup: 1.62, highGround: 1.12, retreatHp: 0.42, retreatFireChance: 0.56 }
     ,Feng:   { role: 'wind_martial_artist', aggression: 1.12, caution: 0.62, burst: 1.45, kite: 0.72, setup: 0.35, highGround: 0.72, retreatHp: 0.28, retreatFireChance: 0.18 },
-    Ocel:    { role: 'war_priest', aggression: 1.08, caution: 0.66, burst: 1.52, kite: 0.34, setup: 1.25, highGround: 0.52, retreatHp: 0.27, retreatFireChance: 0.12 }
+    Ocel:    { role: 'war_priest', aggression: 1.08, caution: 0.66, burst: 1.52, kite: 0.34, setup: 1.25, highGround: 0.52, retreatHp: 0.27, retreatFireChance: 0.12 },
+    Magnetar:{ role: 'heavy_artillery', aggression: 0.52, caution: 1.30, burst: 1.48, kite: 1.42, setup: 1.68, highGround: 1.30, retreatHp: 0.40, retreatFireChance: 0.72 }
 };
 
 function getHeroTactic(ai) {
@@ -498,6 +499,7 @@ function getCombatProfile(ai, source = ai) {
         case 'Pat': range = 620; preferred = 390; break;
         case 'Feng': range = ai.fengWindTimer > 0 ? 900 : 430; preferred = ai.fengWindTimer > 0 ? 360 : 270; break;
         case 'Ocel': range = 150; preferred = 82; break;
+        case 'Magnetar': range = 800; preferred = 520; break;
     }
     return { range, preferred, ranged: !ai.isMeleeAttack(), tactics };
 }
@@ -956,6 +958,10 @@ function chooseHeroAction(game, ai, target, targetEntity, dist, verticalDistance
             if(superReady&&dist<520&&(combatState==='burst'||combatState==='pressure'||target.hp<target.maxHp*.48))return 'super';
             if(ai.ocelRitualCooldown<=0&&dist<260&&(combatState==='setup'||combatState==='pressure'))return 'switch';
             if(ai.ocelSerpentCooldown<=0&&dist>85&&dist<620)return 'extra';
+            break;
+        case 'Magnetar':
+            if(superReady&&dist<780&&(combatState==='setup'||combatState==='pressure'||combatState==='burst'||isVulnerableTarget(target)))return 'super';
+            if(ai.magnetarPulseCooldown<=0&&(dist<230||combatState==='evade'||combatState==='retreat'))return 'switch';
             break;
     }
     return null;

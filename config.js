@@ -441,6 +441,11 @@ var HEROES = {
         name: "Ocel", desc: "The Godbound Warrior",
         color: "#137f78", maxHp: 900, speed: 5.7, jump: 15, width: 44, height: 73, superCD: 20000,
         ui: { hp: "90 WRD", atk: "2.5 WRD (Divine Macuahuitl)", passive: "Attacks apply Sacred Venom. Three Venom Marks erupt for 4 WRD. Press [Switch] to invoke Tlaloc's heavily slowing ritual zone; press [Extra] to summon a slow homing Feathered Serpent that stuns and poisons.", super: "<span class='skill-tag'>Gods of the Fifth Sun</span> Raise the Macuahuitl to summon Tonatiuh, then Quetzalcoatl circles Ocel and crashes down for 8 WRD before five seconds of Godbound Form." }
+    },
+    Magnetar: {
+        name: "Magnetar", desc: "Heavy Electromancer",
+        color: "#385985", maxHp: 850, speed: 4.2, jump: 13.5, width: 48, height: 75, superCD: 28000,
+        ui: { hp: "85 WRD", atk: "6 WRD (Electromagnetic Matrix)", passive: "Charge for 0.8s and fire a slow, large piercing matrix. Successful shots build Overload; after 3 stacks the next matrix deals 9 WRD and stuns. Press [Switch] for Magnetic Repulsion (8s CD).", super: "<span class='skill-tag'>Matrix Bombardment</span> Mark a large area for 3s, then call down six 10 WRD electromagnetic matrices. Each impact leaves a short electric slowing field." }
     }
 };
 
