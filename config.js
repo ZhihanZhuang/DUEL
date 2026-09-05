@@ -450,7 +450,7 @@ var HEROES = {
     Nerath: {
         name: "Nerath", desc: "Hellbound Controller",
         color: "#541627", maxHp: 720, speed: 5.5, jump: 14.5, width: 40, height: 70, superCD: 26000,
-        ui: { hp: "72 WRD", atk: "1.2 WRD (Black Shard + Shatter)", passive: "<span class='skill-tag'>Second Death</span> Revives once at 25% HP with 50% power, recovering to full strength over 10s. Press [Switch] to summon two destructible Hands of Hell (10s CD).", super: "<span class='skill-tag'>Gate of Hell</span> Warns beneath the enemy, then pulls for up to 4s. Escape the outer edge or be dragged into Hell and thrown from a random point above the arena for height-based fall damage." }
+        ui: { hp: "72 WRD", atk: "1.5 WRD (Black Shard + Shatter)", passive: "<span class='skill-tag'>Second Death</span> Revives once at 25% HP with 50% power, recovering to full strength over 10s. Press [Switch] to summon two destructible Hands of Hell (10s CD).", super: "<span class='skill-tag'>Gate of Hell</span> Warns beneath the enemy, then pulls for up to 4s. Escape the outer edge or be dragged into Hell and thrown from a random point above the arena for height-based fall damage." }
     }
 };
 

@@ -3384,12 +3384,13 @@ test('Magnetar CPU uses repulsion up close and bombardment to control a setup', 
     assert.equal(context.keysPressed[ai.controls.super],true);
 });
 
-test('Nerath fires a fast 1.2 WRD shard that shatters into four spikes', () => {
+test('Nerath fires a large fast 1.5 WRD shard that shatters into four spikes', () => {
     const context=loadProjectileContext();
     const owner={id:'nerath',x:100,y:500,w:40,h:70,facing:1,dead:false,getNerathPower:()=>1};
     const victim={id:'victim',x:145,y:500,w:45,h:70,hp:200,dead:false,untargetable:false,buffs:{},takeDamage(amount){this.hp-=amount;}};
     context.game.opponents=[victim];const shard=new context.window.BlackShard(owner,0);shard.update(16);
-    assert.equal(victim.hp,188);assert.equal(shard.dead,true);
+    assert.equal(shard.w,34);assert.equal(shard.h,26);
+    assert.equal(victim.hp,185);assert.equal(shard.dead,true);
     assert.equal(context.game.projectiles.filter(item=>item.type==='black_spike').length,4);
 });
 
