@@ -725,16 +725,24 @@ class Projectile extends Entity {
             if (!this.owner || this.owner.dead) { this.dead = true; return; }
             const delay = Math.max(1, this.launchDelay || 150);
             const progress = Math.max(0, Math.min(1, this.launchTimer / delay));
-            const lift = Math.sin(progress * Math.PI * .5);
             const ratio = Math.max(.35, Math.min(1, this.chargeRatio || .55));
-            const orbit = 44 + ratio * 18;
-            const bob = Math.sin(this.timer * .02 + (this.floatSeed || 0)) * 4;
-            const offset = (this.floatOffsetIndex || 0) * 24;
             const side = this.owner.facing || 1;
+            if (!this.floatDriftDirection) {
+                const angle = Math.random() * Math.PI * 2;
+                this.floatDriftDirection = { x: Math.cos(angle), y: Math.sin(angle) };
+            }
+            if (!Number.isFinite(this.floatOriginX)) {
+                const offset = (this.floatOffsetIndex || 0) * 24;
+                this.floatOriginX = this.x + offset;
+                this.floatOriginY = this.y - Math.abs(offset) * .25;
+            }
             this.w = 28 + Math.round(16 * ratio);
             this.h = 10 + Math.round(4 * ratio);
-            this.x = this.owner.x + this.owner.w/2 + side * orbit - this.w/2 + offset;
-            this.y = this.owner.y + this.owner.h/2 - 16 - lift * 72 + bob - this.h/2 - Math.abs(offset) * .25;
+            const driftDistance = Math.min(this.floatMaxDistance || 68, this.launchTimer * (this.floatSpeed || .042));
+            const sway = Math.sin(progress * Math.PI * 2) * 6;
+            const drift = this.floatDriftDirection;
+            this.x = Math.max(8, Math.min(CANVAS_W - this.w - 8, this.floatOriginX + drift.x * driftDistance - drift.y * sway));
+            this.y = Math.max(20, Math.min(GROUND_Y - this.h - 8, this.floatOriginY + drift.y * driftDistance + drift.x * sway));
             if (this.launchTimer >= delay) {
                 let direction = this.launchDirection || { x: side, y: 0 };
                 if (this.aimAtTargetOnLaunch) {

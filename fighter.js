@@ -2570,7 +2570,7 @@ class Fighter extends Entity {
         const spear = this.createRaigoGoldenSpear(direction, {
             damage: options.damage ?? 32,
             speed: options.speed ?? 42,
-            launchDelay: options.launchDelay ?? 1000,
+            launchDelay: options.launchDelay ?? 1500,
             stun: options.stun ?? 0,
             offsetIndex: options.offsetIndex ?? 0,
             pullScale: options.pullScale ?? 1,
@@ -2599,6 +2599,10 @@ class Fighter extends Entity {
         spear.chargeRatio = options.chargeRatio ?? .6;
         spear.lifestealRatio = .35;
         spear.floatSeed = Math.random() * Math.PI * 2;
+        const floatAngle = Math.random() * Math.PI * 2;
+        spear.floatDriftDirection = { x: Math.cos(floatAngle), y: Math.sin(floatAngle) };
+        spear.floatSpeed = options.floatSpeed ?? .042;
+        spear.floatMaxDistance = options.floatMaxDistance ?? 68;
         spear.target = game.getEnemyOf(this);
         spear.aimAtTargetOnLaunch = options.aimAtTargetOnLaunch ?? false;
         spear.straightFlight = options.straightFlight ?? spear.aimAtTargetOnLaunch;

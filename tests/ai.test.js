@@ -2662,8 +2662,9 @@ test('Raigo builds Energy, spends Thunder Strike, and lifesteals from actual arm
     const spear = context.game.projectiles.at(-1);
     assert.equal(spear.type, 'raigo_golden_spear');
     assert.equal(spear.released, false);
-    assert.equal(spear.launchDelay, 1000);
+    assert.equal(spear.launchDelay, 1500);
     assert.equal(spear.launchSpeed, 42);
+    assert.ok(Math.abs(Math.hypot(spear.floatDriftDirection.x, spear.floatDriftDirection.y) - 1) < 0.001);
     assert.equal(spear.aimAtTargetOnLaunch, true);
     assert.equal(spear.straightFlight, true);
     assert.equal(spear.damage, 32);
@@ -2706,7 +2707,7 @@ test('Raigo golden spears heal and pull enemies during Super', () => {
     assert.equal(spear.dead, true);
 });
 
-test('Raigo golden spears float upward before launching automatically', () => {
+test('Raigo golden spears drift independently before launching automatically', () => {
     const context = loadProjectileContext();
     const owner = {
         id: 'raigo', heroName: 'Raigo', x: 500, y: 520, w: 42, h: 72, dead: false, facing: 1,
@@ -2719,19 +2720,26 @@ test('Raigo golden spears float upward before launching automatically', () => {
     spear.launchTimer = 0;
     spear.launchSpeed = 34;
     spear.launchDirection = { x: 1, y: 0 };
+    spear.floatDriftDirection = { x: .8, y: .6 };
+    spear.floatSpeed = .042;
     spear.floatOffsetIndex = 0;
+    const startX = spear.x;
     const startY = spear.y;
 
     spear.update(75);
     assert.equal(spear.released, false);
-    assert.ok(spear.y < startY, 'golden spear should rise before launching');
+    assert.ok(spear.x > startX, 'golden spear should drift horizontally');
+    assert.ok(spear.y > startY, 'golden spear should follow its random drift direction');
+    owner.x = 100;
+    owner.y = 100;
 
     spear.update(75);
     assert.equal(spear.released, true);
     assert.equal(spear.vx, 34);
+    assert.ok(spear.x > 490 && spear.y > 540, 'drifting spear should not remain attached to its moving owner');
 });
 
-test('Raigo Arsenal basic floats for one second then snapshots the enemy direction', () => {
+test('Raigo Arsenal basic drifts for 1.5 seconds then snapshots the enemy direction', () => {
     const context = loadProjectileContext();
     const owner = {
         id: 'raigo', heroName: 'Raigo', x: 500, y: 520, w: 42, h: 72, dead: false, facing: 1,
@@ -2741,16 +2749,16 @@ test('Raigo Arsenal basic floats for one second then snapshots the enemy directi
     context.game.opponents = [target];
     const spear = new context.window.Projectile(499, 551, 44, 12, 0, 0, 32, owner, '#ffd84d', 'raigo_golden_spear');
     Object.assign(spear, {
-        released: false, launchDelay: 1000, launchTimer: 0, launchSpeed: 42,
+        released: false, launchDelay: 1500, launchTimer: 0, launchSpeed: 42,
         launchDirection: { x: 1, y: 0 }, aimAtTargetOnLaunch: true, straightFlight: true,
-        target, chargeRatio: .6, floatOffsetIndex: 0
+        target, chargeRatio: .6, floatOffsetIndex: 0, floatDriftDirection: { x: 0, y: -1 }
     });
 
-    spear.update(500);
+    spear.update(750);
     assert.equal(spear.released, false);
     target.x = 390;
     target.y = 360;
-    spear.update(499);
+    spear.update(749);
     assert.equal(spear.released, false);
     spear.update(1);
     assert.equal(spear.released, true);
