@@ -244,7 +244,7 @@
     .boss-visual { height:330px; min-height:0; }
 }
 
-.hero-detail-screen { position:fixed; inset:0; z-index:40; display:flex; flex-direction:column; gap:14px; padding:18px 28px; box-sizing:border-box; background:#050a12; color:#eef4fa; overflow:auto; }
+.hero-detail-screen { position:fixed; inset:0; z-index:300; display:flex; flex-direction:column; gap:14px; padding:18px 28px; box-sizing:border-box; background:#050a12; color:#eef4fa; overflow:auto; }
 .hero-detail-screen.hidden { display:none; }
 .hero-detail-head { display:flex; justify-content:space-between; align-items:flex-end; border-bottom:3px solid #34445d; padding-bottom:10px; }
 .hero-detail-head h1 { margin:0; color:#f2cf55; font:900 clamp(1.6rem,4vw,3rem) monospace; text-transform:uppercase; }

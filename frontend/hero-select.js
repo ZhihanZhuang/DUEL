@@ -249,6 +249,7 @@ class HeroSelectUI {
         const entries = [['ATK','Basic Attack',hero.ui?.atk],['T','Technique',hero.ui?.passive],['E','Ultimate',hero.ui?.super],['G','Utility','Press G to practice the hero utility skill.']];
         document.getElementById('detail-skills-list').innerHTML = entries.map(([key,name,text]) => `<article class="detail-skill"><span>${key}</span><div><strong>${name}</strong><small>${this.strip(text || 'Special technique')}</small></div></article>`).join('');
         this.training.screen.classList.remove('hidden'); this.training.screen.classList.remove('training-mode');
+        document.getElementById('hero-select-screen')?.classList.add('hidden');
         this.training.screen.querySelector('.training-zone').classList.add('hidden');
         this.training.screen.querySelector('#detail-enter-training').classList.remove('hidden');
         this.training.screen.querySelector('#detail-close').textContent = 'Exit to Hero Select';
@@ -274,6 +275,7 @@ class HeroSelectUI {
             return;
         }
         this.training.screen.classList.add('hidden');
+        document.getElementById('hero-select-screen')?.classList.remove('hidden');
     }
 
     trainingKey(event) {
