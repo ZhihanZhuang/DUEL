@@ -56,7 +56,7 @@ class HeroSelectUI {
                         <div class="hero-stat"><span>SPEED</span><strong data-stat="speed"></strong></div>
                     </div>
                     <div class="skill-list"></div>
-                    <button class="hero-training-button" type="button">Enter Training Arena</button>
+                    <button class="hero-training-button" type="button">Open Hero Details</button>
                 </div>
             </section>`;
     }
@@ -74,8 +74,8 @@ class HeroSelectUI {
             panel._lastWheel = now;
             this.move(slot, event.deltaY > 0 ? 1 : -1);
         }, { passive: false });
-        panel.querySelector('.hero-figure').onclick = () => { this.attackPulse[slot] = performance.now(); };
-        panel.querySelector('.hero-training-button').onclick = () => this.openTraining(this.keys[this.indices[slot]]);
+        panel.querySelector('.hero-figure').onclick = () => { this.attackPulse[slot] = performance.now(); this.openTraining(this.keys[this.indices[slot]]); };
+        panel.querySelector('.hero-training-button').onclick = event => { event.stopPropagation(); this.openTraining(this.keys[this.indices[slot]]); };
     }
 
     move(slot, direction) {
