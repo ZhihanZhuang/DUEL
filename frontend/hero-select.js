@@ -227,13 +227,7 @@ class HeroSelectUI {
             <div class="hero-detail-layout"><section class="training-zone hidden"><canvas id="training-canvas" width="900" height="560"></canvas><div class="training-help">WASD move / SPACE attack / T, E, G skills</div><div class="training-actions"><button id="training-reset" type="button">Reset Dummy</button><span id="training-feedback">Ready</span></div></section><aside class="detail-skills"><h2>Fighter Data</h2><div id="detail-stats"></div><div id="detail-skills-list"></div></aside></div>`;
         document.body.appendChild(screen);
         this.training = { screen, canvas: screen.querySelector('#training-canvas'), hero: null, dummyHp: 1000, dummyMax: 1000, keys: {}, feedback: 'Ready', lastAction: 0 };
-        screen.querySelector('#detail-enter-training').onclick = () => {
-            const zone = screen.querySelector('.training-zone');
-            screen.classList.add('training-mode'); zone.classList.remove('hidden');
-            screen.querySelector('#detail-enter-training').classList.add('hidden');
-            screen.querySelector('#detail-close').textContent = 'Exit Training';
-            this.training?.screen.focus();
-        };
+        screen.querySelector('#detail-enter-training').onclick = () => this.enterTraining();
         screen.querySelector('#detail-close').onclick = () => this.closeTraining();
         screen.querySelector('#training-reset').onclick = () => { this.training.dummyHp = this.training.dummyMax; this.training.feedback = 'Dummy reset'; };
         screen.addEventListener('keydown', event => this.trainingKey(event));
@@ -258,11 +252,8 @@ class HeroSelectUI {
 
     enterTraining() {
         if (!this.training) return;
-        this.training.screen.classList.add('training-mode');
-        this.training.screen.querySelector('.training-zone').classList.remove('hidden');
-        this.training.screen.querySelector('#detail-enter-training').classList.add('hidden');
-        this.training.screen.querySelector('#detail-close').textContent = 'Exit Training';
-        this.training.screen.focus();
+        this.training.screen.classList.add('hidden');
+        this.game.startTrainingGame(this.training.hero);
     }
 
     closeTraining() {

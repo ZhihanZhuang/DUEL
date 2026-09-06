@@ -17,6 +17,7 @@ class Game {
         this.bossPlayerCount = 1;
         this.boss = null;
         this.isBossMode = false;
+        this.isTraining = false;
         this.fighters = [];
         this.aiFighters = [];
         this.selectedArena = localStorage.getItem('otokojuku_duel_arena') || 'dojo';
@@ -336,6 +337,7 @@ class Game {
         this.isSinglePlayer = false;
         this.isBattleRoyale = false;
         this.isBossMode = false;
+        this.isTraining = false;
         this.boss = null;
         this.state = 'MENU';
     }
@@ -428,6 +430,22 @@ class Game {
         this.updateCamera(1000);
         const generation = this.loopGeneration;
         this.animationFrameId = requestAnimationFrame(t => this.loop(t, generation));
+    }
+
+    startTrainingGame(heroName) {
+        this.p1Choice = heroName || this.p1Choice;
+        this.p2Choice = 'Noae';
+        this.startGame(false, 'duel');
+        this.isTraining = true;
+        this.p2.maxHp = 1000; this.p2.hp = 1000; this.p2.baseMaxHp = 1000;
+        this.p2.displayName = 'Training Dummy'; this.p2.isTrainingDummy = true;
+        this.p2.x = Math.max(420, CANVAS_W - 300); this.p2.y = GROUND_Y - this.p2.h; this.p2.isGrounded = true;
+        document.getElementById('hud-p2')?.classList.remove('hidden');
+        document.getElementById('p2-name').innerText = 'TRAINING DUMMY // 100 WRD';
+        document.getElementById('btn-pause-menu')?.classList.add('hidden');
+        let exit = document.getElementById('training-exit-button');
+        if (!exit) { exit = document.createElement('button'); exit.id='training-exit-button'; exit.textContent='Exit Training'; document.body.appendChild(exit); }
+        exit.onclick = () => { this.stopLoop(); this.state='MENU'; this.isTraining=false; document.getElementById('game-ui')?.classList.add('hidden'); document.getElementById('hero-detail-screen')?.classList.remove('hidden'); document.getElementById('hero-detail-screen')?.classList.remove('training-mode'); document.querySelector('.training-zone')?.classList.add('hidden'); document.getElementById('detail-enter-training')?.classList.remove('hidden'); document.getElementById('detail-close').textContent='Exit to Hero Select'; exit.remove(); };
     }
 
     startBossGame() {
@@ -973,6 +991,11 @@ class Game {
     }
 
     handleFighterDefeat(fighter, attacker) {
+        if (this.isTraining && fighter === this.p2) {
+            fighter.dead = false; fighter.hp = fighter.maxHp; fighter.x = Math.max(420, CANVAS_W - 300); fighter.y = GROUND_Y - fighter.h; fighter.vx = 0; fighter.vy = 0; fighter.isGrounded = true;
+            this.updateUI();
+            return;
+        }
         fighter.aiTarget = null;
         if (fighter.controls && fighter.isCPU) {
             Object.values(fighter.controls).forEach(code => { keys[code] = false; delete keysPressed[code]; });
@@ -1343,6 +1366,9 @@ class Game {
         }
         const timeStopped = this.boss?.type === 'boss_chronos' && this.boss.timeStopTimer > 0;
         if (!timeStopped) this.getFighters().forEach(fighter => fighter.update(dt));
+        if (this.isTraining && this.p2) {
+            this.p2.dead = false; this.p2.vx = 0; this.p2.vy = 0; this.p2.x = Math.max(420, CANVAS_W - 300); this.p2.y = GROUND_Y - this.p2.h; this.p2.isGrounded = true;
+        }
         if (this.hurricane && !this.hurricane.dead) this.hurricane.update(dt);
 
         this.minions.forEach(m => { if (!timeStopped || m === this.boss) m.update(dt); });

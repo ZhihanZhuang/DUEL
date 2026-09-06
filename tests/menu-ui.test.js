@@ -34,8 +34,8 @@ test('hero selection is data-driven and supports staged mode flows', () => {
     assert.match(source, /TRAINING DUMMY/);
     assert.match(source, /hero-training-button/);
     assert.match(source, /Open Hero Details/);
-    assert.match(html, /frontend\/hero-select\.css\?v=8/);
-    assert.match(html, /frontend\/hero-select\.js\?v=9/);
+    assert.match(html, /frontend\/hero-select\.css\?v=9/);
+    assert.match(html, /frontend\/hero-select\.js\?v=10/);
     assert.match(networkSource, /heroSelectUI\.open\('online'\)/);
 });
 
