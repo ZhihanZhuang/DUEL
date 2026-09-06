@@ -934,7 +934,7 @@ class Game {
         }
         if (fighter.heroName === 'Ocel') {
             const borrowed=fighter.ocelBorrowWindup>0?` [BORROW RITUAL ${(fighter.ocelBorrowWindup/1000).toFixed(1)}s]`:fighter.ocelBorrowTimer>0?` [BORROWED ${(fighter.ocelBorrowTimer/1000).toFixed(1)}s +${(fighter.ocelBorrowedHp/10).toFixed(1)} WRD]`:'';
-            return ` ${cooldown('ALTAR', fighter.ocelRitualCooldown)} ${cooldown('BORROW', fighter.ocelBorrowCooldown)}${borrowed}`;
+            return ` ${cooldown('SERPENT', fighter.ocelSerpentCooldown)} ${cooldown('BORROW', fighter.ocelBorrowCooldown)}${borrowed}${fighter.ocelBorrowTimer>0?' [ALTAR ACTIVE]':''}`;
         }
         if (fighter.heroName === 'Magnetar') return ` ${cooldown('REPULSE', fighter.magnetarPulseCooldown)} [OVERLOAD ${fighter.magnetarOverload}/3]`;
         if (fighter.heroName === 'Nerath') {

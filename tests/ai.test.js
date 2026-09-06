@@ -3254,9 +3254,10 @@ test('Ocel has 90 WRD and all three combat skills are reachable', () => {
     assert.equal(ai.maxHp, 900);
     ai.ocelSpawnTimer=0;ai.attackState='idle';
     context.keysPressed[ai.controls.switch]=true;ai.update(16);delete context.keysPressed[ai.controls.switch];
-    assert.equal(context.game.hazards.at(-1).type,'ocel_ritual_zone');
+    assert.equal(context.game.projectiles.at(-1).type,'ocel_feathered_serpent');
     ai.attackState='idle';context.keysPressed[ai.controls.extra]=true;ai.update(16);delete context.keysPressed[ai.controls.extra];
     assert.equal(ai.ocelBorrowWindup,2000);assert.equal(ai.ocelBorrowCooldown,22000);
+    ai.update(2000); assert.equal(context.game.hazards.at(-1).type,'ocel_ritual_zone');
     ai.attackState='idle';ai.superCooldown=0;ai.performSuper();
     assert.equal(ai.ocelUltimatePhase,'sun');
     assert.equal(context.game.hazards.at(-1).type,'ocel_fifth_sun');

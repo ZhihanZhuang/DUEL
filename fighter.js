@@ -877,6 +877,7 @@ class Fighter extends Entity {
                 this.vx = 0; this.vy = 0;
                 if (before > 0 && this.ocelBorrowWindup === 0) {
                     this.ocelBorrowedHp = 250; this.ocelBorrowTimer = 10000; this.ocelBorrowWarning = 0;
+                    this.ocelRitualCooldown = 9000; game.hazards.push(new OcelRitualZone(this));
                 }
             } else if (this.ocelBorrowTimer > 0) {
                 this.ocelBorrowTimer = Math.max(0, this.ocelBorrowTimer - dt);
@@ -1902,7 +1903,7 @@ class Fighter extends Entity {
                 } else if (this.heroName === 'Feng' && this.attackState === 'idle' && this.fengStepTimer <= 0) {
                     this.startFengLightStep();
                 } else if (this.heroName === 'Ocel' && this.attackState === 'idle') {
-                    this.castOcelRitual();
+                    this.castOcelSerpent();
                 } else if (this.heroName === 'Magnetar' && this.attackState === 'idle') {
                     this.fireMagneticRepulsion();
                 } else if (this.heroName === 'Nerath' && this.attackState === 'idle') {

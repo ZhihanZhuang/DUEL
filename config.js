@@ -440,7 +440,7 @@ var HEROES = {
     Ocel: {
         name: "Ocel", desc: "The Godbound Warrior",
         color: "#137f78", maxHp: 900, speed: 5.7, jump: 15, width: 44, height: 73, superCD: 20000,
-        ui: { hp: "90 WRD", atk: "2.5 WRD (Divine Macuahuitl)", passive: "Attacks apply Sacred Venom. Three Venom Marks erupt for 4 WRD. [T] invokes a heavily slowing ritual altar that lightly heals Ocel. [G] Borrowed Blood has a 2s invulnerable ritual, grants 25 temporary WRD for 10s, then exacts 5 WRD interest (22s CD).", super: "<span class='skill-tag'>Gods of the Fifth Sun</span> Raise the Macuahuitl to summon Tonatiuh, then Quetzalcoatl circles Ocel and crashes down for 10 WRD before five seconds of Godbound Form." }
+        ui: { hp: "90 WRD", atk: "2.5 WRD (Divine Macuahuitl)", passive: "Attacks apply Sacred Venom. Three Venom Marks erupt for 4 WRD. [T] fires a slow homing Feathered Serpent that stuns and poisons. [G] Borrowed Blood has a 2s invulnerable ritual, grants 25 temporary WRD for 10s, then creates a slowing, healing altar and exacts 5 WRD interest (22s CD).", super: "<span class='skill-tag'>Gods of the Fifth Sun</span> Raise the Macuahuitl to summon Tonatiuh, then Quetzalcoatl circles Ocel and crashes down for 10 WRD before five seconds of Godbound Form." }
     },
     Magnetar: {
         name: "Magnetar", desc: "Heavy Electromancer",
