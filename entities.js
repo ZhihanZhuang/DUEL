@@ -3558,10 +3558,14 @@ class OcelRitualZone extends Entity {
     constructor(owner) {
         const centerX=Math.max(145,Math.min(CANVAS_W-145,owner.x+owner.w/2+owner.facing*105));
         super(centerX-145,GROUND_Y-34,290,34);this.owner=owner;this.type='ocel_ritual_zone';this.life=4000;this.maxLife=4000;
-        this.phase=0;this.initialTargets=new Set();
+        this.phase=0;this.healTick=0;this.initialTargets=new Set();
     }
     update(dt) {
-        this.phase+=dt;this.life-=dt;
+        this.phase+=dt;this.life-=dt;this.healTick+=dt;
+        const ownerCenter=this.owner.x+this.owner.w/2;
+        if(ownerCenter>=this.x&&ownerCenter<=this.x+this.w&&this.owner.y+this.owner.h>=this.y-95){
+            while(this.healTick>=500){this.healTick-=500;this.owner.heal?.(2);}
+        }else this.healTick=Math.min(this.healTick,500);
         for(const target of getHostileTargets(this.owner,this)){
             if(!target||target.dead)continue;
             const tx=target.x+target.w/2,inside=tx>=this.x&&tx<=this.x+this.w&&target.y+target.h>=this.y-95;
@@ -3601,14 +3605,14 @@ class OcelFifthSun extends Entity {
             for(const target of getHostileTargets(this.owner,this)){
                 if(!target||target.dead)continue;const tx=target.x+target.w/2,ty=target.y+target.h/2;
                 if(Math.hypot(tx-this.strikeX,ty-(GROUND_Y-35))>430)continue;
-                target.takeDamage(80,this.owner,false,true);const direction=Math.sign(tx-this.strikeX)||this.owner.facing;target.vx=direction*24;target.vy=-13;
+                target.takeDamage(100,this.owner,false,true);const direction=Math.sign(tx-this.strikeX)||this.owner.facing;target.vx=direction*24;target.vy=-13;
                 target.buffs=target.buffs||{};target.buffs.slow=Math.max(target.buffs.slow||0,3000);this.owner.applyOcelPoison?.(target,5000,8);
             }
             for(let i=0;i<70;i++){const a=Math.random()*Math.PI*2;game.particles.push(new Particle(this.strikeX,GROUND_Y-22,i%5?'#35dfca':'#ffd75e',Math.cos(a)*(5+Math.random()*18),-Math.abs(Math.sin(a))*(7+Math.random()*17),760,5));}
         }
         if(this.struck){
             this.godTick+=dt;
-            if(this.godTick>=1250){this.godTick-=1250;const targets=getHostileTargets(this.owner,this).filter(t=>t&&!t.dead);const target=targets[0];if(target){target.takeDamage(12,this.owner,false,true);target.buffs=target.buffs||{};target.buffs.slow=Math.max(target.buffs.slow||0,450);this.owner.applyOcelPoison?.(target,1500,6);for(let i=0;i<16;i++)game.particles.push(new Particle(target.x+target.w/2,target.y-45,i%3?'#f5c84d':'#48e8da',(Math.random()-.5)*7,6+Math.random()*9,420,4));}}
+            if(this.godTick>=1250){this.godTick-=1250;const targets=getHostileTargets(this.owner,this).filter(t=>t&&!t.dead);const target=targets[0];if(target){target.takeDamage(15,this.owner,false,true);target.buffs=target.buffs||{};target.buffs.slow=Math.max(target.buffs.slow||0,450);this.owner.applyOcelPoison?.(target,1500,6);for(let i=0;i<16;i++)game.particles.push(new Particle(target.x+target.w/2,target.y-45,i%3?'#f5c84d':'#48e8da',(Math.random()-.5)*7,6+Math.random()*9,420,4));}}
         }
         if(this.life<=0){this.owner.ocelUltimatePhase=null;this.owner.ocelGodboundTimer=0;for(let i=0;i<28;i++){const a=Math.random()*Math.PI*2;game.particles.push(new Particle(this.owner.x+this.owner.w/2,this.owner.y+this.owner.h/2,i%2?'#f4c94f':'#39decb',Math.cos(a)*10,Math.sin(a)*10,520,4));}this.dead=true;}
     }
@@ -3731,7 +3735,7 @@ class HellHand extends Entity {
     getTarget(){return (typeof game.getFighters==='function'?game.getFighters():[]).find(target=>target&&target.id===this.targetId)||null;}
     takeDamage(amount,attacker){if(this.dead)return;window.audioManager?.playEntityHit(this,attacker,amount);this.hp-=Math.max(0,amount||0);if(this.hp<=0){this.dead=true;for(let i=0;i<14;i++)game.particles.push(new Particle(this.x+24,this.y+25,i%2?'#12070d':'#8f1f39',(Math.random()-.5)*11,(Math.random()-.5)*11,360,4));}}
     beginHold(target){const pair=(game.minions||[]).find(hand=>hand instanceof HellHand&&hand!==this&&!hand.dead&&hand.castId===this.castId&&hand.grabbed);if(!pair)return;const duration=800*(this.owner.getNerathPower?.()||1);for(const hand of [this,pair]){hand.phase='holding';hand.holdTimer=duration;}target.buffs=target.buffs||{};target.buffs.root=Math.max(target.buffs.root||0,120);}
-    tear(target){if(target.nerathTearCastId===this.castId)return;target.nerathTearCastId=this.castId;const power=this.owner.getNerathPower?.()||1;target.takeDamage(30*power,this.owner,false,true);target.buffs=target.buffs||{};target.buffs.slow=Math.max(target.buffs.slow||0,1500*power);game.hazards.push(new HellTearEffect(target.x+target.w/2,target.y+target.h/2));for(const hand of game.minions||[]){if(hand instanceof HellHand&&hand.castId===this.castId&&!hand.dead){hand.phase='tearing';hand.life=330;hand.vx=hand.side*19;hand.vy=-2;}}}
+    tear(target){if(target.nerathTearCastId===this.castId)return;target.nerathTearCastId=this.castId;const power=this.owner.getNerathPower?.()||1;target.takeDamage(50*power,this.owner,false,true);target.buffs=target.buffs||{};target.buffs.slow=Math.max(target.buffs.slow||0,1500*power);game.hazards.push(new HellTearEffect(target.x+target.w/2,target.y+target.h/2));for(const hand of game.minions||[]){if(hand instanceof HellHand&&hand.castId===this.castId&&!hand.dead){hand.phase='tearing';hand.life=330;hand.vx=hand.side*19;hand.vy=-2;}}}
     update(dt){const target=this.getTarget();this.life-=dt;if(!target||target.dead||target.untargetable||!this.owner||this.owner.dead){this.dead=true;return;}if(this.phase==='tracking'){const desiredX=target.x+target.w/2+this.side*(target.w/2+20)-this.w/2,desiredY=target.y+target.h*.48-this.h/2,dx=desiredX-this.x,dy=desiredY-this.y,d=Math.hypot(dx,dy);this.vx=dx/Math.max(1,d)*8.5;this.vy=dy/Math.max(1,d)*8.5;this.x+=this.vx;this.y+=this.vy;if(d<14){this.grabbed=true;this.x=desiredX;this.y=desiredY;this.beginHold(target);}}else if(this.phase==='holding'){const pair=(game.minions||[]).find(hand=>hand instanceof HellHand&&hand!==this&&!hand.dead&&hand.castId===this.castId&&hand.phase==='holding');if(!pair){this.dead=true;return;}this.x=target.x+target.w/2+this.side*(target.w/2+20)-this.w/2;this.y=target.y+target.h*.48-this.h/2;target.buffs.root=Math.max(target.buffs.root||0,120);target.vx=0;this.holdTimer-=dt;if(this.holdTimer<=0)this.tear(target);}else{this.x+=this.vx;this.y+=this.vy;}if(this.life<=0)this.dead=true;}
     draw(ctx){const t=Date.now()*.012;ctx.save();ctx.translate(this.x+this.w/2,this.y+this.h/2);ctx.scale(this.side,1);ctx.shadowBlur=16;ctx.shadowColor='#9d1838';ctx.fillStyle='#090609';ctx.strokeStyle='#801b34';ctx.lineWidth=2.5;ctx.beginPath();ctx.ellipse(0,4,17,20,0,0,Math.PI*2);ctx.fill();ctx.stroke();for(let finger=0;finger<5;finger++){const a=-1.08+finger*.53+Math.sin(t+finger)*.06;ctx.save();ctx.rotate(a);ctx.fillRect(4,-4,30+Math.sin(t*1.4+finger)*4,8);ctx.restore();}ctx.fillStyle='#b22a49';ctx.beginPath();ctx.arc(-3,3,4,0,Math.PI*2);ctx.fill();ctx.restore();ctx.fillStyle='#310b18';ctx.fillRect(this.x,this.y-8,this.w,4);ctx.fillStyle='#b22a49';ctx.fillRect(this.x,this.y-8,this.w*Math.max(0,this.hp/this.maxHp),4);}
 }

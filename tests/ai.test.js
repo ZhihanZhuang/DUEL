@@ -3256,7 +3256,7 @@ test('Ocel has 90 WRD and all three combat skills are reachable', () => {
     context.keysPressed[ai.controls.switch]=true;ai.update(16);delete context.keysPressed[ai.controls.switch];
     assert.equal(context.game.hazards.at(-1).type,'ocel_ritual_zone');
     ai.attackState='idle';context.keysPressed[ai.controls.extra]=true;ai.update(16);delete context.keysPressed[ai.controls.extra];
-    assert.equal(context.game.projectiles.at(-1).type,'ocel_feathered_serpent');
+    assert.equal(ai.ocelBorrowWindup,2000);assert.equal(ai.ocelBorrowCooldown,22000);
     ai.attackState='idle';ai.superCooldown=0;ai.performSuper();
     assert.equal(ai.ocelUltimatePhase,'sun');
     assert.equal(context.game.hazards.at(-1).type,'ocel_fifth_sun');
@@ -3281,7 +3281,7 @@ test('Ocel Fifth Sun has a ritual startup, serpent impact, and five-second trans
     sun.update(1);assert.equal(owner.ocelUltimatePhase,'serpent');assert.equal(victim.hp,750);
     sun.update(900);assert.equal(owner.ocelUltimatePhase,'strike');assert.equal(victim.hp,750);
     sun.update(449);assert.equal(victim.hp,750,'damage landed before Quetzalcoatl struck the ground');
-    sun.update(1);assert.equal(owner.ocelUltimatePhase,'godbound');assert.equal(owner.ocelGodboundTimer,5000);assert.equal(victim.hp,670);assert.deepEqual(victim.poison,[5000,8]);
+    sun.update(1);assert.equal(owner.ocelUltimatePhase,'godbound');assert.equal(owner.ocelGodboundTimer,5000);assert.equal(victim.hp,650);assert.deepEqual(victim.poison,[5000,8]);
     sun.update(5000);assert.equal(sun.dead,true);assert.equal(owner.ocelUltimatePhase,null);
 });
 
@@ -3295,11 +3295,22 @@ test('Ocel Feathered Serpent turns toward enemies slowly, then stuns and heavily
     assert.equal(victim.hp,720);assert.equal(victim.buffs.dizzy,900);assert.deepEqual(victim.poison,[4000,7]);
 });
 
-test('Ocel ritual zone continuously applies its stronger movement slow', () => {
+test('Ocel ritual zone continuously applies its stronger movement slow and lightly heals Ocel', () => {
     const context=loadProjectileContext();
-    const owner={id:'ocel',heroName:'Ocel',x:280,y:560,w:44,h:73,facing:1,dead:false,addOcelVenomMark(){},applyOcelPoison(){}};
+    const owner={id:'ocel',heroName:'Ocel',x:280,y:560,w:44,h:73,facing:1,dead:false,hp:700,maxHp:900,heal(amount){this.hp=Math.min(this.maxHp,this.hp+amount);},addOcelVenomMark(){},applyOcelPoison(){}};
     const zone=new context.window.OcelRitualZone(owner);const victim={id:'victim',heroName:'Hunter',x:zone.x+100,y:560,w:45,h:70,hp:750,dead:false,untargetable:false,buffs:{},vx:0,vy:0,takeDamage(amount){this.hp-=amount;}};
     context.game.opponents=[victim];zone.update(16);assert.equal(victim.buffs.ocelRitualSlow,240);assert.equal(victim.hp,710);
+    zone.update(484);assert.equal(owner.hp,702);
+});
+
+test('Ocel Borrowed Blood has an invulnerable two-second ritual and repays temporary HP with interest', () => {
+    const {ai,target}=loadPhysicsGame('Ocel');ai.ocelSpawnTimer=0;ai.isCPU=false;ai.attackState='idle';
+    assert.equal(ai.castOcelBorrowedBlood(),true);assert.equal(ai.ocelBorrowWindup,2000);assert.equal(ai.ocelBorrowCooldown,22000);
+    const hp=ai.hp;ai.takeDamage(100,target);assert.equal(ai.hp,hp,'Borrowed Blood startup must ignore all damage');
+    ai.vx=8;ai.vy=-6;ai.update(2000);assert.equal(ai.vx,0);assert.equal(ai.vy,0);assert.equal(ai.ocelBorrowedHp,250);assert.equal(ai.ocelBorrowTimer,10000);
+    ai.invincible=0;ai.takeDamage(100,target);assert.equal(ai.ocelBorrowedHp,150);assert.equal(ai.hp,hp);
+    ai.update(10000);assert.equal(ai.ocelBorrowedHp,0);assert.equal(ai.hp,hp-50);
+    assert.equal(ai.castOcelBorrowedBlood(),false);
 });
 
 test('Magnetar has 85 WRD and charges its matrix for 0.8 seconds', () => {
@@ -3403,7 +3414,7 @@ test('Nerath Twin Hands are destructible and tear only after both complete the h
     left.x=victim.x-43;left.y=victim.y+10;right.x=victim.x+victim.w+1;right.y=victim.y+10;
     left.update(16);right.update(16);assert.equal(left.phase,'holding');assert.equal(right.phase,'holding');assert.equal(victim.hp,300);
     left.update(799);right.update(799);left.update(1);
-    assert.equal(victim.hp,270);assert.equal(victim.buffs.slow,1500);assert.equal(context.game.hazards.at(-1).type,'hell_tear_effect');
+    assert.equal(victim.hp,250);assert.equal(victim.buffs.slow,1500);assert.equal(context.game.hazards.at(-1).type,'hell_tear_effect');
 
     const spare=new context.window.HellHand(owner,victim,-1,'spare');spare.takeDamage(30,owner);
     assert.equal(spare.dead,true);assert.equal(spare.maxHp,30);

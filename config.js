@@ -440,7 +440,7 @@ var HEROES = {
     Ocel: {
         name: "Ocel", desc: "The Godbound Warrior",
         color: "#137f78", maxHp: 900, speed: 5.7, jump: 15, width: 44, height: 73, superCD: 20000,
-        ui: { hp: "90 WRD", atk: "2.5 WRD (Divine Macuahuitl)", passive: "Attacks apply Sacred Venom. Three Venom Marks erupt for 4 WRD. Press [Switch] to invoke Tlaloc's heavily slowing ritual zone; press [Extra] to summon a slow homing Feathered Serpent that stuns and poisons.", super: "<span class='skill-tag'>Gods of the Fifth Sun</span> Raise the Macuahuitl to summon Tonatiuh, then Quetzalcoatl circles Ocel and crashes down for 8 WRD before five seconds of Godbound Form." }
+        ui: { hp: "90 WRD", atk: "2.5 WRD (Divine Macuahuitl)", passive: "Attacks apply Sacred Venom. Three Venom Marks erupt for 4 WRD. [T] invokes a heavily slowing ritual altar that lightly heals Ocel. [G] Borrowed Blood has a 2s invulnerable ritual, grants 25 temporary WRD for 10s, then exacts 5 WRD interest (22s CD).", super: "<span class='skill-tag'>Gods of the Fifth Sun</span> Raise the Macuahuitl to summon Tonatiuh, then Quetzalcoatl circles Ocel and crashes down for 10 WRD before five seconds of Godbound Form." }
     },
     Magnetar: {
         name: "Magnetar", desc: "Heavy Electromancer",
@@ -450,7 +450,7 @@ var HEROES = {
     Nerath: {
         name: "Nerath", desc: "Hellbound Controller",
         color: "#541627", maxHp: 720, speed: 5.5, jump: 14.5, width: 40, height: 70, superCD: 26000,
-        ui: { hp: "72 WRD", atk: "1.5 WRD (Black Shard + Shatter)", passive: "<span class='skill-tag'>Second Death</span> Revives once at 25% HP with 50% power, recovering to full strength over 10s. Press [Switch] to summon two destructible Hands of Hell (10s CD).", super: "<span class='skill-tag'>Gate of Hell</span> The 0.45s cast is uninterruptible. Opens beneath the nearest enemy and pulls every enemy in range for up to 4s. Escape the outer edge or be dragged into Hell and thrown from above for height-based fall damage." }
+        ui: { hp: "72 WRD", atk: "1.5 WRD (Black Shard; 0.45s attack cycle)", passive: "<span class='skill-tag'>Second Death</span> Revives once at 25% HP with 50% power, recovering to full strength over 10s. [T] summons two destructible Hands of Hell that tear for 5 WRD (10s CD).", super: "<span class='skill-tag'>Gate of Hell</span> The 0.45s cast has super armor but Nerath still takes damage. Opens beneath the nearest enemy and pulls every enemy in range for up to 4s. Escape the outer edge or be dragged into Hell and thrown from above for height-based fall damage." }
     }
 };
 

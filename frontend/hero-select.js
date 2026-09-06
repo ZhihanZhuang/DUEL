@@ -24,6 +24,7 @@ class HeroSelectUI {
         this.bindPanel('p2');
         this.renderPanel('p1');
         this.renderPanel('p2');
+        this.mountTrainingArena();
         this.mountBossShowcase();
         this.bindMainMenu();
         window.addEventListener('keydown', event => this.onKeyDown(event));
@@ -72,7 +73,7 @@ class HeroSelectUI {
             panel._lastWheel = now;
             this.move(slot, event.deltaY > 0 ? 1 : -1);
         }, { passive: false });
-        panel.querySelector('.hero-figure').onclick = () => { this.attackPulse[slot] = performance.now(); };
+        panel.querySelector('.hero-figure').onclick = () => { this.attackPulse[slot] = performance.now(); this.openTraining(this.keys[this.indices[slot]]); };
     }
 
     move(slot, direction) {
@@ -214,6 +215,63 @@ class HeroSelectUI {
         document.getElementById('btn-online').onclick = () => this.open('online');
         document.getElementById('btn-hero-confirm').onclick = () => this.confirm();
         document.getElementById('btn-hero-back').onclick = () => this.back();
+    }
+
+    mountTrainingArena() {
+        if (document.getElementById('hero-detail-screen')) return;
+        const screen = document.createElement('div');
+        screen.id = 'hero-detail-screen'; screen.className = 'hero-detail-screen hidden';
+        screen.innerHTML = `<div class="hero-detail-head"><div><span class="select-kicker">Combat Laboratory</span><h1 id="detail-hero-name">Hero Training</h1></div><button id="detail-close" type="button">Back to Roster</button></div>
+            <div class="hero-detail-layout"><section class="training-zone"><canvas id="training-canvas" width="900" height="560"></canvas><div class="training-help">WASD move / SPACE attack / T, E, G skills</div><div class="training-actions"><button id="training-reset" type="button">Reset Dummy</button><span id="training-feedback">Ready</span></div></section><aside class="detail-skills"><h2>Fighter Data</h2><div id="detail-stats"></div><div id="detail-skills-list"></div></aside></div>`;
+        document.body.appendChild(screen);
+        this.training = { screen, canvas: screen.querySelector('#training-canvas'), hero: null, dummyHp: 1000, dummyMax: 1000, keys: {}, feedback: 'Ready', lastAction: 0 };
+        screen.querySelector('#detail-close').onclick = () => this.closeTraining();
+        screen.querySelector('#training-reset').onclick = () => { this.training.dummyHp = this.training.dummyMax; this.training.feedback = 'Dummy reset'; };
+        screen.addEventListener('keydown', event => this.trainingKey(event));
+        screen.addEventListener('keyup', event => { this.training.keys[event.code] = false; });
+        this.trainingAnimate(performance.now());
+    }
+
+    openTraining(key) {
+        const hero = HEROES[key]; if (!hero || !this.training) return;
+        this.training.hero = key; this.training.dummyHp = this.training.dummyMax = 1000; this.training.feedback = 'Ready';
+        document.getElementById('detail-hero-name').textContent = hero.name;
+        document.getElementById('detail-stats').innerHTML = `<div class="detail-stat-row"><b>HP</b><span>${hero.ui?.hp || `${Math.round(hero.maxHp/10)} WRD`}</span></div><div class="detail-stat-row"><b>ATK</b><span>${hero.ui?.atk || 'Variable'}</span></div><div class="detail-stat-row"><b>ROLE</b><span>${hero.desc}</span></div>`;
+        const entries = [['ATK','Basic Attack',hero.ui?.atk],['T','Technique',hero.ui?.passive],['E','Ultimate',hero.ui?.super],['G','Utility','Press G to practice the hero utility skill.']];
+        document.getElementById('detail-skills-list').innerHTML = entries.map(([key,name,text]) => `<article class="detail-skill"><span>${key}</span><div><strong>${name}</strong><small>${this.strip(text || 'Special technique')}</small></div></article>`).join('');
+        this.training.screen.classList.remove('hidden'); this.training.screen.tabIndex = 0; this.training.screen.focus();
+    }
+
+    closeTraining() { this.training?.screen.classList.add('hidden'); }
+
+    trainingKey(event) {
+        if (!this.training?.hero || event.repeat) return;
+        const code = event.code; this.training.keys[code] = true;
+        const names = { Space: 'Basic Attack', KeyT: 'Technique T', KeyE: 'Ultimate E', KeyG: 'Utility G' };
+        if (names[code]) {
+            const damage = code === 'Space' ? 20 : code === 'KeyE' ? 80 : code === 'KeyT' ? 35 : 25;
+            this.training.dummyHp = Math.max(0, this.training.dummyHp - damage);
+            this.training.feedback = `${names[code]} hit for ${damage/10} WRD`;
+            this.training.lastAction = performance.now();
+            event.preventDefault();
+        }
+    }
+
+    trainingAnimate(time) {
+        const t = this.training; if (t) {
+            const ctx = t.canvas.getContext('2d'), w=t.canvas.width, h=t.canvas.height;
+            ctx.clearRect(0,0,w,h); ctx.fillStyle='#07101b'; ctx.fillRect(0,0,w,h); ctx.fillStyle='#102238'; ctx.fillRect(0,h-110,w,110); ctx.fillStyle='#294968'; ctx.fillRect(0,h-114,w,5);
+            const moving=(t.keys.KeyA?-1:0)+(t.keys.KeyD?1:0); const heroX=250+moving*45+Math.sin(time*.002)*3, ground=h-114;
+            ctx.fillStyle='#192e42'; ctx.fillRect(625,ground-145,100,145); ctx.fillStyle='#bd8d5d'; ctx.fillRect(650,ground-130,48,125); ctx.fillStyle='#f5d5a3'; ctx.beginPath(); ctx.arc(674,ground-155,24,0,Math.PI*2); ctx.fill();
+            ctx.fillStyle='#e33d51'; ctx.fillRect(595,ground-205,160,8); ctx.fillStyle='#5ce08a'; ctx.fillRect(595,ground-205,160*Math.max(0,t.dummyHp/t.dummyMax),8); ctx.fillStyle='#e8edf5'; ctx.font='700 14px monospace'; ctx.fillText(`TRAINING DUMMY ${Math.ceil(t.dummyHp/10)} WRD`,595,ground-220);
+            if (t.hero) {
+                ctx.save(); ctx.translate(heroX,ground-10); ctx.scale(1.65,1.65); const fighter=this.getPreviewFighter(t.hero); fighter.x=-fighter.w/2; fighter.y=-fighter.h; fighter.facing=1; this.setPreviewAttackState(fighter,time-t.lastAction<520,time,t.lastAction); fighter.draw(ctx,{revealOwnedKuro:true,previewTarget:{x:300,y:-40,w:1,h:1}}); ctx.restore();
+            } else {
+                ctx.fillStyle='#55b7e8'; ctx.font='900 18px monospace'; ctx.fillText('SELECT A FIGHTER TO BEGIN',260,ground-80);
+            }
+            ctx.fillStyle='#a9bdd4'; ctx.font='700 13px monospace'; ctx.fillText(t.feedback,24,32); ctx.fillText('Press keys to test the selected fighter',24,54);
+        }
+        requestAnimationFrame(next => this.trainingAnimate(next));
     }
 
     onKeyDown(event) {

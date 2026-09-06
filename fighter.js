@@ -264,6 +264,8 @@ class Fighter extends Entity {
             this.ocelSerpentCooldown = 0; this.ocelRitualCooldown = 0;
             this.ocelGodboundTimer = 0; this.ocelUltimatePhase = null;
             this.ocelAttackCount = 0; this.ocelSwingFlash = 0;
+            this.ocelBorrowCooldown = 0; this.ocelBorrowWindup = 0; this.ocelBorrowTimer = 0;
+            this.ocelBorrowedHp = 0; this.ocelBorrowWarning = 0;
         }
         if (this.heroName === 'Magnetar') {
             this.magnetarOverload = 0; this.magnetarPulseCooldown = 0; this.magnetarArmorTimer = 0;
@@ -291,6 +293,16 @@ class Fighter extends Entity {
             return;
         }
         if (this.dead || this.invincible > 0 || (this.heroName === 'Sola' && this.solaChargeTimer > 0)) return;
+        if (this.heroName === 'Ocel' && this.ocelBorrowedHp > 0) {
+            const absorbed = Math.min(this.ocelBorrowedHp, Math.max(0, amt));
+            this.ocelBorrowedHp -= absorbed;
+            amt -= absorbed;
+            if (amt <= 0) {
+                window.audioManager?.playHit(this, attacker, absorbed, isDoT);
+                this.timeSinceLastDamage = 0;
+                return;
+            }
+        }
         const itanSuperDebuffImmune = this.heroName === 'Itan' && this.itanSuperWindupTimer > 0;
         const geDanceUninterruptible = this.heroName === 'Ge' && this.geDanceTimer > 0;
         const fengSuperArmor = this.heroName === 'Feng' && (this.fengStepActive || ['launch','hover','ending'].includes(this.fengUltimatePhase));
@@ -858,6 +870,22 @@ class Fighter extends Entity {
             this.ocelRitualCooldown = Math.max(0, this.ocelRitualCooldown - dt);
             this.ocelGodboundTimer = Math.max(0, this.ocelGodboundTimer - dt);
             this.ocelSwingFlash = Math.max(0, this.ocelSwingFlash - dt);
+            this.ocelBorrowCooldown = Math.max(0, this.ocelBorrowCooldown - dt);
+            if (this.ocelBorrowWindup > 0) {
+                const before = this.ocelBorrowWindup;
+                this.ocelBorrowWindup = Math.max(0, this.ocelBorrowWindup - dt);
+                this.vx = 0; this.vy = 0;
+                if (before > 0 && this.ocelBorrowWindup === 0) {
+                    this.ocelBorrowedHp = 250; this.ocelBorrowTimer = 10000; this.ocelBorrowWarning = 0;
+                }
+            } else if (this.ocelBorrowTimer > 0) {
+                this.ocelBorrowTimer = Math.max(0, this.ocelBorrowTimer - dt);
+                this.ocelBorrowWarning = this.ocelBorrowTimer <= 2500 ? 2500 - this.ocelBorrowTimer : 0;
+                if (this.ocelBorrowTimer === 0) {
+                    this.ocelBorrowedHp = 0; this.ocelBorrowWarning = 0;
+                    this.takeDamage(50, null, true, true, true);
+                }
+            }
             if (this.ocelGodboundTimer > 0 && Math.random() < .45) {
                 const a=Math.random()*Math.PI*2;
                 game.particles.push(new Particle(this.x+this.w/2+Math.cos(a)*34,this.y+this.h/2+Math.sin(a)*42,Math.random()<.45?'#f6c94c':'#39e0d0',-Math.sin(a)*2,Math.cos(a)*2,360,3));
@@ -1057,13 +1085,13 @@ class Fighter extends Entity {
         const isGeLocked = this.heroName === 'Ge' && (this.geDanceTimer > 0 || this.geThrustTimer > 0);
         const isFengActionLocked = this.heroName === 'Feng' && (this.fengUltimatePhase === 'launch' || this.fengUltimatePhase === 'ending');
         const isFengHoverLocked = this.heroName === 'Feng' && (this.fengUltimatePhase === 'hover' || this.fengUltimatePhase === 'ending');
-        const isOcelActionLocked = this.heroName === 'Ocel' && (this.ocelSpawnTimer > 0 || ['ritual','sun','serpent','strike'].includes(this.ocelUltimatePhase));
+        const isOcelActionLocked = this.heroName === 'Ocel' && (this.ocelSpawnTimer > 0 || this.ocelBorrowWindup > 0 || ['ritual','sun','serpent','strike'].includes(this.ocelUltimatePhase));
         let canAct = (this.stunTimer <= 0 && this.buffs.dizzy <= 0 && this.grapplePhase !== 1 && this.superWindupTimer <= 0 && this.euclidSwitchTimer <= 0 && !(this.itanSuperWindupTimer > 0) && !(this.veyraReversalTimer > 0) && !(this.axeronRushTimer > 0) && !(this.gelannBreathWindup > 0) && !isKilaSwitching && !isSolaForceLocked && !isSolaCharging && !isUkonBursting && !isUkonUltimateLocked && !isMoriGrappling && !isRaigoCharging && !isDogelCharging && !isGeLocked && !isFengActionLocked);
         if (isOcelActionLocked) canAct = false;
         let canMoveAndAttack = (canAct || isDogelCharging) && !hasPuppet;
 
         if (this.heroName === 'Vaeilash' && canAct && keysPressed[this.controls.extra]) this.startVaeilashReversal();
-        if (this.heroName === 'Ocel' && canAct && keysPressed[this.controls.extra]) this.castOcelSerpent();
+        if (this.heroName === 'Ocel' && canAct && keysPressed[this.controls.extra]) this.castOcelBorrowedBlood();
 
         if (this.heroName === 'Gensan') {
             if (this.gensanSwitchCD > 0) this.gensanSwitchCD -= dt;
@@ -1533,7 +1561,7 @@ class Fighter extends Entity {
                         if (this.heroName === 'Dogel') activeTime = this.dogelReaperTimer > 0 ? 90 : 130;
                         if (this.heroName === 'Lapis') activeTime = this.lapisWhipTimer > 0 ? 95 : 80;
                         if (this.heroName === 'Ocel') activeTime = this.ocelGodboundTimer > 0 ? 90 : 120;
-                        if (this.heroName === 'Nerath') activeTime = 35;
+                        if (this.heroName === 'Nerath') activeTime = 50;
 
                         this.attackState = 'active';
                         this.stateTimer = activeTime;
@@ -1689,7 +1717,7 @@ class Fighter extends Entity {
                     if (this.heroName === 'Vaeilash') recTime = this.vaeilashBloodMoon > 0 ? 55 : 85;
                     if (this.heroName === 'Dogel') recTime = this.dogelReaperTimer > 0 ? 150 : 330;
                     if (this.heroName === 'Lapis') recTime = this.lapisWhipTimer > 0 ? 115 : 260;
-                    if (this.heroName === 'Nerath') recTime = 45;
+                    if (this.heroName === 'Nerath') recTime = 320;
 
                     this.attackState = 'recovery';
                     this.stateTimer = recTime;
@@ -2188,6 +2216,13 @@ class Fighter extends Entity {
         game.hazards.push(new OcelRitualZone(this)); return true;
     }
 
+    castOcelBorrowedBlood() {
+        if (this.heroName !== 'Ocel' || this.ocelBorrowCooldown > 0 || this.ocelBorrowWindup > 0 || this.ocelBorrowTimer > 0 || this.ocelSpawnTimer > 0) return false;
+        this.ocelBorrowCooldown = 22000; this.ocelBorrowWindup = 2000; this.invincible = Math.max(this.invincible, 2000);
+        this.attackState = 'recovery'; this.stateTimer = 2000; this.maxStateTimer = 2000; this.vx = 0; this.vy = 0;
+        return true;
+    }
+
     fireMagneticRepulsion() {
         if (this.heroName !== 'Magnetar' || this.magnetarPulseCooldown > 0) return false;
         this.magnetarPulseCooldown=8000;this.magnetarArmorTimer=300;this.attackState='recovery';this.stateTimer=330;this.maxStateTimer=330;
@@ -2370,7 +2405,7 @@ class Fighter extends Entity {
         if (this.heroName === 'Pat') this.stateTimer = 90;
         if (this.heroName === 'Ocel') this.stateTimer = this.ocelGodboundTimer > 0 ? 55 : 90;
         if (this.heroName === 'Magnetar') this.stateTimer = 800;
-        if (this.heroName === 'Nerath') this.stateTimer = 35;
+        if (this.heroName === 'Nerath') this.stateTimer = 80;
         if (this.heroName === 'Wolf') {
             this.stateTimer = 50;
             this.wolfPassiveReady = this.wolfAttackTimer >= 1500;
@@ -4754,6 +4789,16 @@ class Fighter extends Entity {
             ctx.strokeStyle=this.ocelSwingFlash>0&&this.ocelAttackCount===0?'#69ffee':'#f0c34a';ctx.shadowBlur=this.ocelSwingFlash>0&&this.ocelAttackCount===0?13:0;ctx.shadowColor='#55f3df';ctx.lineWidth=2;for(let rune=0;rune<4;rune++){const y=-130+rune*11;ctx.beginPath();ctx.moveTo(-6,y);ctx.lineTo(0,y-5);ctx.lineTo(6,y);ctx.lineTo(0,y+5);ctx.closePath();ctx.stroke();}ctx.shadowBlur=0;
             ctx.fillStyle='#23bfae';ctx.beginPath();ctx.moveTo(-8,16);ctx.lineTo(-27,32);ctx.lineTo(-5,27);ctx.fill();ctx.fillStyle='#f2c44b';ctx.beginPath();ctx.moveTo(8,16);ctx.lineTo(25,35);ctx.lineTo(6,27);ctx.fill();ctx.restore();
             ctx.fillStyle='#082b2b';ctx.fillRect(-hw+7,8,this.w-14,20);ctx.fillStyle='#49f0db';ctx.shadowBlur=12;ctx.shadowColor='#49f0db';ctx.fillRect(-10,14,7,3);ctx.fillRect(3,14,7,3);ctx.shadowBlur=0;
+            if(this.ocelBorrowWindup>0){
+                const progress=1-this.ocelBorrowWindup/2000,radius=92*(1-progress)+12;
+                ctx.save();ctx.translate(0,30);ctx.strokeStyle='#e62d45';ctx.shadowBlur=22;ctx.shadowColor='#ff253f';ctx.lineWidth=9;ctx.lineCap='round';
+                ctx.beginPath();for(let segment=0;segment<=18;segment++){const a=time*4+segment*.28,x=Math.cos(a)*radius*(1-segment/24),y=Math.sin(a)*32-segment*2;segment?ctx.lineTo(x,y):ctx.moveTo(x,y);}ctx.stroke();
+                const headA=time*4+18*.28;ctx.translate(Math.cos(headA)*radius*.25,Math.sin(headA)*32-36);ctx.rotate(headA);ctx.fillStyle='#ff5366';ctx.beginPath();ctx.moveTo(12,0);ctx.lineTo(-8,-7);ctx.lineTo(-5,0);ctx.lineTo(-8,7);ctx.closePath();ctx.fill();ctx.restore();
+            }
+            if(this.ocelBorrowedHp>0){
+                const warning=this.ocelBorrowTimer<=2500&&Math.floor(Date.now()/140)%2===0;
+                ctx.save();ctx.globalAlpha=warning?.35:.78;ctx.strokeStyle='#ffffff';ctx.shadowBlur=warning?26:14;ctx.shadowColor=warning?'#ff3e52':'#ffffff';ctx.lineWidth=3;ctx.beginPath();ctx.ellipse(0,35,hw+18,h*.62,0,0,Math.PI*2);ctx.stroke();ctx.restore();
+            }
             if(this.ocelSpawnTimer>0){const progress=1-this.ocelSpawnTimer/this.ocelSpawnMax,fade=Math.sin(progress*Math.PI);ctx.save();ctx.globalAlpha=fade;ctx.fillStyle='rgba(255,211,75,.16)';ctx.fillRect(-62,-170,124,245);ctx.translate(0,h);ctx.scale(1,.3);ctx.rotate(progress*1.6);ctx.strokeStyle='#f3c84c';ctx.lineWidth=8;ctx.beginPath();ctx.arc(0,0,68,0,Math.PI*2);ctx.stroke();ctx.strokeStyle='#3ce2d0';ctx.lineWidth=5;for(let i=0;i<12;i++){ctx.rotate(Math.PI/6);ctx.beginPath();ctx.moveTo(31,0);ctx.lineTo(62,0);ctx.stroke();}ctx.restore();for(let i=0;i<5;i++){const a=time+i*1.25;ctx.fillStyle=i%2?'rgba(65,230,211,.55)':'rgba(244,201,75,.6)';ctx.beginPath();ctx.ellipse(Math.cos(a)*54,-18+Math.sin(a)*24,10,4,a,0,Math.PI*2);ctx.fill();}}
         }
         else if (this.heroName === 'Feng') {

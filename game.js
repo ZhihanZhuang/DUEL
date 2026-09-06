@@ -569,7 +569,15 @@ class Game {
 
     updateUI() {
         if (!this.p1 || !this.p2) return;
-        document.getElementById('p1-hp').style.width = `${Math.max(0, (this.p1.hp / this.p1.maxHp) * 100)}%`;
+        const updateHealthBar=(element,fighter,baseColor)=>{
+            const hp=Math.max(0,fighter.hp),borrowed=Math.max(0,fighter.ocelBorrowedHp||0),total=hp+borrowed;
+            const capacity=fighter.maxHp+(borrowed>0?250:0);
+            const totalPercent=Math.min(100,total/capacity*100),hpShare=total>0?hp/total*100:0;
+            element.style.width=`${totalPercent}%`;
+            const flash=borrowed>0&&fighter.ocelBorrowTimer<=2500&&Math.floor(Date.now()/140)%2===0;
+            element.style.background=borrowed>0?`linear-gradient(90deg, ${baseColor} 0 ${hpShare}%, ${flash?'#ff5b6d':'#ffffff'} ${hpShare}% 100%)`:baseColor;
+        };
+        updateHealthBar(document.getElementById('p1-hp'),this.p1,'#4caf50');
         if (this.p1.heroName === 'Duke') {
             document.getElementById('p1-horse-hp').style.width = `${Math.max(0, (this.p1.horseHp / this.p1.maxHorseHp) * 100)}%`;
             document.getElementById('p1-horse-hp').style.background = '#8B4513';
@@ -718,6 +726,7 @@ class Game {
         if (this.p1.heroName === 'Ge') p1Stat += `${this.p1.geGodTimer>0?`[BRONZE GOD ${(this.p1.geGodTimer/1000).toFixed(1)}s] `:this.p1.geDanceTimer>0?`[RITUAL ${(this.p1.geDanceTimer/1000).toFixed(1)}s] `:''}${this.p1.geThrustCooldown>0?`[THRUST ${(this.p1.geThrustCooldown/1000).toFixed(1)}s]`:'[THRUST READY]'}`;
         if (this.p1.heroName === 'Lak') p1Stat += `[HAMMER ${this.p1.lakCombo}/3] ${this.p1.lakWallCooldown>0?`[WALL ${(this.p1.lakWallCooldown/1000).toFixed(1)}s]`:'[WALL READY]'}`;
         if (this.p1.heroName === 'Pat') p1Stat += `${this.p1.patBindingCooldown>0?`[BIND ${(this.p1.patBindingCooldown/1000).toFixed(1)}s]`:'[BIND READY]'}${this.p1.patMarionette&&!this.p1.patMarionette.dead?' [MARIONETTE]':''}`;
+        p1Stat += this.getNewHeroSkillStatus(this.p1);
 
         if (this.p1.buffs.poison > 0) p1Stat += " [POISONED]";
         if (this.p1.buffs.burn > 0) p1Stat += " [BURN]";
@@ -726,7 +735,7 @@ class Game {
         if (this.p1.buffs.bleed > 0) p1Stat += " [BLEEDING]";
         document.getElementById('p1-status').innerText = p1Stat;
 
-        document.getElementById('p2-hp').style.width = `${Math.max(0, (this.p2.hp / this.p2.maxHp) * 100)}%`;
+        updateHealthBar(document.getElementById('p2-hp'),this.p2,'#ff5252');
         if (this.p2.heroName === 'Duke') {
             document.getElementById('p2-horse-hp').style.width = `${Math.max(0, (this.p2.horseHp / this.p2.maxHorseHp) * 100)}%`;
             document.getElementById('p2-horse-hp').style.background = '#8B4513';
@@ -875,6 +884,7 @@ class Game {
         if (this.p2.heroName === 'Ge') p2Stat += `${this.p2.geGodTimer>0?`[BRONZE GOD ${(this.p2.geGodTimer/1000).toFixed(1)}s] `:this.p2.geDanceTimer>0?`[RITUAL ${(this.p2.geDanceTimer/1000).toFixed(1)}s] `:''}${this.p2.geThrustCooldown>0?`[THRUST ${(this.p2.geThrustCooldown/1000).toFixed(1)}s]`:'[THRUST READY]'}`;
         if (this.p2.heroName === 'Lak') p2Stat += `[HAMMER ${this.p2.lakCombo}/3] ${this.p2.lakWallCooldown>0?`[WALL ${(this.p2.lakWallCooldown/1000).toFixed(1)}s]`:'[WALL READY]'}`;
         if (this.p2.heroName === 'Pat') p2Stat += `${this.p2.patBindingCooldown>0?`[BIND ${(this.p2.patBindingCooldown/1000).toFixed(1)}s]`:'[BIND READY]'}${this.p2.patMarionette&&!this.p2.patMarionette.dead?' [MARIONETTE]':''}`;
+        p2Stat += this.getNewHeroSkillStatus(this.p2);
 
         if (this.p2.buffs.poison > 0) p2Stat += " [POISONED]";
         if (this.p2.buffs.burn > 0) p2Stat += " [BURN]";
@@ -894,6 +904,26 @@ class Game {
         }
         if (this.isBattleRoyale) this.updateBattleRoyaleHUD();
         if (this.isBossMode) this.updateBossHUD();
+    }
+
+    getNewHeroSkillStatus(fighter) {
+        const cooldown = (label, value) => value > 0 ? `[${label} ${(value/1000).toFixed(1)}s]` : `[${label} READY]`;
+        if (fighter.heroName === 'Vaeilash') {
+            return ` ${cooldown('STEP', fighter.vaeilashBloodstepCooldown)} ${cooldown('REVERSAL', fighter.vaeilashReversalCooldown)}${fighter.vaeilashBloodMoon>0?` [BLOOD MOON ${(fighter.vaeilashBloodMoon/1000).toFixed(1)}s]`:''}`;
+        }
+        if (fighter.heroName === 'Feng') {
+            return ` ${cooldown('LIGHT STEP', fighter.fengStepTimer)}${fighter.fengUltimatePhase?` [DRIFTING WIND ${fighter.fengWindWaves}/6]`:''}`;
+        }
+        if (fighter.heroName === 'Ocel') {
+            const borrowed=fighter.ocelBorrowWindup>0?` [BORROW RITUAL ${(fighter.ocelBorrowWindup/1000).toFixed(1)}s]`:fighter.ocelBorrowTimer>0?` [BORROWED ${(fighter.ocelBorrowTimer/1000).toFixed(1)}s +${(fighter.ocelBorrowedHp/10).toFixed(1)} WRD]`:'';
+            return ` ${cooldown('ALTAR', fighter.ocelRitualCooldown)} ${cooldown('BORROW', fighter.ocelBorrowCooldown)}${borrowed}`;
+        }
+        if (fighter.heroName === 'Magnetar') return ` ${cooldown('REPULSE', fighter.magnetarPulseCooldown)} [OVERLOAD ${fighter.magnetarOverload}/3]`;
+        if (fighter.heroName === 'Nerath') {
+            const recovery=fighter.nerathRecoveryTimer>0?` [HELL POWER ${Math.round(fighter.getNerathPower()*100)}%]`:'';
+            return ` ${cooldown('HANDS', fighter.nerathHandsCooldown)}${recovery}`;
+        }
+        return '';
     }
 
     updateBossHUD() {
