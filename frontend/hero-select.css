@@ -176,6 +176,8 @@
 .skill-key { width:34px; height:34px; display:grid; place-items:center; border:2px solid #536981; color:#fff; background:#070b12; font:900 .62rem monospace; }
 .skill-copy strong { display:block; color:#f4f6f8; font:800 .58rem monospace; text-transform:uppercase; }
 .skill-copy small { display:block; margin-top:3px; color:#8799ad; font:600 .48rem/1.35 monospace; }
+.hero-training-button { margin-top:auto; width:100%; border-radius:0; border:2px solid var(--select-gold); background:#3a2a12; color:#ffe99b; padding:10px 12px; font:900 .62rem monospace; text-transform:uppercase; cursor:pointer; }
+.hero-training-button:hover,.hero-training-button:focus-visible { background:#66501e; color:#fff; box-shadow:0 0 14px rgba(242,207,85,.35); }
 
 .select-footer {
     width: min(1500px, 100%);
@@ -247,6 +249,11 @@
 .hero-detail-head { display:flex; justify-content:space-between; align-items:flex-end; border-bottom:3px solid #34445d; padding-bottom:10px; }
 .hero-detail-head h1 { margin:0; color:#f2cf55; font:900 clamp(1.6rem,4vw,3rem) monospace; text-transform:uppercase; }
 .hero-detail-head button,.training-actions button { border-radius:0; border:2px solid #536981; background:#111d2c; color:#fff; padding:9px 14px; font:800 .62rem monospace; }
+.detail-head-actions { display:flex; gap:8px; align-items:center; }
+#detail-enter-training { border-color:var(--select-gold); background:#3a2a12; color:#ffe99b; }
+.hero-detail-screen.training-mode .hero-detail-layout { grid-template-columns:1fr; }
+.hero-detail-screen.training-mode .detail-skills { display:none; }
+.hero-detail-screen.training-mode .training-zone { min-height:0; }
 .hero-detail-layout { flex:1; min-height:0; display:grid; grid-template-columns:minmax(0,1fr) 360px; gap:14px; }
 .training-zone { position:relative; min-height:420px; border:3px solid #34445d; background:#07101b; overflow:hidden; }
 #training-canvas { width:100%; height:100%; min-height:420px; image-rendering:auto; }

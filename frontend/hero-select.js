@@ -56,6 +56,7 @@ class HeroSelectUI {
                         <div class="hero-stat"><span>SPEED</span><strong data-stat="speed"></strong></div>
                     </div>
                     <div class="skill-list"></div>
+                    <button class="hero-training-button" type="button">Enter Training Arena</button>
                 </div>
             </section>`;
     }
@@ -73,7 +74,8 @@ class HeroSelectUI {
             panel._lastWheel = now;
             this.move(slot, event.deltaY > 0 ? 1 : -1);
         }, { passive: false });
-        panel.querySelector('.hero-figure').onclick = () => { this.attackPulse[slot] = performance.now(); this.openTraining(this.keys[this.indices[slot]]); };
+        panel.querySelector('.hero-figure').onclick = () => { this.attackPulse[slot] = performance.now(); };
+        panel.querySelector('.hero-training-button').onclick = () => this.openTraining(this.keys[this.indices[slot]]);
     }
 
     move(slot, direction) {
@@ -221,10 +223,11 @@ class HeroSelectUI {
         if (document.getElementById('hero-detail-screen')) return;
         const screen = document.createElement('div');
         screen.id = 'hero-detail-screen'; screen.className = 'hero-detail-screen hidden';
-        screen.innerHTML = `<div class="hero-detail-head"><div><span class="select-kicker">Combat Laboratory</span><h1 id="detail-hero-name">Hero Training</h1></div><button id="detail-close" type="button">Back to Roster</button></div>
-            <div class="hero-detail-layout"><section class="training-zone"><canvas id="training-canvas" width="900" height="560"></canvas><div class="training-help">WASD move / SPACE attack / T, E, G skills</div><div class="training-actions"><button id="training-reset" type="button">Reset Dummy</button><span id="training-feedback">Ready</span></div></section><aside class="detail-skills"><h2>Fighter Data</h2><div id="detail-stats"></div><div id="detail-skills-list"></div></aside></div>`;
+        screen.innerHTML = `<div class="hero-detail-head"><div><span class="select-kicker">Combat Laboratory</span><h1 id="detail-hero-name">Hero Details</h1></div><div class="detail-head-actions"><button id="detail-enter-training" type="button">Enter Training Arena</button><button id="detail-close" type="button">Exit to Hero Select</button></div></div>
+            <div class="hero-detail-layout"><section class="training-zone hidden"><canvas id="training-canvas" width="900" height="560"></canvas><div class="training-help">WASD move / SPACE attack / T, E, G skills</div><div class="training-actions"><button id="training-reset" type="button">Reset Dummy</button><span id="training-feedback">Ready</span></div></section><aside class="detail-skills"><h2>Fighter Data</h2><div id="detail-stats"></div><div id="detail-skills-list"></div></aside></div>`;
         document.body.appendChild(screen);
         this.training = { screen, canvas: screen.querySelector('#training-canvas'), hero: null, dummyHp: 1000, dummyMax: 1000, keys: {}, feedback: 'Ready', lastAction: 0 };
+        screen.querySelector('#detail-enter-training').onclick = () => this.enterTraining();
         screen.querySelector('#detail-close').onclick = () => this.closeTraining();
         screen.querySelector('#training-reset').onclick = () => { this.training.dummyHp = this.training.dummyMax; this.training.feedback = 'Dummy reset'; };
         screen.addEventListener('keydown', event => this.trainingKey(event));
@@ -239,10 +242,33 @@ class HeroSelectUI {
         document.getElementById('detail-stats').innerHTML = `<div class="detail-stat-row"><b>HP</b><span>${hero.ui?.hp || `${Math.round(hero.maxHp/10)} WRD`}</span></div><div class="detail-stat-row"><b>ATK</b><span>${hero.ui?.atk || 'Variable'}</span></div><div class="detail-stat-row"><b>ROLE</b><span>${hero.desc}</span></div>`;
         const entries = [['ATK','Basic Attack',hero.ui?.atk],['T','Technique',hero.ui?.passive],['E','Ultimate',hero.ui?.super],['G','Utility','Press G to practice the hero utility skill.']];
         document.getElementById('detail-skills-list').innerHTML = entries.map(([key,name,text]) => `<article class="detail-skill"><span>${key}</span><div><strong>${name}</strong><small>${this.strip(text || 'Special technique')}</small></div></article>`).join('');
-        this.training.screen.classList.remove('hidden'); this.training.screen.tabIndex = 0; this.training.screen.focus();
+        this.training.screen.classList.remove('hidden'); this.training.screen.classList.remove('training-mode');
+        this.training.screen.querySelector('.training-zone').classList.add('hidden');
+        this.training.screen.querySelector('#detail-enter-training').classList.remove('hidden');
+        this.training.screen.querySelector('#detail-close').textContent = 'Exit to Hero Select';
+        this.training.screen.tabIndex = 0; this.training.screen.focus();
     }
 
-    closeTraining() { this.training?.screen.classList.add('hidden'); }
+    enterTraining() {
+        if (!this.training?.hero) return;
+        this.training.screen.classList.add('training-mode');
+        this.training.screen.querySelector('.training-zone').classList.remove('hidden');
+        this.training.screen.querySelector('#detail-enter-training').classList.add('hidden');
+        this.training.screen.querySelector('#detail-close').textContent = 'Exit Training';
+        this.training.screen.focus();
+    }
+
+    closeTraining() {
+        if (!this.training?.hero) return;
+        if (this.training.screen.classList.contains('training-mode')) {
+            this.training.screen.classList.remove('training-mode');
+            this.training.screen.querySelector('.training-zone').classList.add('hidden');
+            this.training.screen.querySelector('#detail-enter-training').classList.remove('hidden');
+            this.training.screen.querySelector('#detail-close').textContent = 'Exit to Hero Select';
+            return;
+        }
+        this.training.screen.classList.add('hidden');
+    }
 
     trainingKey(event) {
         if (!this.training?.hero || event.repeat) return;
@@ -260,10 +286,12 @@ class HeroSelectUI {
     trainingAnimate(time) {
         const t = this.training; if (t) {
             const ctx = t.canvas.getContext('2d'), w=t.canvas.width, h=t.canvas.height;
-            ctx.clearRect(0,0,w,h); ctx.fillStyle='#07101b'; ctx.fillRect(0,0,w,h); ctx.fillStyle='#102238'; ctx.fillRect(0,h-110,w,110); ctx.fillStyle='#294968'; ctx.fillRect(0,h-114,w,5);
-            const moving=(t.keys.KeyA?-1:0)+(t.keys.KeyD?1:0); const heroX=250+moving*45+Math.sin(time*.002)*3, ground=h-114;
+            ctx.clearRect(0,0,w,h); ctx.fillStyle='#07101b'; ctx.fillRect(0,0,w,h); ctx.fillStyle='#102238'; ctx.fillRect(0,h-90,w,90); ctx.fillStyle='#294968'; ctx.fillRect(0,h-94,w,5);
+            const moving=(t.keys.KeyA?-1:0)+(t.keys.KeyD?1:0); const heroX=250+moving*45, ground=h-94;
+            // Central floating platform: the dummy and fighter stand above the lower void.
+            ctx.save(); ctx.shadowBlur=18; ctx.shadowColor='#55b7e8'; ctx.fillStyle='#1b3853'; ctx.fillRect(170,ground-18,560,18); ctx.fillStyle='#55b7e8'; ctx.fillRect(170,ground-18,560,4); ctx.fillStyle='#0b1725'; ctx.fillRect(215,ground,470,70); ctx.restore();
             ctx.fillStyle='#192e42'; ctx.fillRect(625,ground-145,100,145); ctx.fillStyle='#bd8d5d'; ctx.fillRect(650,ground-130,48,125); ctx.fillStyle='#f5d5a3'; ctx.beginPath(); ctx.arc(674,ground-155,24,0,Math.PI*2); ctx.fill();
-            ctx.fillStyle='#e33d51'; ctx.fillRect(595,ground-205,160,8); ctx.fillStyle='#5ce08a'; ctx.fillRect(595,ground-205,160*Math.max(0,t.dummyHp/t.dummyMax),8); ctx.fillStyle='#e8edf5'; ctx.font='700 14px monospace'; ctx.fillText(`TRAINING DUMMY ${Math.ceil(t.dummyHp/10)} WRD`,595,ground-220);
+            ctx.fillStyle='#e33d51'; ctx.fillRect(595,ground-205,160,8); ctx.fillStyle='#5ce08a'; ctx.fillRect(595,ground-205,160*Math.max(0,t.dummyHp/t.dummyMax),8); ctx.fillStyle='#e8edf5'; ctx.font='700 14px monospace'; ctx.fillText(`TRAINING DUMMY // ${Math.ceil(t.dummyHp/10)} WRD`,565,ground-220);
             if (t.hero) {
                 ctx.save(); ctx.translate(heroX,ground-10); ctx.scale(1.65,1.65); const fighter=this.getPreviewFighter(t.hero); fighter.x=-fighter.w/2; fighter.y=-fighter.h; fighter.facing=1; this.setPreviewAttackState(fighter,time-t.lastAction<520,time,t.lastAction); fighter.draw(ctx,{revealOwnedKuro:true,previewTarget:{x:300,y:-40,w:1,h:1}}); ctx.restore();
             } else {
@@ -275,6 +303,10 @@ class HeroSelectUI {
     }
 
     onKeyDown(event) {
+        if (this.training?.screen && !this.training.screen.classList.contains('hidden')) {
+            if (event.code === 'Escape') { this.closeTraining(); event.preventDefault(); }
+            return;
+        }
         if (document.getElementById('hero-select-screen')?.classList.contains('hidden')) return;
         const activeP1 = !this.panels.p1.classList.contains('inactive');
         const activeP2 = !this.panels.p2.classList.contains('inactive');
