@@ -414,7 +414,7 @@ var HEROES = {
     },
     Tonia: {
         name: "Tonia", desc: "The Iron Rain",
-        color: "#61706e", maxHp: 700, speed: 4.9, jump: 14, width: 44, height: 70, superCD: 25000,
+        color: "#61706e", maxHp: 700, speed: 4.9, jump: 14, width: 44, height: 70, superCD: 10000,
         ui: { hp: "70 WRD", atk: "0.25 WRD (Held Gatling Fire)", passive: "Hold Attack for rapid suppressive fire. Each bullet builds Heat; at 100 Heat the gun overheats and cannot fire until it cools. Press [Switch] to launch six arcing 1.5 WRD grenades (7s CD).", super: "<span class='skill-tag'>Missile Salvo</span> Clears all Heat and launches three 4 WRD explosive missiles that track for 1.5s before flying straight." }
     },
     Ge: {

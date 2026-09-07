@@ -412,7 +412,7 @@ function loadPhysicsGame(heroName = 'Hunter') {
             Vaeilash: { maxHp: 700, speed: 7.2, jump: 16, width: 36, height: 67, color: '#a71930', superCD: 24000 },
             Dogel: { maxHp: 800, speed: 5.8, jump: 15, width: 42, height: 72, color: '#7c2538', superCD: 26000 },
             Lapis: { maxHp: 650, speed: 5.2, jump: 14.5, width: 40, height: 68, color: '#4066b1', superCD: 24000 },
-            Tonia: { maxHp: 700, speed: 4.9, jump: 14, width: 44, height: 70, color: '#61706e', superCD: 25000 },
+        Tonia: { maxHp: 700, speed: 4.9, jump: 14, width: 44, height: 70, color: '#61706e', superCD: 10000 },
             Ge: { maxHp: 850, speed: 5.5, jump: 15, width: 43, height: 72, color: '#9a6a2f', superCD: 26000 },
             Lak: { maxHp: 1000, speed: 4.2, jump: 13, width: 48, height: 76, color: '#6f6759', superCD: 30000 },
             Pat: { maxHp: 700, speed: 5.2, jump: 14.5, width: 39, height: 69, color: '#a34887', superCD: 28000 },
@@ -3106,6 +3106,7 @@ test('Lapis stones can be destroyed and Sola deflects them back to their caster'
 
 test('Tonia builds Heat with held fire, launches six grenades, and resets with missiles', () => {
     const simulation = loadPhysicsGame('Tonia');
+    assert.equal(simulation.ai.superCooldownMax, 10000);
     const { ai, context } = simulation;
     ai.attackState = 'idle';
     for (let shot = 0; shot < 5; shot++) { ai.toniaFireTimer = 0; ai.fireToniaBullet(); }
