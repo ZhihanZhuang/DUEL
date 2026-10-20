@@ -165,15 +165,24 @@ class Game {
 
     configureArena(arenaId, preserveFighters = true) {
         const oldWorldWidth = CANVAS_W || window.innerWidth;
-        const layout = buildArenaLayout(arenaId, window.innerWidth, window.innerHeight);
+        const onlineView = this.isOnline || this.isSpectator;
+        const viewWidth = onlineView ? 1280 : window.innerWidth;
+        const viewHeight = onlineView ? 720 : window.innerHeight;
+        const layout = buildArenaLayout(onlineView ? (this.onlineArenaId || 'dojo') : arenaId, viewWidth, viewHeight);
         CANVAS_W = layout.worldWidth;
         CANVAS_H = layout.worldHeight;
         GROUND_Y = layout.groundY;
         PLATFORMS = layout.platforms;
         this.activeArenaId = layout.id;
         this.activeArena = layout.arena;
-        this.canvas.width = window.innerWidth;
-        this.canvas.height = window.innerHeight;
+        this.canvas.width = viewWidth;
+        this.canvas.height = viewHeight;
+        if (this.canvas.style) {
+            const scale = Math.min(window.innerWidth / viewWidth, window.innerHeight / viewHeight);
+            this.canvas.style.width = `${viewWidth * scale}px`;
+            this.canvas.style.height = `${viewHeight * scale}px`;
+            this.canvas.style.margin = 'auto';
+        }
 
         if (preserveFighters && this.fighters?.length) {
             const widthRatio = oldWorldWidth > 0 ? CANVAS_W / oldWorldWidth : 1;
@@ -344,6 +353,9 @@ class Game {
 
     startGame(isSinglePlayer, singlePlayerMode = 'duel') {
         this.stopLoop();
+        this.onlineAccumulator = 0;
+        this.onlineStateTimer = 0;
+        this.onlineFrames = [];
         if (this.endGameTimer) clearTimeout(this.endGameTimer);
         this.endGameTimer = null;
         this.releaseAIControls();
@@ -450,6 +462,9 @@ class Game {
 
     startBossGame() {
         this.stopLoop();
+        this.onlineAccumulator = 0;
+        this.onlineStateTimer = 0;
+        this.onlineFrames = [];
         if (this.endGameTimer) clearTimeout(this.endGameTimer);
         this.endGameTimer = null;
         this.releaseAIControls();
@@ -1054,6 +1069,20 @@ class Game {
             let dt = timestamp - this.lastTime;
             this.lastTime = timestamp;
             if (!Number.isFinite(dt) || dt < 0 || dt > 100) dt = 16;
+
+            if (this.isOnline || this.isSpectator) {
+                this.onlineAccumulator = Math.min(100, (this.onlineAccumulator || 0) + dt);
+                const step = 1000 / 60;
+                while (this.onlineAccumulator + 0.0001 >= step) {
+                    this.update(step);
+                    this.onlineAccumulator -= step;
+                    for (const key in keysPressed) delete keysPressed[key];
+                    if (this.state !== 'PLAYING') break;
+                }
+                this.draw();
+                this.scheduleNextFrame(generation);
+                return;
+            }
 
             if (this.hitstop > 0) {
                 this.hitstop -= dt;

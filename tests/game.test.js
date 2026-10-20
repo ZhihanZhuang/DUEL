@@ -489,3 +489,39 @@ test('Boss Mode camera follows a solo player and centers surviving co-op players
     game.updateCamera(1000);
     assert.ok(game.camera.x > 1500 && game.camera.x < 1800);
 });
+
+test('online simulation advances equally at 30, 60 and 144 Hz and consumes input once', () => {
+    for (const hz of [30, 60, 144]) {
+        const { Game, context } = loadGameClass();
+        const game = Object.create(Game.prototype);
+        let updates = 0, presses = 0;
+        Object.assign(game, { state: 'PLAYING', loopGeneration: 1, lastTime: 0, isOnline: true,
+            update(dt) { assert.equal(dt, 1000 / 60); updates++; if (context.keysPressed.Space) presses++; },
+            draw() {}, scheduleNextFrame() {}, handleLoopError(error) { throw error; } });
+        context.keysPressed.Space = true;
+        for (let frame = 1; frame <= hz; frame++) game.loop(frame * 1000 / hz, 1);
+        assert.equal(updates, 60, `${hz} Hz`);
+        assert.equal(presses, 1);
+    }
+});
+
+test('online arena geometry stays fixed across mismatched windows and resizing', () => {
+    const { Game, context } = loadGameClass();
+    context.CANVAS_W = 1280;
+    context.CANVAS_H = 720;
+    context.GROUND_Y = 620;
+    context.PLATFORMS = [];
+    context.buildArenaLayout = (id, w, h) => ({ id, arena: { name: id }, worldWidth: w, worldHeight: h, groundY: h - 100, platforms: [] });
+    const game = Object.create(Game.prototype);
+    Object.assign(game, { isOnline: true, onlineArenaId: 'cliff', camera: { x: 0 }, canvas: { style: {} }, fighters: [{ x: 900, y: 500, w: 40, h: 70 }] });
+    for (const [w, h] of [[1920, 1080], [390, 844], [800, 600]]) {
+        context.window.innerWidth = w; context.window.innerHeight = h;
+        game.configureArena('dojo');
+        assert.equal(context.CANVAS_W, 1280);
+        assert.equal(context.GROUND_Y, 620);
+        assert.equal(game.activeArenaId, 'cliff');
+        assert.equal(game.fighters[0].x, 900);
+        assert.ok(parseFloat(game.canvas.style.width) <= w);
+        assert.ok(parseFloat(game.canvas.style.height) <= h);
+    }
+});

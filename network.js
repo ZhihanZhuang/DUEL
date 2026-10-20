@@ -107,61 +107,85 @@ function setupOnlineControls(game) {
     game.p2.controls = game.netRole === 'host' ? ONLINE_REMOTE_BINDS : p1Binds;
 }
 
-function predictOnlineLocalFighter(game, dt) {
-    const fighter = game?.p2;
-    if (!fighter || fighter.dead || fighter.stunTimer > 0 || fighter.buffs?.dizzy > 0) return;
-    const binds = getOnlineP1Binds();
-    if (!binds) return;
-    fighter.controls = binds;
-
-    let speed = fighter.baseSpeed || 5;
-    if (fighter.buffs?.msBoost > 0) speed *= fighter.heroName === 'Wolf' ? 1.3 : 1.2;
-    if (fighter.heroName === 'Vaeilash' && fighter.vaeilashBloodMoon > 0) speed *= 1.35;
-    if (fighter.heroName === 'Itan' && fighter.buffs?.nuMode > 0) speed *= 1.35;
-    if (fighter.buffs?.slow > 0) speed *= 0.5;
-    if (fighter.buffs?.gravitySlow > 0) speed *= 0.3;
-    if (fighter.buffs?.root > 0) speed = 0;
-
-    let targetVx = 0;
-    if (window.keys[binds.left] && !window.keys[binds.right]) {
-        targetVx = -speed;
-        fighter.facing = -1;
-    } else if (window.keys[binds.right] && !window.keys[binds.left]) {
-        targetVx = speed;
-        fighter.facing = 1;
-    }
-    fighter.vx = (fighter.vx || 0) + (targetVx - (fighter.vx || 0)) * 0.32;
-
-    fighter.x += fighter.vx;
-    const canvasW = typeof CANVAS_W === 'number' ? CANVAS_W : 1280;
-    fighter.x = Math.max(0, Math.min(canvasW - fighter.w, fighter.x));
-}
-
 window.clearOnlineRemoteInputs = clearOnlineRemoteInputs;
 window.setupOnlineControls = setupOnlineControls;
 
 if (window.Game && !window.Game.prototype.socketSyncPatched) {
     const entityClasses = {
-        Particle,
-        SwordShadow,
-        KuroDecoy,
-        UkonShadow,
-        PeachTree,
-        GiantSword,
-        LandMine,
-        Minecart,
-        Hazard,
-        FireDragon,
-        Projectile,
-        GravityWell,
-        ChiqPath,
-        D2FDrone,
-        D2FTargetBeacon,
-        D2FGiantRobot,
-        Minion,
-        Skeleton,
-        Puppet,
-        Hurricane,
+        ...(typeof Fighter !== 'undefined' ? { Fighter } : {}),
+        ...(typeof Entity !== 'undefined' ? { Entity } : {}),
+        ...(typeof Particle !== 'undefined' ? { Particle } : {}),
+        ...(typeof SwordShadow !== 'undefined' ? { SwordShadow } : {}),
+        ...(typeof KuroDecoy !== 'undefined' ? { KuroDecoy } : {}),
+        ...(typeof UkonShadow !== 'undefined' ? { UkonShadow } : {}),
+        ...(typeof PeachTree !== 'undefined' ? { PeachTree } : {}),
+        ...(typeof GiantSword !== 'undefined' ? { GiantSword } : {}),
+        ...(typeof LandMine !== 'undefined' ? { LandMine } : {}),
+        ...(typeof Minecart !== 'undefined' ? { Minecart } : {}),
+        ...(typeof Hazard !== 'undefined' ? { Hazard } : {}),
+        ...(typeof FireDragon !== 'undefined' ? { FireDragon } : {}),
+        ...(typeof Projectile !== 'undefined' ? { Projectile } : {}),
+        ...(typeof TimeAnchor !== 'undefined' ? { TimeAnchor } : {}),
+        ...(typeof TemporalEcho !== 'undefined' ? { TemporalEcho } : {}),
+        ...(typeof HeavensThunder !== 'undefined' ? { HeavensThunder } : {}),
+        ...(typeof LaegonLightning !== 'undefined' ? { LaegonLightning } : {}),
+        ...(typeof LaegonHammerStrike !== 'undefined' ? { LaegonHammerStrike } : {}),
+        ...(typeof LaegonHammer !== 'undefined' ? { LaegonHammer } : {}),
+        ...(typeof BromExplosive !== 'undefined' ? { BromExplosive } : {}),
+        ...(typeof BromBlastCharge !== 'undefined' ? { BromBlastCharge } : {}),
+        ...(typeof BromStickyBomb !== 'undefined' ? { BromStickyBomb } : {}),
+        ...(typeof MechanismNode !== 'undefined' ? { MechanismNode } : {}),
+        ...(typeof MoriEnergyWire !== 'undefined' ? { MoriEnergyWire } : {}),
+        ...(typeof MechanicFanBlade !== 'undefined' ? { MechanicFanBlade } : {}),
+        ...(typeof MoriTrap !== 'undefined' ? { MoriTrap } : {}),
+        ...(typeof ThousandMechanisms !== 'undefined' ? { ThousandMechanisms } : {}),
+        ...(typeof GelannFlameCone !== 'undefined' ? { GelannFlameCone } : {}),
+        ...(typeof GelannArrowRain !== 'undefined' ? { GelannArrowRain } : {}),
+        ...(typeof RokaCannonball !== 'undefined' ? { RokaCannonball } : {}),
+        ...(typeof RokaMortarShell !== 'undefined' ? { RokaMortarShell } : {}),
+        ...(typeof TemporalBolt !== 'undefined' ? { TemporalBolt } : {}),
+        ...(typeof VossTemporalDouble !== 'undefined' ? { VossTemporalDouble } : {}),
+        ...(typeof DemolitionZone !== 'undefined' ? { DemolitionZone } : {}),
+        ...(typeof TitanAxe !== 'undefined' ? { TitanAxe } : {}),
+        ...(typeof GravityWell !== 'undefined' ? { GravityWell } : {}),
+        ...(typeof ChiqPath !== 'undefined' ? { ChiqPath } : {}),
+        ...(typeof D2FDrone !== 'undefined' ? { D2FDrone } : {}),
+        ...(typeof D2FTargetBeacon !== 'undefined' ? { D2FTargetBeacon } : {}),
+        ...(typeof D2FGiantRobot !== 'undefined' ? { D2FGiantRobot } : {}),
+        ...(typeof DogelChainHook !== 'undefined' ? { DogelChainHook } : {}),
+        ...(typeof LapisStone !== 'undefined' ? { LapisStone } : {}),
+        ...(typeof ToniaGrenade !== 'undefined' ? { ToniaGrenade } : {}),
+        ...(typeof ToniaMissile !== 'undefined' ? { ToniaMissile } : {}),
+        ...(typeof BossBase !== 'undefined' ? { BossBase } : {}),
+        ...(typeof BossLaserStrike !== 'undefined' ? { BossLaserStrike } : {}),
+        ...(typeof TyranntBoss !== 'undefined' ? { TyranntBoss } : {}),
+        ...(typeof BossFireDemon !== 'undefined' ? { BossFireDemon } : {}),
+        ...(typeof DragonBoss !== 'undefined' ? { DragonBoss } : {}),
+        ...(typeof BossKnight !== 'undefined' ? { BossKnight } : {}),
+        ...(typeof LibertusBoss !== 'undefined' ? { LibertusBoss } : {}),
+        ...(typeof AbyssTentacle !== 'undefined' ? { AbyssTentacle } : {}),
+        ...(typeof AbyssWave !== 'undefined' ? { AbyssWave } : {}),
+        ...(typeof AbyssBoss !== 'undefined' ? { AbyssBoss } : {}),
+        ...(typeof ChronosShockwave !== 'undefined' ? { ChronosShockwave } : {}),
+        ...(typeof TimeFragment !== 'undefined' ? { TimeFragment } : {}),
+        ...(typeof ChronosBoss !== 'undefined' ? { ChronosBoss } : {}),
+        ...(typeof MortemSkeleton !== 'undefined' ? { MortemSkeleton } : {}),
+        ...(typeof SoulHarvest !== 'undefined' ? { SoulHarvest } : {}),
+        ...(typeof MortemBoss !== 'undefined' ? { MortemBoss } : {}),
+        ...(typeof Minion !== 'undefined' ? { Minion } : {}),
+        ...(typeof Skeleton !== 'undefined' ? { Skeleton } : {}),
+        ...(typeof Puppet !== 'undefined' ? { Puppet } : {}),
+        ...(typeof Hurricane !== 'undefined' ? { Hurricane } : {}),
+        ...(typeof LakEarthWall !== 'undefined' ? { LakEarthWall } : {}),
+        ...(typeof LakShockwave !== 'undefined' ? { LakShockwave } : {}),
+        ...(typeof LakMountainBreaker !== 'undefined' ? { LakMountainBreaker } : {}),
+        ...(typeof PatThread !== 'undefined' ? { PatThread } : {}),
+        ...(typeof PatMarionette !== 'undefined' ? { PatMarionette } : {}),
+        ...(typeof FengQigong !== 'undefined' ? { FengQigong } : {}),
+        ...(typeof FengWindWave !== 'undefined' ? { FengWindWave } : {}),
+        ...(typeof PiashPellet !== 'undefined' ? { PiashPellet } : {}),
+        ...(typeof PiashGrapple !== 'undefined' ? { PiashGrapple } : {}),
+        ...(typeof PiashRopeSwing !== 'undefined' ? { PiashRopeSwing } : {}),
         ...(typeof OcelFeatheredSerpent !== 'undefined' ? { OcelFeatheredSerpent } : {}),
         ...(typeof OcelRitualZone !== 'undefined' ? { OcelRitualZone } : {}),
         ...(typeof OcelFifthSun !== 'undefined' ? { OcelFifthSun } : {}),
@@ -173,89 +197,123 @@ if (window.Game && !window.Game.prototype.socketSyncPatched) {
         ...(typeof HellHand !== 'undefined' ? { HellHand } : {}),
         ...(typeof HellTearEffect !== 'undefined' ? { HellTearEffect } : {}),
         ...(typeof GateOfHell !== 'undefined' ? { GateOfHell } : {}),
-        ...(typeof NerathResurrection !== 'undefined' ? { NerathResurrection } : {})
+        ...(typeof NerathResurrection !== 'undefined' ? { NerathResurrection } : {}),
     };
 
-    const cloneEntity = entity => {
-        if (!entity) return null;
-        const clone = { classType: entity.constructor.name };
-        for (const key in entity) {
-            if (['owner', 'hitTargets', 'grappledBy', 'grappleTarget', 'aiTarget', 'aiBrain', 'controls'].includes(key)) continue;
-            const value = entity[key];
-            if (typeof value !== 'function' && (value === null || typeof value !== 'object')) clone[key] = value;
-            else if (key === 'buffs') clone.buffs = { ...value };
-            else if (Array.isArray(value) && value.every(item => item === null || typeof item !== 'object')) clone[key] = [...value];
-        }
-        if (entity.owner) clone.ownerId = entity.owner.id;
-        return clone;
-    };
-
+    // Preserve shared references and nested attack data without serializing AI brains or controls.
+    const entityIds = new WeakMap();
+    let nextEntityId = 1;
     window.Game.prototype.exportState = function() {
-        return {
-            p1: cloneEntity(this.p1),
-            p2: cloneEntity(this.p2),
-            projectiles: this.projectiles.map(cloneEntity),
-            minions: this.minions.map(cloneEntity),
-            particles: this.particles.slice(-ONLINE_PARTICLE_SNAPSHOT_LIMIT).map(cloneEntity),
-            hazards: this.hazards.map(cloneEntity),
-            hurricane: cloneEntity(this.hurricane),
-            hitstop: this.hitstop,
-            screenShakeTimer: this.screenShakeTimer,
-            screenShakeMagnitude: this.screenShakeMagnitude,
-            camera: { ...(this.camera || { x: 0 }) }
+        const nodes = [];
+        const seen = new Map();
+        const encode = value => {
+            if (value === null || typeof value !== 'object') return value;
+            if (seen.has(value)) return { ref: seen.get(value) };
+            const ref = nodes.length;
+            seen.set(value, ref);
+            const type = Array.isArray(value) ? 'Array' : value.constructor?.name || 'Object';
+            if (!entityIds.has(value)) entityIds.set(value, nextEntityId++);
+            const node = { type, id: entityIds.get(value), data: null };
+            nodes.push(node);
+            if (value instanceof Map) node.data = [...value].map(([k, v]) => [encode(k), encode(v)]);
+            else if (value instanceof Set || Array.isArray(value)) node.data = [...value].map(encode);
+            else {
+                node.data = {};
+                for (const key of Object.keys(value)) {
+                    if (['aiBrain', 'controls', 'hitTargets', 'aiTarget'].includes(key)) continue;
+                    if (typeof value[key] !== 'function') node.data[key] = encode(value[key]);
+                }
+            }
+            return { ref };
         };
+        const root = encode({
+            p1: this.p1, p2: this.p2,
+            projectiles: this.projectiles, minions: this.minions,
+            particles: this.particles.slice(-ONLINE_PARTICLE_SNAPSHOT_LIMIT),
+            hazards: this.hazards, hurricane: this.hurricane,
+            camera: this.camera, hitstop: this.hitstop, screenShakeTimer: this.screenShakeTimer,
+            screenShakeMagnitude: this.screenShakeMagnitude
+        });
+        return { version: 2, nodes, root };
     };
 
     window.Game.prototype.importState = function(state) {
-        if (!state || !this.p1 || !this.p2 || !state.p1 || !state.p2) return;
-        const owners = { p1: this.p1, p2: this.p2 };
-        const hydrate = data => {
-            if (!data) return null;
-            const EntityClass = entityClasses[data.classType];
-            const entity = EntityClass ? Object.create(EntityClass.prototype) : {};
-            Object.assign(entity, data);
-            if (data.ownerId) entity.owner = owners[data.ownerId] || null;
-            if (data.buffs) entity.buffs = { ...data.buffs };
-            return entity;
-        };
-        const mergeFighter = (fighter, data) => {
-            for (const key in data) {
-                if (['classType', 'ownerId', 'controls'].includes(key)) continue;
-                if (key === 'buffs') fighter.buffs = { ...data.buffs };
-                else fighter[key] = data[key];
+        if (state?.version !== 2 || !Array.isArray(state.nodes) || !this.p1 || !this.p2) return;
+        const rootNode = state.nodes[state.root.ref];
+        if (!rootNode?.data?.p1 || !rootNode?.data?.p2) return;
+        const objects = state.nodes.map((node, index) => {
+            if (index === rootNode.data.p1.ref) return this.p1;
+            if (index === rootNode.data.p2.ref) return this.p2;
+            if (node.type === 'Array') return [];
+            if (node.type === 'Map') return new Map();
+            if (node.type === 'Set') return new Set();
+            return Object.create(entityClasses[node.type]?.prototype || Object.prototype);
+        });
+        const decode = value => value && typeof value === 'object' ? objects[value.ref] : value;
+        state.nodes.forEach((node, index) => {
+            const object = objects[index];
+            if (node.type === 'Map') node.data.forEach(([k, v]) => object.set(decode(k), decode(v)));
+            else if (node.type === 'Set') node.data.forEach(value => object.add(decode(value)));
+            else if (node.type === 'Array') node.data.forEach(value => object.push(decode(value)));
+            else {
+                for (const [key, value] of Object.entries(node.data)) {
+                    if (['__proto__', 'constructor', 'prototype', 'controls'].includes(key)) continue;
+                    object[key] = decode(value);
+                }
+                Object.defineProperty(object, 'onlineEntityId', { value: node.id, configurable: true });
             }
-        };
-
-        mergeFighter(this.p1, state.p1);
-        mergeFighter(this.p2, state.p2);
+        });
+        const root = objects[state.root.ref];
+        Object.assign(this, root);
         this.fighters = [this.p1, this.p2];
-        this.projectiles = (state.projectiles || []).map(hydrate);
-        this.minions = (state.minions || []).map(hydrate);
-        this.particles = (state.particles || []).map(hydrate);
-        this.hazards = (state.hazards || []).map(hydrate);
-        this.hurricane = hydrate(state.hurricane);
-        this.hitstop = state.hitstop || 0;
-        this.screenShakeTimer = state.screenShakeTimer || 0;
-        this.screenShakeMagnitude = state.screenShakeMagnitude || 0;
-        if (state.camera) this.camera = { ...this.camera, ...state.camera };
         setupOnlineControls(this);
+    };
+
+    window.Game.prototype.receiveOnlineState = function(state) {
+        if (state?.version !== 2) return;
+        const now = performance.now();
+        this.onlineFrames ||= [];
+        this.onlineFrames.push({ time: now, state });
+        if (this.onlineFrames.length > 8) this.onlineFrames.shift();
+        if (this.onlineFrames.length === 1) this.importState(state);
+    };
+
+    window.Game.prototype.interpolateOnlineState = function() {
+        const frames = this.onlineFrames || [];
+        if (!frames.length) return;
+        // One snapshot of buffering smooths both fighters without speculative combat.
+        const time = performance.now() - ONLINE_STATE_INTERVAL_MS;
+        while (frames.length > 2 && frames[1].time <= time) frames.shift();
+        const a = frames[0], b = frames[1] || a;
+        const alpha = a === b ? 1 : Math.max(0, Math.min(1, (time - a.time) / Math.max(1, b.time - a.time)));
+        this.importState(alpha >= 1 ? b.state : a.state);
+        if (alpha >= 1 || a === b) return;
+        const nextNodes = new Map(b.state.nodes.map(node => [node.id, node]));
+        for (const entity of [this.p1, this.p2, ...this.projectiles, ...this.minions, ...this.particles, ...this.hazards]) {
+            const next = nextNodes.get(entity.onlineEntityId)?.data;
+            if (!next || Math.abs(next.x - entity.x) > 180 || Math.abs(next.y - entity.y) > 180) continue;
+            for (const key of ['x', 'y']) {
+                if (Number.isFinite(entity[key]) && Number.isFinite(next[key])) entity[key] += (next[key] - entity[key]) * alpha;
+            }
+        }
     };
 
     const originalUpdate = window.Game.prototype.update;
     window.Game.prototype.update = function(dt) {
         if (this.isOnline) setupOnlineControls(this);
-        if (this.isOnline && this.netRole === 'client') {
-            window.sendBackendInputs?.(collectLocalOnlineInputs());
-            predictOnlineLocalFighter(this, dt);
+        if (this.isSpectator || (this.isOnline && this.netRole === 'client')) {
+            if (!this.isSpectator) window.sendBackendInputs?.(collectLocalOnlineInputs());
+            this.interpolateOnlineState();
             this.updateUI();
             return;
         }
 
-        originalUpdate.call(this, dt);
+        if (this.isOnline && this.hitstop > 0) this.hitstop = Math.max(0, this.hitstop - dt);
+        else originalUpdate.call(this, dt);
         if (this.isOnline && this.netRole === 'host') {
             this.onlineStateTimer = (this.onlineStateTimer || 0) + dt;
             if (this.onlineStateTimer >= ONLINE_STATE_INTERVAL_MS) {
-                this.onlineStateTimer = 0;
+                this.onlineStateTimer %= ONLINE_STATE_INTERVAL_MS;
                 window.sendBackendState?.(this.exportState());
             }
         }
@@ -266,7 +324,7 @@ if (window.Game && !window.Game.prototype.socketSyncPatched) {
         const wasPlaying = this.state !== 'GAMEOVER';
         originalEndGame.call(this, winnerText);
         if (wasPlaying && this.isOnline && this.netRole === 'host') {
-            window.finishBackendMatch?.(winnerText);
+            window.finishBackendMatch?.(winnerText, this.exportState());
         }
     };
 
@@ -309,3 +367,11 @@ document.getElementById('btn-login').onclick = () => {
 };
 
 updateOnlineHeroLabel();
+
+// Losing keyboard focus must not leave movement or charged attacks held remotely.
+window.addEventListener('blur', () => {
+    if (!window.game?.isOnline) return;
+    for (const key of Object.keys(window.keys)) window.keys[key] = false;
+    for (const key of Object.keys(window.keysPressed)) delete window.keysPressed[key];
+    if (window.game.netRole === 'client') window.sendBackendInputs?.({});
+});

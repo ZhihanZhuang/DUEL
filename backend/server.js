@@ -122,6 +122,7 @@ function matchState(match, role) {
         role,
         status: match.status,
         isPrivate: !!match.isPrivate,
+        arenaId: match.arenaId || 'dojo',
         host: { name: match.hostName, hero: match.hostHero },
         client: match.clientSocket ? { name: match.clientName, hero: match.clientHero } : null
     };
@@ -473,9 +474,11 @@ io.on('connection', (socket) => {
         broadcastQueueStatus();
     });
 
-    socket.on('match:ready', ({ matchId }) => {
+    socket.on('match:ready', ({ matchId, arenaId }) => {
         const match = activeMatches.get(matchId);
         if (!match || match.hostSocket !== socket.id || !match.clientSocket) return;
+        if (match.status !== 'lobby') return;
+        match.arenaId = ['dojo', 'cliff', 'foundry', 'citadel'].includes(arenaId) ? arenaId : 'dojo';
         match.status = 'playing';
         io.to(match.hostSocket).emit('match:start', matchState(match, 'host'));
         io.to(match.clientSocket).emit('match:start', matchState(match, 'client'));
@@ -491,14 +494,14 @@ io.on('connection', (socket) => {
     socket.on('match:state', ({ matchId, state }) => {
         const match = activeMatches.get(matchId);
         if (!match || match.status !== 'playing' || match.hostSocket !== socket.id || !state) return;
-        io.to(match.clientSocket).emit('match:state', { state });
-        io.to(`spectate:${matchId}`).emit('spectate:state', { state });
+        io.to(match.clientSocket).volatile.emit('match:state', { state });
+        io.to(`spectate:${matchId}`).volatile.emit('spectate:state', { state });
     });
 
-    socket.on('match:end', ({ matchId, winnerText }) => {
+    socket.on('match:end', ({ matchId, winnerText, state }) => {
         const match = activeMatches.get(matchId);
         if (!match || match.hostSocket !== socket.id) return;
-        if (match.clientSocket) io.to(match.clientSocket).emit('match:finished', { winnerText });
+        if (match.clientSocket) io.to(match.clientSocket).emit('match:finished', { winnerText, state });
         match.spectators.forEach(sid => io.to(sid).emit('spectate:ended', { matchId }));
         [match.hostSocket, match.clientSocket].filter(Boolean).forEach(socketId => {
             const participant = getUser(socketId);
@@ -521,6 +524,7 @@ io.on('connection', (socket) => {
         socket.join(`spectate:${matchId}`);
         socket.emit('spectate:joined', {
             matchId,
+            arenaId: match.arenaId || 'dojo',
             hostName: match.hostName,
             clientName: match.clientName,
             hostHero: match.hostHero,
@@ -542,6 +546,9 @@ io.on('connection', (socket) => {
     });
 
     socket.on('disconnect', () => {
+        for (const match of activeMatches.values()) {
+            if (match.clientSocket === socket.id) io.to(match.hostSocket).emit('match:input', { inputs: {} });
+        }
         cancelDisconnectCleanup(socket.id);
         disconnectTimers.set(socket.id, setTimeout(() => cleanupSocket(socket.id), DISCONNECT_GRACE_MS));
     });

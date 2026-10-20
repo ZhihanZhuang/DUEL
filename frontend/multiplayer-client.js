@@ -86,10 +86,13 @@ function initMultiplayerClient() {
     mpSocket.on('match:start', startOnlineMatch);
     mpSocket.on('match:input', data => window.applyRemoteOnlineInputs?.(data.inputs));
     mpSocket.on('match:state', data => {
-        if (window.game?.isOnline && window.game.netRole === 'client') window.game.importState?.(data.state);
+        if (window.game?.isOnline && window.game.netRole === 'client') window.game.receiveOnlineState?.(data.state);
     });
     mpSocket.on('match:finished', data => {
-        if (window.game?.isOnline && window.game.netRole === 'client') window.game.endGame(data.winnerText || 'Opponent');
+        if (window.game?.isOnline && window.game.netRole === 'client') {
+            if (data.state) window.game.importState(data.state);
+            window.game.endGame(data.winnerText || 'Opponent');
+        }
         window.currentMatchId = null;
         window.clearOnlineRemoteInputs?.();
     });
@@ -104,7 +107,7 @@ function initMultiplayerClient() {
     mpSocket.on('matches:update', refreshSpectateList);
     mpSocket.on('spectate:joined', enterSpectatorMode);
     mpSocket.on('spectate:state', data => {
-        if (window.game?.isSpectator && data.state) window.game.importState?.(data.state);
+        if (window.game?.isSpectator && data.state) window.game.receiveOnlineState?.(data.state);
     });
     mpSocket.on('spectate:ended', () => {
         if (window.game?.isSpectator) window.game.endGame('Match Ended');
@@ -234,7 +237,7 @@ function showMatchLobby(state, notice = '') {
     const status = document.getElementById('room-status-text');
     const canStart = state.role === 'host' && !!state.client && state.status === 'lobby';
     start.style.display = canStart ? 'inline-block' : 'none';
-    start.onclick = () => mpSocket?.emit('match:ready', { matchId: state.matchId });
+    start.onclick = () => mpSocket?.emit('match:ready', { matchId: state.matchId, arenaId: window.game?.selectedArena });
     if (notice) status.innerText = notice;
     else if (state.status === 'playing') status.innerText = 'Match in progress';
     else if (canStart) status.innerText = 'Both fighters ready';
@@ -249,6 +252,8 @@ function startOnlineMatch(state) {
     window.onlineMatchState = state;
     window.isHost = state.role === 'host';
 
+    window.game.onlineArenaId = state.arenaId || 'dojo';
+    window.clearOnlineRemoteInputs?.();
     window.game.p1Choice = state.host.hero;
     window.game.p2Choice = state.client.hero;
     window.game.isOnline = true;
@@ -376,6 +381,7 @@ function enterSpectatorMode(state) {
     document.getElementById('menu-screen')?.classList.add('hidden');
     document.getElementById('game-ui')?.classList.remove('hidden');
     document.getElementById('spectator-banner')?.classList.remove('hidden');
+    window.game.onlineArenaId = state.arenaId || 'dojo';
     window.game.p1Choice = state.hostHero;
     window.game.p2Choice = state.clientHero;
     window.game.isOnline = false;
@@ -391,11 +397,11 @@ window.sendBackendInputs = inputs => {
     if (mpSocket?.connected && window.currentMatchId) mpSocket.emit('match:input', { matchId: window.currentMatchId, inputs });
 };
 window.sendBackendState = state => {
-    if (mpSocket?.connected && window.currentMatchId) mpSocket.emit('match:state', { matchId: window.currentMatchId, state });
+    if (mpSocket?.connected && window.currentMatchId) mpSocket.volatile.emit('match:state', { matchId: window.currentMatchId, state });
 };
-window.finishBackendMatch = winnerText => {
+window.finishBackendMatch = (winnerText, state) => {
     if (mpSocket?.connected && window.currentMatchId) {
-        mpSocket.emit('match:end', { matchId: window.currentMatchId, winnerText });
+        mpSocket.emit('match:end', { matchId: window.currentMatchId, winnerText, state });
         window.currentMatchId = null;
     }
 };
